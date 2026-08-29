@@ -6,4 +6,5 @@ app_name = "camaras_ia"
 
 urlpatterns = [
     path("eventos/", views.recibir_evento_camara, name="recibir_evento_camara"),
+    path("reglas-activas/", views.obtener_reglas_activas, name="obtener_reglas_activas"),
 ]

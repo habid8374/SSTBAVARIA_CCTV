@@ -25,14 +25,18 @@ que no se mezclan:
   eventos, historial, alertas, dashboard. **Nunca recibe video crudo, solo eventos
   con una foto.**
 
-## Cámara de referencia (pendiente de confirmar en sitio)
+## Cámara de referencia
 
-Hikvision DS-2DE2C400MWG-E — 4MP, PoE, ONVIF/ISAPI/SDK confirmado por el
-fabricante, analítico ACUSENSE Lite (detección de humano/vehículo **por
-movimiento simple, no por zona ni intrusión**). Esto significa que la lógica de
-"¿cayó dentro del polígono restringido?" la resolvemos nosotros en el backend,
-cruzando el evento de movimiento de la cámara contra `ZonaRestringida` — la
-cámara no define zonas internamente.
+Confirmada en sitio: **Dahua PTZ Pico A2** (pendiente documentar specs
+ONVIF/ISAPI exactas del modelo en la visita técnica). Se mantiene el mismo
+supuesto de diseño que con la referencia Hikvision original evaluada antes de
+la confirmación: la detección de movimiento la hace la cámara/equipo local,
+pero **la lógica de "¿cayó dentro del polígono restringido?" la resuelve el
+backend**, cruzando el punto detectado contra `ZonaRestringida` — la cámara
+no define zonas internamente. Esto hace que el backend (Fase 2, ver abajo)
+sea agnóstico a la marca/modelo exacto de cámara: solo necesita un punto
+(x, y) en el mismo sistema de coordenadas del encuadre de referencia usado
+para dibujar el polígono.
 
 ## Proyecto Django
 
@@ -89,11 +93,22 @@ paso de integración posterior — no bloquea arrancar cada uno por su lado:
 ## Fases de entrega (del alcance cotizado al cliente)
 
 1. **Análisis de zonas y reglas** — visita/levantamiento de qué cámara ve qué
-   zona y en qué horario aplica cada alerta. Esta fase es la que arrancamos
-   ahora: modelo de datos + panel de administración para registrar lo que se
-   levante en la visita, todavía sin conexión real a cámaras.
-2. Integración con las cámaras (ONVIF/RTSP reales)
-3. Motor de detección y reglas funcionando end-to-end
+   zona y en qué horario aplica cada alerta. Modelo de datos + panel de
+   administración para registrar lo levantado en la visita. **Completa.**
+2. **Integración con las cámaras (ONVIF/RTSP reales)** — dividida en dos
+   partes que no se mezclan (ver "Qué hace este módulo" arriba):
+   - **Backend en la nube — completa**: `evaluar_zona_horario` (cruce punto
+     detectado + polígono + horario, con ray casting y manejo de horarios
+     que cruzan medianoche), `disparar_alerta` (stub con logging, sin
+     proveedor de WhatsApp/correo real todavía), `recibir_evento_camara`
+     (recibe cámara + punto + snapshot, valida ownership por empresa, crea
+     `EventoDetectado`) y `obtener_reglas_activas` (el equipo local
+     sincroniza cámaras/zonas/reglas activas de su empresa por API key).
+   - **Equipo local en sitio (ONVIF/RTSP/PTZ real contra la Dahua PTZ Pico
+     A2)** — pendiente, es un desarrollo aparte (posiblemente otro repo),
+     no parte de este backend Django.
+3. Motor de detección y reglas funcionando end-to-end (requiere el equipo
+   local de sitio integrado con el backend de arriba)
 4. Panel en el dashboard (zonas dibujadas, tablero de indicadores)
 5. Pruebas en sitio y ajustes de producción
 
