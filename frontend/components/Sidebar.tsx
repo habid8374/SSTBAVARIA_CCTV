@@ -11,22 +11,21 @@ import {
   IconZona,
 } from "./icons";
 
-export type SeccionId = "resumen" | "usuarios";
+export type SeccionId = "tablero" | "camaras" | "zonas" | "alertas" | "usuarios";
 
 type Item = {
   id: SeccionId;
   label: string;
   icon: ComponentType<{ className?: string }>;
   adminOnly?: boolean;
-  disponible?: boolean;
 };
 
 const ITEMS: Item[] = [
-  { id: "resumen", label: "Resumen", icon: IconResumen, disponible: true },
-  { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true, disponible: true },
-  { id: "camaras" as SeccionId, label: "Cámaras", icon: IconCamara, disponible: false },
-  { id: "zonas" as SeccionId, label: "Zonas y horarios", icon: IconZona, disponible: false },
-  { id: "alertas" as SeccionId, label: "Alertas", icon: IconAlerta, disponible: false },
+  { id: "tablero", label: "Tablero", icon: IconResumen },
+  { id: "camaras", label: "Cámaras", icon: IconCamara },
+  { id: "zonas", label: "Zonas y horarios", icon: IconZona },
+  { id: "alertas", label: "Alertas", icon: IconAlerta },
+  { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true },
 ];
 
 type Props = {
@@ -78,20 +77,14 @@ export default function Sidebar({
             <button
               key={item.id}
               type="button"
-              disabled={!item.disponible}
-              onClick={() => item.disponible && onSeleccionar(item.id)}
+              onClick={() => onSeleccionar(item.id)}
               title={colapsado ? item.label : undefined}
               className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
                 activo ? "bg-corp-blue text-white" : "text-white/80 hover:bg-white/10"
-              } ${!item.disponible ? "cursor-not-allowed opacity-40" : ""}`}
+              }`}
             >
               <Icon className="h-5 w-5 shrink-0" />
               {!colapsado && <span className="flex-1 truncate text-left">{item.label}</span>}
-              {!colapsado && !item.disponible && (
-                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
-                  Pronto
-                </span>
-              )}
             </button>
           );
         })}

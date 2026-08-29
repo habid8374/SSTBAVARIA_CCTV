@@ -1,5 +1,6 @@
 import datetime
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -8,6 +9,8 @@ from core.models import Empresa
 
 from .models import Camara, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
 from .services import _regla_vigente, evaluar_zona_horario, punto_en_poligono
+
+Usuario = get_user_model()
 
 CUADRADO = [[0, 0], [10, 0], [10, 10], [0, 10]]
 
@@ -186,3 +189,125 @@ class ObtenerReglasActivasViewTests(TestCase):
         self.zona.save()
         response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
         self.assertEqual(response.data["camaras"][0]["zonas"], [])
+
+
+class DashboardEndpointsTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1", activa=True)
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.regla = ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            destinatario="+573000000000",
+        )
+        self.evento = EventoDetectado.objects.create(
+            camara=self.camara, zona=self.zona, punto_x=5, punto_y=5, disparo_alerta=True
+        )
+
+    def _token(self, user):
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        )
+        return response.data["token"]
+
+    def _auth(self, user):
+        return {"HTTP_AUTHORIZATION": f"Token {self._token(user)}"}
+
+    def test_indicadores(self):
+        response = self.client.get(reverse("camaras_ia:indicadores_dashboard"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["camaras_activas"], 1)
+        self.assertEqual(response.data["camaras_total"], 1)
+        self.assertEqual(response.data["disponibilidad"], 100)
+
+    def test_eventos_por_zona(self):
+        response = self.client.get(reverse("camaras_ia:eventos_por_zona"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [{"zona": "Bodega", "camara": "Cam 1", "total": 1}])
+
+    def test_lista_eventos_y_filtro_estado(self):
+        response = self.client.get(reverse("camaras_ia:eventos_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+        response = self.client.get(
+            reverse("camaras_ia:eventos_lista") + "?estado=revisado", **self._auth(self.operador)
+        )
+        self.assertEqual(len(response.data), 0)
+
+    def test_operador_puede_marcar_evento_revisado(self):
+        url = reverse("camaras_ia:eventos_detalle", args=[self.evento.pk])
+        response = self.client.patch(
+            url, {"estado": "revisado"}, content_type="application/json", **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.evento.refresh_from_db()
+        self.assertEqual(self.evento.estado, "revisado")
+
+    def test_lista_camaras_incluye_ultimo_evento_y_zonas(self):
+        response = self.client.get(reverse("camaras_ia:camaras_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        camara = response.data[0]
+        self.assertEqual(camara["ultimo_evento"]["id"], self.evento.pk)
+        self.assertEqual(len(camara["zonas"]), 1)
+
+    def test_operador_no_puede_crear_zona(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {"camara": self.camara.pk, "nombre": "Nueva", "poligono": CUADRADO},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_operador_puede_listar_zonas(self):
+        response = self.client.get(reverse("camaras_ia:zonas_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+    def test_admin_crea_zona(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {"camara": self.camara.pk, "nombre": "Nueva zona", "poligono": CUADRADO},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(ZonaRestringida.objects.filter(nombre="Nueva zona").exists())
+
+    def test_admin_crea_regla_para_zona(self):
+        response = self.client.post(
+            reverse("camaras_ia:reglas_lista"),
+            {
+                "zona": self.zona.pk,
+                "hora_inicio": "22:00",
+                "hora_fin": "06:00",
+                "dias_semana": [4, 5],
+                "canal_notificacion": "correo",
+                "destinatario": "seguridad@bavaria.com",
+            },
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_operador_no_puede_eliminar_zona(self):
+        url = reverse("camaras_ia:zonas_detalle", args=[self.zona.pk])
+        response = self.client.delete(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_elimina_zona(self):
+        url = reverse("camaras_ia:zonas_detalle", args=[self.zona.pk])
+        response = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(response.status_code, 204)
+
+    def test_sin_autenticar_devuelve_401(self):
+        response = self.client.get(reverse("camaras_ia:indicadores_dashboard"))
+        self.assertEqual(response.status_code, 401)

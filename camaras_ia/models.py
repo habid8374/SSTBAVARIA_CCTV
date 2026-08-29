@@ -19,6 +19,13 @@ class Camara(models.Model):
     usuario_onvif = models.CharField("usuario ONVIF", max_length=100, blank=True)
     password_onvif = models.CharField("contraseña ONVIF", max_length=100, blank=True)
     ubicacion = models.CharField(max_length=255, blank=True, help_text="Descripción del punto donde está instalada")
+    snapshot_referencia = models.ImageField(
+        "snapshot de referencia",
+        upload_to="camaras/referencia",
+        null=True,
+        blank=True,
+        help_text="Encuadre fijo de la cámara sobre el que se dibujan las zonas restringidas",
+    )
     activa = models.BooleanField(default=True)
     creada_en = models.DateTimeField(auto_now_add=True)
 
@@ -127,6 +134,13 @@ class EventoDetectado(models.Model):
     )
     timestamp = models.DateTimeField(auto_now_add=True)
     snapshot = models.ImageField(upload_to=snapshot_upload_to, null=True, blank=True)
+    punto_x = models.FloatField(
+        "punto detectado (x)",
+        null=True,
+        blank=True,
+        help_text="Coordenada del punto reportado por el equipo local, mismo sistema que el polígono de la zona",
+    )
+    punto_y = models.FloatField("punto detectado (y)", null=True, blank=True)
     disparo_alerta = models.BooleanField(default=False)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.NUEVO)
 

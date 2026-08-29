@@ -12,11 +12,12 @@ frontend en Vercel — pero viven en el mismo repositorio.
   equipo local. La conexión ONVIF/RTSP/PTZ real contra las cámaras en sitio
   es un desarrollo aparte del lado del equipo local, no de este backend —
   ver "Qué hace este módulo" en `CLAUDE_CAMARAS.md`.
-- **Dashboard** (login + gestión de usuarios, completo): panel Next.js con
-  login corporativo, navegación por sidebar (sin URLs sueltas por sección) y
-  gestión de usuarios con roles (Administrador/Operador). Las secciones de
-  Cámaras, Zonas y Alertas están en el sidebar como "Pronto" — la Fase 4
-  (dibujar zonas, tablero de indicadores) todavía no se ha construido.
+- **Dashboard** (completo): panel Next.js con login corporativo, navegación
+  por sidebar (sin URLs sueltas por sección) y gestión de usuarios con roles
+  (Administrador/Operador). Incluye ya la Fase 4 (panel en el dashboard):
+  Tablero de indicadores, Cámaras IA con overlays de zona sobre el último
+  snapshot, editor visual de Zonas y horarios (dibujar el polígono haciendo
+  clic sobre el encuadre de referencia), y la bandeja de Alertas.
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 
@@ -111,6 +112,23 @@ curl http://127.0.0.1:8000/api/camaras-ia/reglas-activas/ \
   -H "X-API-Key: <api_key de un EquipoLocal creado en el admin>"
 ```
 
+### Endpoints del dashboard en `camaras_ia` (autenticados por token de usuario)
+
+Todos requieren `Authorization: Token <token>` (el que devuelve el login).
+Zonas y reglas son de solo lectura para Operador — escribir (crear, editar,
+eliminar) requiere rol Administrador.
+
+| Endpoint | Qué hace |
+|---|---|
+| `GET /api/camaras-ia/dashboard/indicadores/` | KPIs del Tablero: cámaras activas/total, alertas hoy, disponibilidad (cámaras activas ÷ total — no es monitoreo de conectividad real) |
+| `GET /api/camaras-ia/dashboard/eventos-por-zona/` | Conteo de eventos de los últimos 7 días agrupados por zona, para el gráfico del Tablero |
+| `GET /api/camaras-ia/dashboard/eventos/` | Bandeja de Alertas; filtros `?estado=&disparo_alerta=&camara=` |
+| `PATCH /api/camaras-ia/dashboard/eventos/<id>/` | Marcar un evento como revisado (o de vuelta a nuevo) |
+| `GET /api/camaras-ia/dashboard/camaras/` | Cámaras con sus zonas y el último evento — usado por Cámaras IA y por el editor de Zonas |
+| `POST /api/camaras-ia/dashboard/camaras/<id>/snapshot-referencia/` | Sube/reemplaza el encuadre fijo sobre el que se dibujan las zonas (multipart, campo `snapshot_referencia`) |
+| `GET/POST /api/camaras-ia/dashboard/zonas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/zonas/<id>/` | CRUD de `ZonaRestringida` — el polígono se dibuja haciendo clic sobre el snapshot de referencia, en las mismas coordenadas de píxel de esa imagen |
+| `GET/POST /api/camaras-ia/dashboard/reglas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/reglas/<id>/` | CRUD de `ReglaAlerta` (horario/días/canal/destinatario) de una zona |
+
 ## Frontend — correr en local
 
 Requiere Node.js 20+. El dashboard es una SPA con sidebar (no hay rutas por
@@ -128,9 +146,18 @@ Abre `http://localhost:3000` (redirige a `/login`). Con el backend corriendo
 en local (`DEBUG=True`), el login ya funciona con el superusuario que hayas
 creado ahí.
 
+- **Secciones del sidebar**: Tablero, Cámaras, Zonas y horarios, Alertas —
+  para todos los roles — y Usuarios, solo para Administrador. Ninguna tiene
+  URL propia; son secciones dentro de `/dashboard` manejadas por estado.
 - **Roles**: el primer usuario (`createsuperuser`) es Administrador y ve la
   sección "Usuarios" en el sidebar; desde ahí crea al resto del equipo con
   su rol (Administrador u Operador) — no hay pantalla de registro público.
+  Operador puede ver todo pero no editar zonas/reglas ni gestionar usuarios.
+- **Editor de zonas**: en "Zonas y horarios", selecciona una cámara, sube su
+  snapshot de referencia si no tiene, y haz clic sobre la imagen para ir
+  agregando los vértices del polígono (mínimo 3). Las coordenadas se
+  guardan en el sistema de píxeles naturales de esa imagen — el mismo que
+  debe usar el equipo local al reportar `punto_x`/`punto_y` de un evento.
 - **Responsive**: sidebar fijo y colapsable en desktop, drawer deslizante en
   móvil/tablet (botón de menú en el header).
 - **PWA**: `manifest.json` + `sw.js` (`frontend/public/`) hacen el dashboard

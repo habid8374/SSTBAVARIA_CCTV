@@ -92,14 +92,24 @@ gestión de usuarios con rol (Administrador/Operador). Sidebar responsive
 Solo hay dos rutas reales (`/login`, `/dashboard`); todo lo demás son
 secciones dentro del sidebar manejadas por estado, no por URL.
 
-**Pendiente** (secciones ya en el sidebar como "Pronto", sin funcionalidad
-todavía — depende de la Fase 4 más abajo):
+También la Fase 4 completa (ver más abajo):
 
-- **Cámaras IA**: alta/edición de cámaras, dibujar zonas restringidas sobre un
-  snapshot de referencia, configurar horarios por zona
-- **Alertas**: bandeja de eventos disparados, con foto y estado
-- **Tablero de indicadores**: cámaras activas, alertas por día, eventos por zona
-  (ver el mockup ya aprobado por el cliente)
+- **Tablero**: KPIs (cámaras activas/total, alertas hoy, disponibilidad) +
+  gráfico de barras de eventos por zona (últimos 7 días).
+- **Cámaras IA**: tarjeta por cámara con el último snapshot, el polígono de
+  su zona dibujado encima (SVG) y un banner verde/rojo según si el último
+  evento disparó alerta — el mismo estilo de las fotos de referencia del
+  cliente (persona detectada en verde, alerta en rojo, zona en amarillo).
+- **Zonas y horarios**: editor visual — seleccionar cámara, subir su
+  snapshot de referencia, dibujar el polígono haciendo clic sobre la imagen
+  (coordenadas en píxeles naturales de esa foto) y configurar sus reglas de
+  horario (días, franja, canal, destinatario) sin tocar el admin de Django.
+- **Alertas**: bandeja de `EventoDetectado` con foto, filtros por
+  estado/disparo de alerta, y marcar revisado.
+
+Operador ve las cuatro secciones pero no puede crear/editar/eliminar zonas
+ni reglas (`EsAdministradorOSoloLectura` en el backend) ni gestionar
+usuarios — solo Administrador.
 
 ## Fases de entrega (del alcance cotizado al cliente)
 
@@ -120,7 +130,10 @@ todavía — depende de la Fase 4 más abajo):
      no parte de este backend Django.
 3. Motor de detección y reglas funcionando end-to-end (requiere el equipo
    local de sitio integrado con el backend de arriba)
-4. Panel en el dashboard (zonas dibujadas, tablero de indicadores)
+4. **Panel en el dashboard (zonas dibujadas, tablero de indicadores) —
+   completo** del lado del dashboard (Tablero, Cámaras IA, Zonas y
+   horarios, Alertas). Sigue pendiente que datos *reales* del equipo local
+   lleguen a poblarlo — hoy se probó con datos de prueba.
 5. Pruebas en sitio y ajustes de producción
 
 No adelantar trabajo de una fase sin cerrar la anterior — el cliente prueba y

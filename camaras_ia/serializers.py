@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Camara, ReglaAlerta, ZonaRestringida
+from .models import Camara, EventoDetectado, ReglaAlerta, ZonaRestringida
 
 
 class EventoEntradaSerializer(serializers.Serializer):
@@ -53,3 +53,102 @@ class CamaraActivaSerializer(serializers.ModelSerializer):
     def get_zonas(self, camara):
         zonas_activas = camara.zonas.filter(activa=True).prefetch_related("reglas")
         return ZonaActivaSerializer(zonas_activas, many=True).data
+
+
+# --- Serializers del dashboard (autenticación por usuario, no API key) ---
+
+
+class ReglaAlertaSerializer(serializers.ModelSerializer):
+    zona_nombre = serializers.CharField(source="zona.nombre", read_only=True)
+
+    class Meta:
+        model = ReglaAlerta
+        fields = [
+            "id",
+            "zona",
+            "zona_nombre",
+            "nombre",
+            "hora_inicio",
+            "hora_fin",
+            "dias_semana",
+            "canal_notificacion",
+            "destinatario",
+            "activa",
+        ]
+
+
+class ZonaDashboardSerializer(serializers.ModelSerializer):
+    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True)
+    reglas = ReglaAlertaSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ZonaRestringida
+        fields = ["id", "camara", "camara_nombre", "nombre", "poligono", "activa", "reglas"]
+
+
+class EventoDashboardSerializer(serializers.ModelSerializer):
+    """Lectura para la bandeja de Alertas; solo `estado` es editable (marcar
+    revisado) — el resto del evento lo escribe recibir_evento_camara."""
+
+    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True)
+    zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
+
+    class Meta:
+        model = EventoDetectado
+        fields = [
+            "id",
+            "camara",
+            "camara_nombre",
+            "zona",
+            "zona_nombre",
+            "timestamp",
+            "snapshot",
+            "punto_x",
+            "punto_y",
+            "disparo_alerta",
+            "estado",
+        ]
+        read_only_fields = [
+            "id",
+            "camara",
+            "camara_nombre",
+            "zona",
+            "zona_nombre",
+            "timestamp",
+            "snapshot",
+            "punto_x",
+            "punto_y",
+            "disparo_alerta",
+        ]
+
+
+class UltimoEventoSerializer(serializers.ModelSerializer):
+    zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
+
+    class Meta:
+        model = EventoDetectado
+        fields = ["id", "zona", "zona_nombre", "timestamp", "snapshot", "punto_x", "punto_y", "disparo_alerta"]
+
+
+class CamaraDashboardSerializer(serializers.ModelSerializer):
+    zonas = ZonaDashboardSerializer(many=True, read_only=True)
+    ultimo_evento = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Camara
+        fields = [
+            "id",
+            "nombre",
+            "ip",
+            "ubicacion",
+            "activa",
+            "snapshot_referencia",
+            "zonas",
+            "ultimo_evento",
+        ]
+
+    def get_ultimo_evento(self, camara):
+        evento = camara.eventos.order_by("-timestamp").first()
+        if not evento:
+            return None
+        return UltimoEventoSerializer(evento, context=self.context).data
