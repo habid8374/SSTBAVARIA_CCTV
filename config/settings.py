@@ -37,6 +37,16 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+# Origen(es) del frontend (Next.js en Vercel) autorizados a llamar esta API.
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+# En local (DEBUG) el frontend corre en localhost:3000 sin configurar nada aparte.
+if DEBUG:
+    CORS_ALLOWED_ORIGINS += ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 if not DEBUG and not ALLOWED_HOSTS:
     # Evita quedar con ALLOWED_HOSTS vacío en producción por falta de config.
     ALLOWED_HOSTS = [".railway.app"]
@@ -52,6 +62,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework.authtoken",
+    "corsheaders",
     "core",
     "camaras_ia",
 ]
@@ -59,6 +71,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -166,6 +179,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Django REST Framework
 
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],

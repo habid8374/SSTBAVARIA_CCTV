@@ -1,4 +1,7 @@
+from django.conf import settings
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class Empresa(models.Model):
@@ -20,3 +23,39 @@ class Empresa(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+class PerfilUsuario(models.Model):
+    """Rol de un usuario del dashboard. Complementa al User de Django."""
+
+    class Rol(models.TextChoices):
+        ADMINISTRADOR = "administrador", "Administrador"
+        OPERADOR = "operador", "Operador"
+
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="perfil"
+    )
+    rol = models.CharField(max_length=20, choices=Rol.choices, default=Rol.OPERADOR)
+
+    class Meta:
+        verbose_name = "perfil de usuario"
+        verbose_name_plural = "perfiles de usuario"
+
+    def __str__(self):
+        return f"{self.usuario.username} ({self.get_rol_display()})"
+
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def crear_perfil_usuario(sender, instance, created, **kwargs):
+    """Todo usuario nuevo recibe un perfil automáticamente: Administrador si
+    se creó como superusuario (ej. createsuperuser), Operador en cualquier
+    otro caso — se puede cambiar después desde la gestión de usuarios."""
+    if created:
+        PerfilUsuario.objects.get_or_create(
+            usuario=instance,
+            defaults={
+                "rol": PerfilUsuario.Rol.ADMINISTRADOR
+                if instance.is_superuser
+                else PerfilUsuario.Rol.OPERADOR
+            },
+        )

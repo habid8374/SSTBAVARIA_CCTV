@@ -1,3 +1,122 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 
-# Create your tests here.
+from .models import PerfilUsuario
+
+Usuario = get_user_model()
+
+
+class PerfilUsuarioSignalTests(TestCase):
+    def test_superusuario_recibe_rol_administrador(self):
+        admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.assertEqual(admin.perfil.rol, PerfilUsuario.Rol.ADMINISTRADOR)
+
+    def test_usuario_normal_recibe_rol_operador(self):
+        user = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.assertEqual(user.perfil.rol, PerfilUsuario.Rol.OPERADOR)
+
+
+class LoginViewTests(TestCase):
+    def setUp(self):
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.url = reverse("core:login")
+
+    def test_login_devuelve_token_y_rol(self):
+        response = self.client.post(
+            self.url, {"username": "admin", "password": "clave12345"}, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("token", response.data)
+        self.assertEqual(response.data["usuario"]["rol"], "administrador")
+
+    def test_login_credenciales_invalidas(self):
+        response = self.client.post(
+            self.url, {"username": "admin", "password": "mala"}, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 401)
+
+
+class UsuarioManagementTests(TestCase):
+    def setUp(self):
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.lista_url = reverse("core:usuarios_lista")
+
+    def _token(self, user):
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        )
+        return response.data["token"]
+
+    def test_operador_no_puede_listar_usuarios(self):
+        token = self._token(self.operador)
+        response = self.client.get(self.lista_url, HTTP_AUTHORIZATION=f"Token {token}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_puede_listar_usuarios(self):
+        token = self._token(self.admin)
+        response = self.client.get(self.lista_url, HTTP_AUTHORIZATION=f"Token {token}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+
+    def test_admin_crea_usuario_operador(self):
+        token = self._token(self.admin)
+        response = self.client.post(
+            self.lista_url,
+            {
+                "username": "nuevo1",
+                "email": "nuevo1@x.com",
+                "password": "otraclave123",
+                "rol": "operador",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        nuevo = Usuario.objects.get(username="nuevo1")
+        self.assertEqual(nuevo.perfil.rol, PerfilUsuario.Rol.OPERADOR)
+        self.assertTrue(nuevo.check_password("otraclave123"))
+
+    def test_admin_cambia_rol_de_usuario(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.operador.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"rol": "administrador"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.operador.refresh_from_db()
+        self.assertEqual(self.operador.perfil.rol, PerfilUsuario.Rol.ADMINISTRADOR)
+
+    def test_admin_no_puede_desactivar_su_propia_cuenta(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.admin.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"is_active": False},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_no_puede_eliminar_su_propia_cuenta(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.admin.pk])
+        response = self.client.delete(detalle_url, HTTP_AUTHORIZATION=f"Token {token}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_elimina_otro_usuario(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.operador.pk])
+        response = self.client.delete(detalle_url, HTTP_AUTHORIZATION=f"Token {token}")
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Usuario.objects.filter(pk=self.operador.pk).exists())
+
+    def test_sin_autenticar_devuelve_401(self):
+        response = self.client.get(self.lista_url)
+        self.assertEqual(response.status_code, 401)

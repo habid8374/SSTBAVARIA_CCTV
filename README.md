@@ -1,6 +1,8 @@
 # SSTBAVARIA_CCTV — Módulo de Videovigilancia con IA
 
-Backend Django (proyecto independiente) del módulo de Cámaras IA.
+Monorepo del módulo de Cámaras IA: backend Django (raíz del repo) + dashboard
+Next.js (`frontend/`). Se despliegan por separado — el backend en Railway, el
+frontend en Vercel — pero viven en el mismo repositorio.
 
 - **Fase 1** (completa): modelo de datos + panel de administración para
   registrar lo levantado en la visita a planta (cámaras, zonas restringidas,
@@ -10,18 +12,26 @@ Backend Django (proyecto independiente) del módulo de Cámaras IA.
   equipo local. La conexión ONVIF/RTSP/PTZ real contra las cámaras en sitio
   es un desarrollo aparte del lado del equipo local, no de este backend —
   ver "Qué hace este módulo" en `CLAUDE_CAMARAS.md`.
+- **Dashboard** (login + gestión de usuarios, completo): panel Next.js con
+  login corporativo, navegación por sidebar (sin URLs sueltas por sección) y
+  gestión de usuarios con roles (Administrador/Operador). Las secciones de
+  Cámaras, Zonas y Alertas están en el sidebar como "Pronto" — la Fase 4
+  (dibujar zonas, tablero de indicadores) todavía no se ha construido.
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 
-## Apps
+## Estructura
 
-- `core/` — modelo `Empresa` (tenant).
+- `core/` — modelo `Empresa` (tenant), autenticación del dashboard (login
+  por token, perfil, gestión de usuarios con rol) — ver endpoints abajo.
 - `camaras_ia/` — modelos `Camara`, `EquipoLocal`, `ZonaRestringida`,
   `ReglaAlerta`, `EventoDetectado`; lógica de negocio en `services.py`
   (`punto_en_poligono`, `evaluar_zona_horario`, `disparar_alerta`); y los
   endpoints de API descritos abajo.
+- `frontend/` — dashboard Next.js (App Router + TypeScript + Tailwind),
+  instalable como PWA. Ver su propia sección más abajo.
 
-## Correr en local
+## Backend — correr en local
 
 Sin `.env`: todo se exporta a mano en la terminal antes de levantar el
 proyecto.
@@ -43,7 +53,27 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Admin en `http://127.0.0.1:8000/admin/`.
+Admin en `http://127.0.0.1:8000/admin/`. En `DEBUG=True` el backend ya
+acepta llamadas CORS desde `http://localhost:3000` (el frontend) sin
+configurar nada más.
+
+### Login del dashboard, perfil y gestión de usuarios
+
+Estos endpoints los usa el frontend — no el equipo local (que usa su propia
+API key, ver más abajo). El primer usuario (`createsuperuser`) recibe
+automáticamente el rol **Administrador**; todo usuario creado después desde
+el dashboard o el admin recibe **Operador** por defecto y el administrador
+le puede cambiar el rol.
+
+- **`POST /api/auth/login/`** — `{"username", "password"}` → `{"token", "usuario"}`.
+- **`POST /api/auth/logout/`** — invalida el token actual (header `Authorization: Token <token>`).
+- **`GET /api/auth/perfil/`** — datos del usuario autenticado (incluye `rol`).
+- **`GET /api/auth/resumen/`** — conteos para la pantalla inicial (cámaras activas, eventos nuevos, alertas hoy).
+- **`GET/POST /api/auth/usuarios/`** y **`GET/PATCH/DELETE /api/auth/usuarios/<id>/`** —
+  gestión de usuarios. Solo Administradores; un usuario no puede desactivarse
+  ni eliminarse a sí mismo.
+
+Todos (salvo login) requieren el header `Authorization: Token <token>`.
 
 ### Endpoints de API (autenticados por API key de `EquipoLocal`)
 
@@ -81,10 +111,39 @@ curl http://127.0.0.1:8000/api/camaras-ia/reglas-activas/ \
   -H "X-API-Key: <api_key de un EquipoLocal creado en el admin>"
 ```
 
-## Desplegar en Railway
+## Frontend — correr en local
+
+Requiere Node.js 20+. El dashboard es una SPA con sidebar (no hay rutas por
+sección: `/login` y `/dashboard` son las únicas dos páginas reales).
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+# .env.local: NEXT_PUBLIC_API_URL=http://127.0.0.1:8000 (o la URL de Railway)
+npm run dev
+```
+
+Abre `http://localhost:3000` (redirige a `/login`). Con el backend corriendo
+en local (`DEBUG=True`), el login ya funciona con el superusuario que hayas
+creado ahí.
+
+- **Roles**: el primer usuario (`createsuperuser`) es Administrador y ve la
+  sección "Usuarios" en el sidebar; desde ahí crea al resto del equipo con
+  su rol (Administrador u Operador) — no hay pantalla de registro público.
+- **Responsive**: sidebar fijo y colapsable en desktop, drawer deslizante en
+  móvil/tablet (botón de menú en el header).
+- **PWA**: `manifest.json` + `sw.js` (`frontend/public/`) hacen el dashboard
+  instalable en el celular ("Agregar a pantalla de inicio" / prompt de
+  instalación de Chrome). El service worker solo cachea páginas y estáticos
+  propios — las llamadas a la API del backend nunca se sirven desde cache,
+  siempre van a la red.
+
+## Desplegar el backend en Railway
 
 1. Crear un proyecto nuevo en Railway (plan Trial para probar) y conectarlo
-   a este repositorio.
+   a este repositorio. **Root Directory**: dejar el default (raíz del repo)
+   — el backend vive ahí, `frontend/` no le afecta.
 2. Agregar un servicio PostgreSQL desde el marketplace de Railway — Railway
    inyecta `DATABASE_URL` automáticamente al servicio web si quedan en el
    mismo proyecto.
@@ -97,6 +156,7 @@ curl http://127.0.0.1:8000/api/camaras-ia/reglas-activas/ \
    | `DEBUG` | `False` |
    | `ALLOWED_HOSTS` | el dominio que asigna Railway, ej. `sstbavaria-cctv-production.up.railway.app` |
    | `CSRF_TRUSTED_ORIGINS` | `https://<mismo-dominio-de-arriba>` |
+   | `CORS_ALLOWED_ORIGINS` | el dominio de Vercel del frontend, ej. `https://sstbavaria-cctv.vercel.app` (agrega también el dominio de preview si lo vas a usar) |
    | `DATABASE_URL` | la inyecta Railway automáticamente al agregar Postgres |
 
 4. Railway detecta `railway.json` (build con Nixpacks) y corre
@@ -110,8 +170,38 @@ curl http://127.0.0.1:8000/api/camaras-ia/reglas-activas/ \
    python manage.py createsuperuser
    ```
 
+   Este es tu único usuario Administrador de arranque — desde el dashboard
+   (sección Usuarios) creas a todo el resto del equipo con su rol.
 6. Entrar a `https://<dominio>/admin/` y cargar ahí las cámaras, zonas y
    reglas levantadas en la visita a planta.
+
+## Desplegar el frontend en Vercel
+
+1. Importar el mismo repositorio de GitHub como un proyecto nuevo en Vercel.
+2. En la configuración del proyecto (**Settings → General → Root
+   Directory**), cambiarlo a `frontend` — es el paso que le dice a Vercel
+   que el Next.js está en un subdirectorio, no en la raíz del repo. Vercel
+   detecta Next.js automáticamente y no hace falta tocar build/install
+   command.
+3. Variables de entorno del proyecto (Settings → Environment Variables):
+
+   | Variable | Valor |
+   |---|---|
+   | `NEXT_PUBLIC_API_URL` | la URL pública del backend en Railway, ej. `https://sstbavaria-cctv-production.up.railway.app` (sin barra al final) |
+
+4. Deploy. Vercel te da un dominio `https://<proyecto>.vercel.app` — ese es
+   el que hay que poner en `CORS_ALLOWED_ORIGINS` y `CSRF_TRUSTED_ORIGINS`
+   del backend en Railway (paso anterior) para que el login funcione en
+   producción. Si luego agregas un dominio propio en Vercel, súmalo también
+   ahí.
+5. Entra a `https://<tu-dominio-vercel>/login` con el superusuario creado en
+   el paso 5 de Railway.
+
+**Orden recomendado**: despliega primero el backend en Railway (para tener
+su dominio), después el frontend en Vercel con `NEXT_PUBLIC_API_URL`
+apuntando a ese dominio, y por último vuelve a Railway a completar
+`CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` con el dominio de Vercel ya
+generado.
 
 ### Nota sobre `media/` (fotos de eventos)
 

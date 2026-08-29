@@ -79,10 +79,21 @@ Proyecto nuevo (no una app dentro de otro proyecto). Apps internas:
 
 ## Frontend / UX
 
-Dashboard propio (Next.js), con el mismo criterio de navegación por sidebar de
-botones (sin rutas separadas) definido en el proyecto principal. Si más adelante
-se decide unificar ambos dashboards en una sola interfaz para el cliente, es un
-paso de integración posterior — no bloquea arrancar cada uno por su lado:
+Dashboard propio (Next.js, en `frontend/` dentro de este mismo repo — no un
+repo aparte), con el mismo criterio de navegación por sidebar de botones
+(sin rutas separadas) definido en el proyecto principal. Si más adelante se
+decide unificar ambos dashboards en una sola interfaz para el cliente, es un
+paso de integración posterior — no bloquea arrancar cada uno por su lado.
+
+**Ya construido**: login corporativo (autenticación real contra usuarios de
+Django, sin registro público — el Administrador crea al resto del equipo) y
+gestión de usuarios con rol (Administrador/Operador). Sidebar responsive
+(colapsa en desktop, drawer en móvil/tablet) y PWA instalable en celular.
+Solo hay dos rutas reales (`/login`, `/dashboard`); todo lo demás son
+secciones dentro del sidebar manejadas por estado, no por URL.
+
+**Pendiente** (secciones ya en el sidebar como "Pronto", sin funcionalidad
+todavía — depende de la Fase 4 más abajo):
 
 - **Cámaras IA**: alta/edición de cámaras, dibujar zonas restringidas sobre un
   snapshot de referencia, configurar horarios por zona
