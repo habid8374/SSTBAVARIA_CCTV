@@ -58,9 +58,8 @@ export default function Sidebar({
       } ${className}`}
     >
       <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-corp-blue text-sm font-bold">
-          SB
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-sstbavaria.png" alt="SST Bavaria" className="h-9 w-9 shrink-0 rounded-lg" />
         {!colapsado && (
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">SST BAVARIA</p>
