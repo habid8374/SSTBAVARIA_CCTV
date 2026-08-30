@@ -27,16 +27,42 @@ que no se mezclan:
 
 ## Cámara de referencia
 
-Confirmada en sitio: **Dahua PTZ Pico A2** (pendiente documentar specs
-ONVIF/ISAPI exactas del modelo en la visita técnica). Se mantiene el mismo
-supuesto de diseño que con la referencia Hikvision original evaluada antes de
-la confirmación: la detección de movimiento la hace la cámara/equipo local,
-pero **la lógica de "¿cayó dentro del polígono restringido?" la resuelve el
-backend**, cruzando el punto detectado contra `ZonaRestringida` — la cámara
-no define zonas internamente. Esto hace que el backend (Fase 2, ver abajo)
-sea agnóstico a la marca/modelo exacto de cámara: solo necesita un punto
-(x, y) en el mismo sistema de coordenadas del encuadre de referencia usado
-para dibujar el polígono.
+Confirmada en sitio: **Dahua Picoo A2** — serie Wi-Fi de consumo/prosumer,
+modelos `DH-P3AE-PV` (3MP) / `DH-P5AE-PV` (5MP), SKU internacional
+`SD2A500HB-GN-AW-PV-S2`. Investigado por Claude (fuentes en el foro
+IPCamTalk y el sitio de Dahua International, agosto 2026 — no es info
+oficial verificada en sitio, confirmar con hardware real):
+
+- Wi-Fi + Ethernet, movimiento motorizado pan/tilt (lente fijo de 4mm, **no
+  es zoom óptico real** pese al nombre "PTZ" usado coloquialmente).
+- Detección de humano/vehículo con IA propia de la cámara ("Smart Dual
+  Light") — coincide con el plan ya documentado de "analítica propia de la
+  cámara o modelo local, según hardware final".
+- **RTSP sí soportado**: puerto 554, formato estándar Dahua
+  `rtsp://usuario:password@IP:554/cam/realmonitor?channel=1&subtype=0`
+  (`subtype=0` = stream principal, `subtype=1` = substream liviano).
+- **ONVIF probablemente NO implementado en la serie Picoo** — consenso de
+  comunidad (no confirmado por Dahua oficialmente); los modelos gemelos de
+  la submarca Imou sí lo traen. Se configura principalmente por la app
+  móvil DMSS (QR + nube P2P), no por un panel web tipo ONVIF/NVR
+  empresarial.
+- **Impacto en Fase 2 (equipo local, fuera de este repo)**: si de verdad no
+  hay ONVIF, el equipo local no puede usar descubrimiento/eventos ONVIF
+  como se asumía originalmente (heredado de la referencia Hikvision
+  evaluada antes de confirmar el modelo real) — tendría que tomar el
+  stream RTSP directo y correr la detección con un modelo propio en el
+  mini-PC del sitio, en vez de recibir eventos nativos de la cámara.
+  **Confirmar con el hardware físico** (ONVIF Device Manager u
+  `onvif-cli` contra la IP real) antes de comprometerse a un enfoque.
+
+Se mantiene el mismo supuesto de diseño de siempre: la detección de
+movimiento la hace la cámara/equipo local, pero **la lógica de "¿cayó
+dentro del polígono restringido?" la resuelve el backend**, cruzando el
+punto detectado contra `ZonaRestringida` — la cámara no define zonas
+internamente. Esto hace que el backend (Fase 2, ver abajo) sea agnóstico a
+la marca/modelo exacto de cámara y al protocolo que use el equipo local
+para capturar el punto: solo necesita un punto (x, y) en el mismo sistema
+de coordenadas del encuadre de referencia usado para dibujar el polígono.
 
 ## Proyecto Django
 
