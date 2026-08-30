@@ -70,7 +70,7 @@ export default function DashboardPage() {
       {seccion === "tablero" && <TableroView token={token} />}
       {seccion === "camaras" && <CamarasView token={token} rol={usuario.rol} />}
       {seccion === "zonas" && <ZonasView token={token} rol={usuario.rol} />}
-      {seccion === "alertas" && <AlertasView token={token} />}
+      {seccion === "alertas" && <AlertasView token={token} rol={usuario.rol} />}
       {seccion === "usuarios" && usuario.rol === "administrador" && (
         <UsuariosView token={token} usuarioActualId={usuario.id} />
       )}

@@ -7,11 +7,60 @@ import {
   listarEventos,
   type EstadoEvento,
   type EventoDashboard,
+  type Rol,
 } from "@/lib/api";
 
-type FiltroDisparo = "todas" | "con_alerta" | "sin_alerta";
+import ConfiguracionAlertasView from "./ConfiguracionAlertasView";
 
-export default function AlertasView({ token }: { token: string }) {
+type FiltroDisparo = "todas" | "con_alerta" | "sin_alerta";
+type Pestana = "bandeja" | "configuracion";
+
+export default function AlertasView({ token, rol }: { token: string; rol: Rol | null }) {
+  const [pestana, setPestana] = useState<Pestana>("bandeja");
+
+  return (
+    <div>
+      <div className="mb-6 flex gap-1 border-b border-corp-border">
+        <BotonPestana activa={pestana === "bandeja"} onClick={() => setPestana("bandeja")}>
+          Bandeja
+        </BotonPestana>
+        <BotonPestana activa={pestana === "configuracion"} onClick={() => setPestana("configuracion")}>
+          Configuración
+        </BotonPestana>
+      </div>
+
+      {pestana === "bandeja" ? (
+        <BandejaAlertas token={token} />
+      ) : (
+        <ConfiguracionAlertasView token={token} rol={rol} />
+      )}
+    </div>
+  );
+}
+
+function BotonPestana({
+  activa,
+  onClick,
+  children,
+}: {
+  activa: boolean;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
+        activa ? "border-corp-blue text-corp-blue" : "border-transparent text-corp-muted hover:text-corp-navy"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function BandejaAlertas({ token }: { token: string }) {
   const [eventos, setEventos] = useState<EventoDashboard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<EstadoEvento | "todos">("todos");
@@ -140,7 +189,11 @@ export default function AlertasView({ token }: { token: string }) {
           </tbody>
         </table>
         {eventos?.length === 0 && (
-          <p className="px-4 py-6 text-center text-sm text-corp-muted">No hay eventos con estos filtros.</p>
+          <p className="px-4 py-6 text-center text-sm text-corp-muted">
+            {filtroEstado === "todos" && filtroDisparo === "todas"
+              ? "Todavía no ha llegado ningún evento — aparecen aquí automáticamente en cuanto una cámara reporte movimiento."
+              : "No hay eventos con estos filtros."}
+          </p>
         )}
       </div>
 
