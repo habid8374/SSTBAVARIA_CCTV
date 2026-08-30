@@ -36,130 +36,195 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-      <FondoAtardecer />
+    <div className="flex min-h-screen flex-col bg-white lg:flex-row">
+      <PanelIlustracion />
 
-      <div className="relative z-10 w-full max-w-sm rounded-3xl border border-white/20 bg-white/10 p-8 shadow-2xl backdrop-blur-xl">
-        <div className="mb-7 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-lg font-bold text-white ring-1 ring-white/30">
-            SB
+      <div className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10">
+        <div className="w-full max-w-sm">
+          <div className="mb-8">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-corp-blue text-sm font-bold text-white">
+              SB
+            </div>
+            <h1 className="text-2xl font-semibold text-corp-navy">Iniciar sesión</h1>
+            <p className="mt-1 text-sm text-corp-muted">SST Bavaria · Módulo de Cámaras IA</p>
           </div>
-          <h1 className="text-2xl font-semibold text-white">Iniciar sesión</h1>
-          <p className="mt-1 text-sm text-white/70">
-            SST Bavaria · Módulo de Cámaras IA
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="username" className="text-sm font-medium text-corp-navy">
+                Usuario
+              </label>
+              <div className="relative">
+                <IconUsuario className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-corp-muted" />
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  required
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="usuario@sstbavaria.com"
+                  className="w-full rounded-lg border border-corp-border py-2.5 pl-10 pr-3 text-sm text-corp-navy outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-sm font-medium text-corp-navy">
+                Contraseña
+              </label>
+              <div className="relative">
+                <IconCandado className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-corp-muted" />
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="••••••••"
+                  className="w-full rounded-lg border border-corp-border py-2.5 pl-10 pr-3 text-sm text-corp-navy outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <label className="flex items-center gap-2 text-corp-muted">
+                <input
+                  type="checkbox"
+                  checked={recordarme}
+                  onChange={(event) => setRecordarme(event.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-corp-border accent-corp-blue"
+                />
+                Recordarme
+              </label>
+              <button
+                type="button"
+                onClick={() => setAvisoClave(true)}
+                className="font-medium text-corp-blue hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+
+            {avisoClave && (
+              <p className="rounded-lg border border-corp-border bg-corp-blue-light px-3 py-2 text-xs text-corp-navy">
+                Contacta a tu administrador para restablecer tu contraseña.
+              </p>
+            )}
+
+            {error && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={cargando}
+              className="w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {cargando ? "Verificando…" : "Entrar"}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-xs text-corp-muted">
+            Acceso exclusivo para personal autorizado.
           </p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <IconUsuario className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-white/60" />
-            <input
-              id="username"
-              name="username"
-              type="text"
-              autoComplete="username"
-              required
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="Usuario"
-              className="w-full rounded-full border border-white/25 bg-white/10 py-3 pl-11 pr-4 text-sm text-white placeholder-white/50 outline-none transition focus:border-white/60 focus:bg-white/15"
-            />
-          </div>
-
-          <div className="relative">
-            <IconCandado className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-white/60" />
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Contraseña"
-              className="w-full rounded-full border border-white/25 bg-white/10 py-3 pl-11 pr-4 text-sm text-white placeholder-white/50 outline-none transition focus:border-white/60 focus:bg-white/15"
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-white/70">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={recordarme}
-                onChange={(event) => setRecordarme(event.target.checked)}
-                className="h-3.5 w-3.5 rounded border-white/40 bg-white/10 accent-white"
-              />
-              Recordarme
-            </label>
-            <button
-              type="button"
-              onClick={() => setAvisoClave(true)}
-              className="font-medium text-white/80 hover:text-white hover:underline"
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
-          </div>
-
-          {avisoClave && (
-            <p className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/80">
-              Contacta a tu administrador para restablecer tu contraseña.
-            </p>
-          )}
-
-          {error && (
-            <div
-              role="alert"
-              className="rounded-xl border border-red-300/40 bg-red-500/20 px-3 py-2 text-sm text-white"
-            >
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={cargando}
-            className="w-full rounded-full bg-white py-3 text-sm font-semibold text-corp-navy shadow-lg transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {cargando ? "Verificando…" : "Entrar"}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-xs text-white/50">
-          Acceso exclusivo para personal autorizado.
-        </p>
       </div>
     </div>
   );
 }
 
-function FondoAtardecer() {
+function PanelIlustracion() {
   return (
-    <div
-      aria-hidden
-      className="absolute inset-0 -z-10"
-      style={{
-        background:
-          "radial-gradient(80% 60% at 50% 10%, var(--color-dusk-3) 0%, transparent 60%), linear-gradient(180deg, var(--color-dusk-1) 0%, var(--color-dusk-2) 45%, var(--color-dusk-3) 75%, var(--color-dusk-4) 100%)",
-      }}
-    >
+    <div className="relative hidden h-56 shrink-0 overflow-hidden bg-corp-navy sm:flex lg:h-auto lg:w-1/2">
       <div
-        className="absolute left-[18%] top-[14%] h-28 w-28 rounded-full opacity-90 blur-[2px] sm:h-36 sm:w-36"
+        aria-hidden
+        className="absolute inset-0"
         style={{
-          background:
-            "radial-gradient(circle at 35% 35%, #fff2d6 0%, var(--color-dusk-4) 55%, transparent 75%)",
+          background: "linear-gradient(160deg, var(--color-corp-navy) 0%, var(--color-corp-navy-deep) 100%)",
         }}
       />
-      <svg
-        viewBox="0 0 1280 400"
-        preserveAspectRatio="none"
-        className="absolute bottom-0 left-0 h-[38%] w-full opacity-90"
-      >
-        <polygon
-          points="0,400 0,220 180,300 340,150 520,260 700,120 900,260 1080,180 1280,280 1280,400"
-          fill="var(--color-corp-navy-deep)"
-        />
-      </svg>
-      <div className="absolute inset-0 bg-black/10" />
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.15]"
+        style={{
+          backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute -left-20 -top-20 h-72 w-72 rounded-full opacity-30 blur-3xl"
+        style={{ background: "var(--color-corp-blue)" }}
+      />
+
+      <div className="relative z-10 flex w-full flex-col justify-between p-8 lg:p-12">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-white ring-1 ring-white/20">
+            SB
+          </div>
+          <span className="text-sm font-semibold tracking-wide text-white">SST BAVARIA</span>
+        </div>
+
+        <EscenaMonitoreo className="mx-auto hidden w-full max-w-sm lg:block" />
+
+        <div className="hidden lg:block">
+          <h2 className="text-2xl font-semibold leading-snug text-white">
+            Videovigilancia con IA para tu planta
+          </h2>
+          <p className="mt-2 max-w-sm text-sm text-white/60">
+            Detección automática de zonas restringidas por horario, con evidencia
+            en tiempo real — las 24 horas, sin turnos de vigilancia manual.
+          </p>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function EscenaMonitoreo({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 360 260" className={className} fill="none">
+      <rect x="20" y="20" width="320" height="200" rx="14" stroke="white" strokeOpacity="0.18" strokeWidth="2" />
+
+      <polygon
+        points="120,70 260,70 280,160 100,160"
+        fill="var(--color-corp-blue)"
+        fillOpacity="0.18"
+        stroke="var(--color-corp-blue)"
+        strokeWidth="2"
+        strokeDasharray="6 5"
+      />
+      <circle cx="120" cy="70" r="3.5" fill="var(--color-corp-blue)" />
+      <circle cx="260" cy="70" r="3.5" fill="var(--color-corp-blue)" />
+      <circle cx="280" cy="160" r="3.5" fill="var(--color-corp-blue)" />
+      <circle cx="100" cy="160" r="3.5" fill="var(--color-corp-blue)" />
+
+      <g transform="translate(175, 105)">
+        <circle cx="10" cy="10" r="9" fill="white" fillOpacity="0.85" />
+        <path d="M0 46c0-12 9-20 20-20s20 8 20 20" fill="white" fillOpacity="0.85" />
+        <rect x="-8" y="-4" width="56" height="52" rx="6" fill="none" stroke="#22c55e" strokeWidth="2" />
+      </g>
+      <rect x="134" y="150" width="130" height="17" rx="8.5" fill="#22c55e" fillOpacity="0.9" />
+      <text x="199" y="161.5" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="var(--color-corp-navy-deep)">
+        PERSONA DETECTADA
+      </text>
+
+      <g transform="translate(160, 4)">
+        <path d="M0 20a20 20 0 0 1 40 0z" fill="white" fillOpacity="0.92" />
+        <rect x="9" y="20" width="22" height="5" rx="2" fill="white" fillOpacity="0.92" />
+        <circle cx="20" cy="15" r="6.5" fill="var(--color-corp-navy)" />
+        <circle cx="20" cy="15" r="2.5" fill="white" fillOpacity="0.7" />
+        <circle cx="35" cy="5" r="3.5" fill="#ef4444" />
+      </g>
+    </svg>
   );
 }
