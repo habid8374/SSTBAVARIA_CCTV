@@ -142,7 +142,7 @@ export default function LoginPage() {
 
 function PanelIlustracion() {
   return (
-    <div className="relative hidden h-56 shrink-0 overflow-hidden bg-corp-navy sm:flex lg:h-auto lg:w-1/2">
+    <div className="relative flex h-48 shrink-0 overflow-hidden bg-corp-navy sm:h-56 lg:h-auto lg:w-1/2">
       <video
         autoPlay
         loop
