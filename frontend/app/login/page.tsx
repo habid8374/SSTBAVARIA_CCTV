@@ -43,9 +43,8 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           <div className="mb-8">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-sstbavaria.png" alt="SST Bavaria" className="mb-3 h-11 w-11 rounded-xl" />
+            <img src="/logo-lockup-light.png" alt="SST Bavaria" className="mb-5 h-28 w-auto" />
             <h1 className="text-2xl font-semibold text-corp-navy">Iniciar sesión</h1>
-            <p className="mt-1 text-sm text-corp-muted">SST Bavaria · Módulo de Cámaras IA</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -144,36 +143,26 @@ export default function LoginPage() {
 function PanelIlustracion() {
   return (
     <div className="relative hidden h-56 shrink-0 overflow-hidden bg-corp-navy sm:flex lg:h-auto lg:w-1/2">
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        poster="/login-poster.jpg"
+        className="absolute inset-0 h-full w-full object-cover"
+      >
+        <source src="/login-animacion.mp4" type="video/mp4" />
+      </video>
+
       <div
         aria-hidden
         className="absolute inset-0"
         style={{
-          background: "linear-gradient(160deg, var(--color-corp-navy) 0%, var(--color-corp-navy-deep) 100%)",
+          background: "linear-gradient(190deg, rgba(11,31,58,0.15) 0%, rgba(6,15,33,0.85) 100%)",
         }}
       />
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute -left-20 -top-20 h-72 w-72 rounded-full opacity-30 blur-3xl"
-        style={{ background: "var(--color-corp-blue)" }}
-      />
 
-      <div className="relative z-10 flex w-full flex-col justify-between p-8 lg:p-12">
-        <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-sstbavaria.png" alt="SST Bavaria" className="h-9 w-9 rounded-lg" />
-          <span className="text-sm font-semibold tracking-wide text-white">SST BAVARIA</span>
-        </div>
-
-        <EscenaMonitoreo className="mx-auto hidden w-full max-w-sm lg:block" />
-
+      <div className="relative z-10 flex w-full flex-col justify-end p-8 lg:p-12">
         <div className="hidden lg:block">
           <h2 className="text-2xl font-semibold leading-snug text-white">
             Videovigilancia con IA para tu planta
@@ -185,44 +174,5 @@ function PanelIlustracion() {
         </div>
       </div>
     </div>
-  );
-}
-
-function EscenaMonitoreo({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 360 260" className={className} fill="none">
-      <rect x="20" y="20" width="320" height="200" rx="14" stroke="white" strokeOpacity="0.18" strokeWidth="2" />
-
-      <polygon
-        points="120,70 260,70 280,160 100,160"
-        fill="var(--color-corp-blue)"
-        fillOpacity="0.18"
-        stroke="var(--color-corp-blue)"
-        strokeWidth="2"
-        strokeDasharray="6 5"
-      />
-      <circle cx="120" cy="70" r="3.5" fill="var(--color-corp-blue)" />
-      <circle cx="260" cy="70" r="3.5" fill="var(--color-corp-blue)" />
-      <circle cx="280" cy="160" r="3.5" fill="var(--color-corp-blue)" />
-      <circle cx="100" cy="160" r="3.5" fill="var(--color-corp-blue)" />
-
-      <g transform="translate(175, 105)">
-        <circle cx="10" cy="10" r="9" fill="white" fillOpacity="0.85" />
-        <path d="M0 46c0-12 9-20 20-20s20 8 20 20" fill="white" fillOpacity="0.85" />
-        <rect x="-8" y="-4" width="56" height="52" rx="6" fill="none" stroke="#22c55e" strokeWidth="2" />
-      </g>
-      <rect x="134" y="150" width="130" height="17" rx="8.5" fill="#22c55e" fillOpacity="0.9" />
-      <text x="199" y="161.5" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="var(--color-corp-navy-deep)">
-        PERSONA DETECTADA
-      </text>
-
-      <g transform="translate(160, 4)">
-        <path d="M0 20a20 20 0 0 1 40 0z" fill="white" fillOpacity="0.92" />
-        <rect x="9" y="20" width="22" height="5" rx="2" fill="white" fillOpacity="0.92" />
-        <circle cx="20" cy="15" r="6.5" fill="var(--color-corp-navy)" />
-        <circle cx="20" cy="15" r="2.5" fill="white" fillOpacity="0.7" />
-        <circle cx="35" cy="5" r="3.5" fill="#ef4444" />
-      </g>
-    </svg>
   );
 }
