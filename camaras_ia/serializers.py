@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from core.models import Empresa
+
 from .models import Camara, EventoDetectado, ReglaAlerta, ZonaRestringida
 
 
@@ -140,6 +142,9 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
             "id",
             "nombre",
             "ip",
+            "puerto_onvif",
+            "usuario_onvif",
+            "password_onvif",
             "ubicacion",
             "activa",
             "snapshot_referencia",
@@ -152,3 +157,29 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
         if not evento:
             return None
         return UltimoEventoSerializer(evento, context=self.context).data
+
+
+class CamaraCrearSerializer(serializers.ModelSerializer):
+    """Alta de una cámara desde el dashboard. La empresa se asigna sola —
+    este panel todavía no tiene gestión de empresas propia; si hace falta
+    una distinta, se ajusta desde el admin de Django (app core)."""
+
+    class Meta:
+        model = Camara
+        fields = [
+            "id",
+            "nombre",
+            "ip",
+            "puerto_onvif",
+            "usuario_onvif",
+            "password_onvif",
+            "ubicacion",
+            "activa",
+        ]
+        read_only_fields = ["id"]
+
+    def create(self, validated_data):
+        empresa = Empresa.objects.first()
+        if empresa is None:
+            empresa = Empresa.objects.create(nombre="Empresa")
+        return Camara.objects.create(empresa=empresa, **validated_data)

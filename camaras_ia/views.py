@@ -13,6 +13,7 @@ from core.permissions import EsAdministrador, EsAdministradorOSoloLectura
 from .models import Camara, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
 from .serializers import (
     CamaraActivaSerializer,
+    CamaraCrearSerializer,
     CamaraDashboardSerializer,
     EventoDashboardSerializer,
     EventoEntradaSerializer,
@@ -183,13 +184,34 @@ class EventoDetalleDashboard(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
 
 
-class CamaraListaDashboard(generics.ListAPIView):
+class CamaraListaDashboard(generics.ListCreateAPIView):
     """Cámaras con sus zonas y el último evento — usado por el Tablero y la
-    vista de Cámaras IA con overlays."""
+    vista de Cámaras IA con overlays. Alta de cámaras nuevas, solo
+    Administrador."""
 
     queryset = Camara.objects.prefetch_related("zonas__reglas", "eventos").order_by("nombre")
+    permission_classes = [EsAdministradorOSoloLectura]
+
+    def get_serializer_class(self):
+        return CamaraCrearSerializer if self.request.method == "POST" else CamaraDashboardSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        camara = serializer.save()
+        return Response(
+            CamaraDashboardSerializer(camara, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CamaraDetalleDashboard(generics.RetrieveUpdateDestroyAPIView):
+    """Editar datos/credenciales ONVIF, activar/desactivar o eliminar una
+    cámara. Solo Administrador puede escribir."""
+
+    queryset = Camara.objects.prefetch_related("zonas__reglas", "eventos")
     serializer_class = CamaraDashboardSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsAdministradorOSoloLectura]
 
 
 @api_view(["POST"])

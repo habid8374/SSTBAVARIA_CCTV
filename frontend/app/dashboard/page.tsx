@@ -68,7 +68,7 @@ export default function DashboardPage() {
       tituloSeccion={TITULOS[seccion]}
     >
       {seccion === "tablero" && <TableroView token={token} />}
-      {seccion === "camaras" && <CamarasView token={token} />}
+      {seccion === "camaras" && <CamarasView token={token} rol={usuario.rol} />}
       {seccion === "zonas" && <ZonasView token={token} rol={usuario.rol} />}
       {seccion === "alertas" && <AlertasView token={token} />}
       {seccion === "usuarios" && usuario.rol === "administrador" && (

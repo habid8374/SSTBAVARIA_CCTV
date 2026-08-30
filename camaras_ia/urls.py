@@ -14,6 +14,7 @@ urlpatterns = [
     path("dashboard/eventos/", views.EventoListaDashboard.as_view(), name="eventos_lista"),
     path("dashboard/eventos/<int:pk>/", views.EventoDetalleDashboard.as_view(), name="eventos_detalle"),
     path("dashboard/camaras/", views.CamaraListaDashboard.as_view(), name="camaras_lista"),
+    path("dashboard/camaras/<int:pk>/", views.CamaraDetalleDashboard.as_view(), name="camaras_detalle"),
     path(
         "dashboard/camaras/<int:pk>/snapshot-referencia/",
         views.subir_snapshot_referencia,

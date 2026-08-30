@@ -215,11 +215,24 @@ export type CamaraDashboard = {
   id: number;
   nombre: string;
   ip: string;
+  puerto_onvif: number;
+  usuario_onvif: string;
+  password_onvif: string;
   ubicacion: string;
   activa: boolean;
   snapshot_referencia: string | null;
   zonas: ZonaDashboard[];
   ultimo_evento: UltimoEvento | null;
+};
+
+export type NuevaCamara = {
+  nombre: string;
+  ip: string;
+  puerto_onvif?: number;
+  usuario_onvif?: string;
+  password_onvif?: string;
+  ubicacion?: string;
+  activa?: boolean;
 };
 
 function authHeaders(token: string) {
@@ -260,6 +273,26 @@ export function actualizarEvento(token: string, id: number, estado: EstadoEvento
 
 export function listarCamarasDashboard(token: string): Promise<CamaraDashboard[]> {
   return request<CamaraDashboard[]>("/api/camaras-ia/dashboard/camaras/", { headers: authHeaders(token) });
+}
+
+export function crearCamara(token: string, datos: NuevaCamara): Promise<CamaraDashboard> {
+  return request<CamaraDashboard>("/api/camaras-ia/dashboard/camaras/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarCamara(
+  token: string,
+  id: number,
+  cambios: Partial<NuevaCamara>
+): Promise<CamaraDashboard> {
+  return request<CamaraDashboard>(`/api/camaras-ia/dashboard/camaras/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
 }
 
 export function subirSnapshotReferencia(

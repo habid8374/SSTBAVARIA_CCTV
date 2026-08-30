@@ -311,3 +311,46 @@ class DashboardEndpointsTests(TestCase):
     def test_sin_autenticar_devuelve_401(self):
         response = self.client.get(reverse("camaras_ia:indicadores_dashboard"))
         self.assertEqual(response.status_code, 401)
+
+    def test_operador_no_puede_crear_camara(self):
+        response = self.client.post(
+            reverse("camaras_ia:camaras_lista"),
+            {"nombre": "Cam nueva", "ip": "10.0.0.9"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_crea_camara_sin_empresa_previa(self):
+        Camara.objects.all().delete()
+        Empresa.objects.all().delete()
+        response = self.client.post(
+            reverse("camaras_ia:camaras_lista"),
+            {"nombre": "Cam nueva", "ip": "10.0.0.9", "ubicacion": "Bodega 2"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        camara = Camara.objects.get(nombre="Cam nueva")
+        self.assertIsNotNone(camara.empresa)
+        self.assertEqual(camara.ip, "10.0.0.9")
+
+    def test_admin_edita_camara(self):
+        url = reverse("camaras_ia:camaras_detalle", args=[self.camara.pk])
+        response = self.client.patch(
+            url,
+            {"ubicacion": "Nueva ubicación", "activa": False},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.camara.refresh_from_db()
+        self.assertEqual(self.camara.ubicacion, "Nueva ubicación")
+        self.assertFalse(self.camara.activa)
+
+    def test_operador_no_puede_editar_camara(self):
+        url = reverse("camaras_ia:camaras_detalle", args=[self.camara.pk])
+        response = self.client.patch(
+            url, {"activa": False}, content_type="application/json", **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
