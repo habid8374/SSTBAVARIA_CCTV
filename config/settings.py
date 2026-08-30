@@ -176,6 +176,32 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
+# Logging: por defecto, con DEBUG=False Django solo intenta mandar los
+# errores 500 por correo (mail_admins) y no los imprime en consola — en un
+# contenedor eso significa que nunca aparecen en los logs de Railway. Los
+# mandamos explícitamente a stdout/stderr para poder diagnosticar.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+
+
 # Django REST Framework
 
 REST_FRAMEWORK = {
