@@ -1,9 +1,11 @@
 import datetime
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from core.models import Empresa
 
@@ -52,6 +54,40 @@ class ActividadMetodoCalculoTests(TestCase):
         self.assertEqual(actividad.riesgo_con, 3)
 
 
+class RadicacionVencimientoTests(TestCase):
+    def setUp(self):
+        empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        contratista = EmpresaContratista.objects.create(empresa=empresa, nombre="SCEPSA")
+        self.trabajador = Trabajador.objects.create(
+            contratista=contratista, nombres="Ana", apellidos="Ríos", documento="123"
+        )
+
+    def test_vencida_true_si_la_fecha_ya_paso(self):
+        radicacion = RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="ENERO",
+            fecha_vencimiento=timezone.localdate() - datetime.timedelta(days=1),
+        )
+        self.assertTrue(radicacion.vencida)
+        self.assertEqual(radicacion.dias_para_vencer, -1)
+
+    def test_vencida_false_si_la_fecha_es_futura(self):
+        radicacion = RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="ENERO",
+            fecha_vencimiento=timezone.localdate() + datetime.timedelta(days=5),
+        )
+        self.assertFalse(radicacion.vencida)
+        self.assertEqual(radicacion.dias_para_vencer, 5)
+
+    def test_sin_fecha_de_vencimiento_no_esta_vencida_ni_tiene_dias(self):
+        radicacion = RadicacionSeguridadSocial.objects.create(trabajador=self.trabajador, anio=2026, mes="ENERO")
+        self.assertFalse(radicacion.vencida)
+        self.assertIsNone(radicacion.dias_para_vencer)
+
+
 class ApiTestsBase(TestCase):
     def setUp(self):
         # El throttle de login cuenta por IP y el test client siempre usa la
@@ -96,6 +132,48 @@ class CatalogosTests(ApiTestsBase):
         self.assertEqual(len(response.data["cursos_safety_academy"]), 7)
         self.assertIn("Trabajos en Altura > 1.8 m", response.data["permisos_trabajo"])
         self.assertEqual(len(response.data["roles_firma"]), 5)
+
+
+class IndicadoresTests(ApiTestsBase):
+    def test_cuenta_vencidas_y_por_vencer(self):
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="ENERO",
+            fecha_vencimiento=timezone.localdate() - datetime.timedelta(days=1),
+        )
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="FEBRERO",
+            fecha_vencimiento=timezone.localdate() + datetime.timedelta(days=5),
+        )
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="MARZO",
+            fecha_vencimiento=timezone.localdate() + datetime.timedelta(days=60),
+        )
+
+        response = self.client.get(reverse("contratistas:indicadores"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["radicaciones_vencidas"], 1)
+        self.assertEqual(response.data["radicaciones_por_vencer"], 1)
+
+    def test_excluye_rechazadas(self):
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="ENERO",
+            fecha_vencimiento=timezone.localdate() - datetime.timedelta(days=1),
+            estado="rechazada",
+        )
+        response = self.client.get(reverse("contratistas:indicadores"), **self._auth(self.operador))
+        self.assertEqual(response.data["radicaciones_vencidas"], 0)
+
+    def test_requiere_autenticacion(self):
+        response = self.client.get(reverse("contratistas:indicadores"))
+        self.assertEqual(response.status_code, 401)
 
 
 class EmpresaContratistaTests(ApiTestsBase):
@@ -199,6 +277,124 @@ class RadicacionSeguridadSocialTests(ApiTestsBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["estado"], "rechazada")
 
+    def test_rechazar_sin_observaciones_devuelve_400(self):
+        radicacion = RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador, anio=2026, mes="AGOSTO"
+        )
+        response = self.client.post(
+            reverse("contratistas:radicaciones_rechazar", args=[radicacion.pk]),
+            {},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+        radicacion.refresh_from_db()
+        self.assertEqual(radicacion.estado, "pendiente")
+
+    def test_aprobar_no_exige_observaciones(self):
+        radicacion = RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador, anio=2026, mes="AGOSTO"
+        )
+        response = self.client.post(
+            reverse("contratistas:radicaciones_aprobar", args=[radicacion.pk]),
+            {},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_aprobar_notifica_al_correo_de_contacto(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        self.contratista.contacto_correo = "contacto@contratista.com"
+        self.contratista.save()
+        radicacion = RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador, anio=2026, mes="AGOSTO"
+        )
+        response = self.client.post(
+            reverse("contratistas:radicaciones_aprobar", args=[radicacion.pk]),
+            {"observaciones": "Todo en orden"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_urlopen.assert_called_once()
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_sin_correo_de_contacto_no_intenta_notificar(self, mock_urlopen):
+        radicacion = RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador, anio=2026, mes="AGOSTO"
+        )
+        response = self.client.post(
+            reverse("contratistas:radicaciones_aprobar", args=[radicacion.pk]),
+            {"observaciones": "Todo en orden"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_urlopen.assert_not_called()
+
+    def test_filtra_por_vencida(self):
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="ENERO",
+            fecha_vencimiento=timezone.localdate() - datetime.timedelta(days=1),
+        )
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="FEBRERO",
+            fecha_vencimiento=timezone.localdate() + datetime.timedelta(days=10),
+        )
+
+        response = self.client.get(
+            reverse("contratistas:radicaciones_lista"), {"vencida": "true"}, **self._auth(self.operador)
+        )
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["mes"], "ENERO")
+
+    def test_exportar_devuelve_xlsx_con_las_filas(self):
+        import openpyxl
+        from io import BytesIO
+
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador, anio=2026, mes="AGOSTO", numero_planilla="94075251"
+        )
+        response = self.client.get(reverse("contratistas:radicaciones_exportar"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        hoja = libro.active
+        filas = list(hoja.iter_rows(values_only=True))
+        self.assertEqual(filas[0][0], "Contratista")  # encabezado
+        self.assertIn("94075251", filas[1])
+
+    def test_exportar_respeta_filtro_de_contratista(self):
+        from io import BytesIO
+
+        import openpyxl
+
+        otro_contratista = EmpresaContratista.objects.create(empresa=self.empresa, nombre="Otra SAS")
+        otro_trabajador = Trabajador.objects.create(
+            contratista=otro_contratista, nombres="X", apellidos="Y", documento="999"
+        )
+        RadicacionSeguridadSocial.objects.create(trabajador=self.trabajador, anio=2026, mes="AGOSTO")
+        RadicacionSeguridadSocial.objects.create(trabajador=otro_trabajador, anio=2026, mes="AGOSTO")
+
+        response = self.client.get(
+            reverse("contratistas:radicaciones_exportar"),
+            {"contratista": self.contratista.pk},
+            **self._auth(self.operador),
+        )
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        filas = list(libro.active.iter_rows(values_only=True))
+        self.assertEqual(len(filas), 2)  # encabezado + 1 fila
+
     def test_requiere_autenticacion(self):
         response = self.client.get(reverse("contratistas:radicaciones_lista"))
         self.assertEqual(response.status_code, 401)
@@ -292,6 +488,126 @@ class DeclaracionMetodoTests(ApiTestsBase):
         declaracion.refresh_from_db()
         self.assertEqual(declaracion.actividades.count(), 1)
         self.assertEqual(declaracion.actividades.first().secuencia, "Actividad nueva")
+
+    def test_aprobar_declaracion_sin_firmas_devuelve_400(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+        declaracion.refresh_from_db()
+        self.assertEqual(declaracion.estado, "borrador")
+
+    def test_aprobar_declaracion_con_firma_permite(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        FirmaMetodo.objects.create(declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana")
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["estado"], "aprobada")
+
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_aprobar_declaracion_notifica_al_contratista(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        self.contratista.contacto_correo = "contacto@contratista.com"
+        self.contratista.save()
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        FirmaMetodo.objects.create(declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana")
+
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_urlopen.assert_called_once()
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_sin_correo_de_contacto_no_intenta_notificar(self, mock_urlopen):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,  # contacto_correo vacío por defecto
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        FirmaMetodo.objects.create(declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana")
+
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_urlopen.assert_not_called()
+
+    def test_editar_sin_cambiar_estado_no_exige_firma(self):
+        """Solo la transición A 'aprobada' exige firma — editar cualquier
+        otro campo (o dejar el estado en borrador) sigue libre."""
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"planta_area": "Cervecería Tocancipá"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_pdf_devuelve_documento(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Ingreso a planta",
+            probabilidad_sin=6,
+            frecuencia_sin=3,
+            impacto_sin=3,
+        )
+        FirmaMetodo.objects.create(declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana")
+
+        response = self.client.get(
+            reverse("contratistas:declaraciones_pdf", args=[declaracion.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_pdf_requiere_autenticacion(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.get(reverse("contratistas:declaraciones_pdf", args=[declaracion.pk]))
+        self.assertEqual(response.status_code, 401)
 
     def test_firmar_declaracion(self):
         declaracion = DeclaracionMetodo.objects.create(

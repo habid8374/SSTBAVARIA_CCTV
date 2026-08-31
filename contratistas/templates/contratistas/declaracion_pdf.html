@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 1.5cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1a1a1a; }
+  h1 { font-size: 15pt; margin: 0 0 2pt 0; color: #0b1f3a; }
+  h2 { font-size: 11pt; margin: 14pt 0 4pt 0; color: #0b1f3a; border-bottom: 1pt solid #cbd5e1; padding-bottom: 2pt; }
+  .subtitulo { font-size: 9pt; color: #555; margin-bottom: 10pt; }
+  table.datos { width: 100%; border-collapse: collapse; margin-bottom: 4pt; }
+  table.datos td { padding: 3pt 6pt; vertical-align: top; border: 0.5pt solid #d4d4d4; }
+  table.datos td.etiqueta { width: 26%; font-weight: bold; background-color: #f1f5f9; }
+  p.descripcion { margin: 4pt 0; }
+  .actividad { border: 0.5pt solid #cbd5e1; padding: 6pt; margin-bottom: 8pt; }
+  .actividad-titulo { font-weight: bold; font-size: 10pt; margin-bottom: 4pt; color: #0b1f3a; }
+  table.eval { width: 48%; border-collapse: collapse; font-size: 8pt; }
+  table.eval.izquierda { float: left; margin-right: 2%; }
+  table.eval.derecha { float: right; }
+  table.eval th { background-color: #f1f5f9; text-align: left; padding: 2pt 4pt; border: 0.5pt solid #d4d4d4; }
+  table.eval td { padding: 2pt 4pt; border: 0.5pt solid #d4d4d4; }
+  .clear { clear: both; }
+  .riesgo { font-weight: bold; padding: 1pt 4pt; }
+  table.firmas { width: 100%; border-collapse: collapse; margin-top: 6pt; }
+  table.firmas th { background-color: #f1f5f9; text-align: left; padding: 3pt 6pt; border: 0.5pt solid #d4d4d4; }
+  table.firmas td { padding: 3pt 6pt; border: 0.5pt solid #d4d4d4; }
+  .permisos { font-size: 8pt; color: #444; margin-top: 4pt; }
+  .sif { font-size: 8pt; font-weight: bold; color: #b91c1c; margin-top: 2pt; }
+</style>
+</head>
+<body>
+  <h1>Declaración de Método y Evaluación de Riesgo</h1>
+  <p class="subtitulo">Método Kinney — Riesgo = Probabilidad &times; Frecuencia &times; Impacto</p>
+
+  <table class="datos">
+    <tr>
+      <td class="etiqueta">Empresa contratista</td><td>{{ declaracion.contratista.nombre }}</td>
+      <td class="etiqueta">Planta / área</td><td>{{ declaracion.planta_area|default:"—" }}</td>
+    </tr>
+    <tr>
+      <td class="etiqueta">Número de pedido</td><td>{{ declaracion.numero_pedido|default:"—" }}</td>
+      <td class="etiqueta">Gerente de proyecto</td><td>{{ declaracion.gerente_proyecto|default:"—" }}</td>
+    </tr>
+    <tr>
+      <td class="etiqueta">Contacto</td><td>{{ declaracion.contacto_nombre|default:"—" }} {{ declaracion.contacto_telefono }}</td>
+      <td class="etiqueta">Fecha de elaboración</td><td>{{ declaracion.fecha_elaboracion|date:"d/m/Y" }}</td>
+    </tr>
+    <tr>
+      <td class="etiqueta">Duración</td><td>{{ declaracion.duracion_dias }} día(s)</td>
+      <td class="etiqueta">Estado</td><td>{{ declaracion.get_estado_display }}</td>
+    </tr>
+  </table>
+
+  <h2>Descripción del trabajo</h2>
+  <p class="descripcion">{{ declaracion.descripcion_trabajo }}</p>
+  {% if declaracion.observaciones %}
+  <p class="descripcion"><strong>Observaciones:</strong> {{ declaracion.observaciones }}</p>
+  {% endif %}
+
+  <h2>Secuencia de actividades y evaluación de riesgo</h2>
+  {% for actividad in actividades %}
+  <div class="actividad">
+    <div class="actividad-titulo">Actividad {{ forloop.counter }}</div>
+    <p><strong>Secuencia:</strong> {{ actividad.secuencia|default:"—" }}</p>
+    {% if actividad.tecnicas_herramientas %}<p><strong>Técnicas / herramientas:</strong> {{ actividad.tecnicas_herramientas }}</p>{% endif %}
+    {% if actividad.descripcion_riesgo %}<p><strong>Riesgo:</strong> {{ actividad.descripcion_riesgo }}</p>{% endif %}
+
+    <table class="eval izquierda">
+      <tr><th colspan="2">Evaluación SIN mitigación</th></tr>
+      <tr><td>Probabilidad</td><td>{{ actividad.probabilidad_sin }}</td></tr>
+      <tr><td>Frecuencia</td><td>{{ actividad.frecuencia_sin }}</td></tr>
+      <tr><td>Impacto</td><td>{{ actividad.impacto_sin }}</td></tr>
+      <tr><td>Riesgo</td><td class="riesgo">{{ actividad.riesgo_sin }} — {{ actividad.nivel_sin }}</td></tr>
+    </table>
+    <table class="eval derecha">
+      <tr><th colspan="2">Evaluación CON mitigación</th></tr>
+      <tr><td>Probabilidad</td><td>{{ actividad.probabilidad_con }}</td></tr>
+      <tr><td>Frecuencia</td><td>{{ actividad.frecuencia_con }}</td></tr>
+      <tr><td>Impacto</td><td>{{ actividad.impacto_con }}</td></tr>
+      <tr><td>Riesgo</td><td class="riesgo">{{ actividad.riesgo_con }} — {{ actividad.nivel_con }}</td></tr>
+    </table>
+    <div class="clear"></div>
+
+    {% if actividad.medidas_mitigacion %}<p><strong>Medidas de mitigación:</strong> {{ actividad.medidas_mitigacion }}</p>{% endif %}
+    {% if actividad.permisos_requeridos %}
+    <p class="permisos"><strong>Permisos requeridos:</strong> {{ actividad.permisos_requeridos|join:", " }}</p>
+    {% endif %}
+    {% if actividad.tarea_sif %}<p class="sif">⚠ Tarea SIF — potencial de lesión seria o fatal</p>{% endif %}
+  </div>
+  {% empty %}
+  <p>No se registraron actividades.</p>
+  {% endfor %}
+
+  <h2>Firmas</h2>
+  <table class="firmas">
+    <tr><th>Rol</th><th>Nombre</th><th>Fecha</th></tr>
+    {% for firma in declaracion.firmas.all %}
+    <tr><td>{{ firma.get_rol_display }}</td><td>{{ firma.nombre_firmante }}</td><td>{{ firma.firmado_en|date:"d/m/Y H:i" }}</td></tr>
+    {% empty %}
+    <tr><td colspan="3">Sin firmas registradas.</td></tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

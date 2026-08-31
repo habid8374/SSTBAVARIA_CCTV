@@ -64,9 +64,12 @@ class EmpresaContratistaCrearSerializer(serializers.ModelSerializer):
 
 
 class RadicacionResumenSerializer(serializers.ModelSerializer):
+    vencida = serializers.BooleanField(read_only=True)
+    dias_para_vencer = serializers.IntegerField(read_only=True, allow_null=True)
+
     class Meta:
         model = RadicacionSeguridadSocial
-        fields = ["id", "anio", "mes", "estado", "fecha_vencimiento"]
+        fields = ["id", "anio", "mes", "estado", "fecha_vencimiento", "vencida", "dias_para_vencer"]
 
 
 class TrabajadorSerializer(serializers.ModelSerializer):
@@ -103,6 +106,8 @@ class TrabajadorSerializer(serializers.ModelSerializer):
 class RadicacionSeguridadSocialSerializer(serializers.ModelSerializer):
     trabajador_nombre = serializers.SerializerMethodField()
     contratista_nombre = serializers.CharField(source="trabajador.contratista.nombre", read_only=True)
+    vencida = serializers.BooleanField(read_only=True)
+    dias_para_vencer = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:
         model = RadicacionSeguridadSocial
@@ -115,6 +120,8 @@ class RadicacionSeguridadSocialSerializer(serializers.ModelSerializer):
             "mes",
             "numero_planilla",
             "fecha_vencimiento",
+            "vencida",
+            "dias_para_vencer",
             "soporte_pago",
             "interventor",
             "estado",
@@ -214,6 +221,15 @@ class DeclaracionMetodoSerializer(serializers.ModelSerializer):
             "firmas",
         ]
         read_only_fields = ["id", "creada_en", "actualizada_en"]
+
+    def validate(self, datos):
+        if datos.get("estado") == DeclaracionMetodo.Estado.APROBADA:
+            tiene_firmas = self.instance is not None and self.instance.firmas.exists()
+            if not tiene_firmas:
+                raise serializers.ValidationError(
+                    {"estado": "No se puede aprobar sin al menos una firma registrada."}
+                )
+        return datos
 
     def create(self, validated_data):
         actividades_data = validated_data.pop("actividades", [])

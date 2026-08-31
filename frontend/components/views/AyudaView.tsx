@@ -216,7 +216,21 @@ const TEMAS: Tema[] = [
         <P>
           Desde el panel de radicaciones de un trabajador, botones <strong>Aprobar</strong>/
           <strong>Rechazar</strong> — piden observaciones (obligatorias al rechazar, opcionales al aprobar) en
-          un cuadro propio de la app, no una ventana del navegador.
+          un cuadro propio de la app, no una ventana del navegador. Al aprobar o rechazar, se le avisa por
+          correo automáticamente al contacto de la empresa contratista (si tiene correo registrado).
+        </P>
+        <Sub>Vencimiento de la seguridad social</Sub>
+        <P>
+          Cada radicación muestra un badge junto a su estado: <strong>Vigente</strong> (verde),{" "}
+          <strong>Vence en N días</strong> (ámbar, a 15 días o menos de vencer) o <strong>Vencida</strong>{" "}
+          (roja). Si hay alguna vencida o por vencer, aparece un aviso arriba de toda la vista de Contratistas
+          con el conteo — para no tener que revisar radicación por radicación.
+        </P>
+        <Sub>Exportar a Excel</Sub>
+        <P>
+          Botón <strong>&quot;Exportar radicaciones (Excel)&quot;</strong> arriba de la vista: descarga todas
+          las radicaciones con contratista, trabajador, planilla, vencimiento y estado — útil para reportes o
+          auditoría fuera de la app.
         </P>
       </>
     ),
@@ -239,6 +253,18 @@ const TEMAS: Tema[] = [
           <li>Firmas por rol (supervisor del contratista, delegado ABI, seguridad de planta, etc.) y estado
             general del documento (borrador / enviada / aprobada / rechazada).</li>
         </Ul>
+        <Sub>Aprobar exige al menos una firma</Sub>
+        <P>
+          El sistema no deja marcar una declaración como &quot;Aprobada&quot; si todavía no tiene ninguna
+          firma registrada — evita aprobar un documento vacío por error.
+        </P>
+        <Sub>Notificación y descarga en PDF</Sub>
+        <P>
+          Al aprobar o rechazar, se le avisa por correo al contacto de la empresa contratista (si tiene correo
+          registrado) — igual que en Contratistas. Botón <strong>&quot;Descargar PDF&quot;</strong> (arriba
+          del formulario, una vez la declaración está guardada) genera el documento completo — datos
+          generales, actividades con su evaluación de riesgo y firmas — listo para archivar o imprimir.
+        </P>
       </>
     ),
   },

@@ -530,6 +530,8 @@ export type RadicacionResumen = {
   mes: string;
   estado: EstadoRadicacion;
   fecha_vencimiento: string | null;
+  vencida: boolean;
+  dias_para_vencer: number | null;
 };
 
 export type Trabajador = {
@@ -600,6 +602,8 @@ export type RadicacionSeguridadSocial = {
   mes: string;
   numero_planilla: string;
   fecha_vencimiento: string | null;
+  vencida: boolean;
+  dias_para_vencer: number | null;
   soporte_pago: string | null;
   interventor: string;
   estado: EstadoRadicacion;
@@ -617,18 +621,64 @@ export type NuevaRadicacion = {
   interventor?: string;
 };
 
-export function listarRadicaciones(
-  token: string,
-  filtros: { trabajador?: number; contratista?: number; estado?: EstadoRadicacion } = {}
-): Promise<RadicacionSeguridadSocial[]> {
+type FiltrosRadicaciones = {
+  trabajador?: number;
+  contratista?: number;
+  estado?: EstadoRadicacion;
+  vencida?: boolean;
+};
+
+function paramsRadicaciones(filtros: FiltrosRadicaciones): URLSearchParams {
   const params = new URLSearchParams();
   if (filtros.trabajador !== undefined) params.set("trabajador", String(filtros.trabajador));
   if (filtros.contratista !== undefined) params.set("contratista", String(filtros.contratista));
   if (filtros.estado) params.set("estado", filtros.estado);
-  const query = params.toString();
+  if (filtros.vencida !== undefined) params.set("vencida", String(filtros.vencida));
+  return params;
+}
+
+export function listarRadicaciones(
+  token: string,
+  filtros: FiltrosRadicaciones = {}
+): Promise<RadicacionSeguridadSocial[]> {
+  const query = paramsRadicaciones(filtros).toString();
   return request<RadicacionSeguridadSocial[]>(`/api/contratistas/radicaciones/${query ? `?${query}` : ""}`, {
     headers: authHeaders(token),
   });
+}
+
+async function descargarArchivo(token: string, ruta: string, nombreArchivo: string): Promise<void> {
+  const respuesta = await fetch(`${API_URL}${ruta}`, { headers: authHeaders(token) });
+  if (!respuesta.ok) {
+    throw new ApiError("No se pudo generar el archivo.", respuesta.status);
+  }
+  const blob = await respuesta.blob();
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function exportarRadicacionesExcel(token: string, filtros: FiltrosRadicaciones = {}): Promise<void> {
+  const query = paramsRadicaciones(filtros).toString();
+  return descargarArchivo(
+    token,
+    `/api/contratistas/radicaciones/exportar/${query ? `?${query}` : ""}`,
+    "radicaciones_seguridad_social.xlsx"
+  );
+}
+
+export type IndicadoresContratistas = {
+  radicaciones_vencidas: number;
+  radicaciones_por_vencer: number;
+};
+
+export function obtenerIndicadoresContratistas(token: string): Promise<IndicadoresContratistas> {
+  return request<IndicadoresContratistas>("/api/contratistas/indicadores/", { headers: authHeaders(token) });
 }
 
 export function crearRadicacion(
@@ -808,4 +858,8 @@ export function firmarDeclaracion(
     headers: authHeaders(token),
     body: JSON.stringify(datos),
   });
+}
+
+export function descargarDeclaracionPdf(token: string, id: number): Promise<void> {
+  return descargarArchivo(token, `/api/contratistas/declaraciones/${id}/pdf/`, `declaracion-metodo-${id}.pdf`);
 }

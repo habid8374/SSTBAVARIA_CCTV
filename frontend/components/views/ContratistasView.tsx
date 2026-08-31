@@ -11,14 +11,17 @@ import {
   crearContratista,
   crearRadicacion,
   crearTrabajador,
+  exportarRadicacionesExcel,
   listarContratistas,
   listarRadicaciones,
   listarTrabajadores,
   obtenerCatalogosContratistas,
+  obtenerIndicadoresContratistas,
   rechazarRadicacion,
   type Catalogos,
   type EmpresaContratista,
   type EstadoRadicacion,
+  type IndicadoresContratistas,
   type NuevaEmpresaContratista,
   type NuevoTrabajador,
   type RadicacionSeguridadSocial,
@@ -41,6 +44,8 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
   const [seleccionada, setSeleccionada] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formulario, setFormulario] = useState<"nueva" | EmpresaContratista | null>(null);
+  const [indicadores, setIndicadores] = useState<IndicadoresContratistas | null>(null);
+  const [exportando, setExportando] = useState(false);
 
   function cargar() {
     listarContratistas(token)
@@ -52,6 +57,22 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
   }
 
   useEffect(cargar, [token]);
+  useEffect(() => {
+    obtenerIndicadoresContratistas(token)
+      .then(setIndicadores)
+      .catch(() => {});
+  }, [token]);
+
+  async function exportar() {
+    setExportando(true);
+    try {
+      await exportarRadicacionesExcel(token);
+    } catch {
+      setError("No se pudo exportar el Excel de radicaciones.");
+    } finally {
+      setExportando(false);
+    }
+  }
 
   const contratista = contratistas?.find((c) => c.id === seleccionada) ?? null;
 
@@ -61,14 +82,43 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
         <p className="text-sm text-corp-muted">
           Empresas contratistas, su personal y la radicación de seguridad social.
         </p>
-        <button
-          type="button"
-          onClick={() => setFormulario("nueva")}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
-        >
-          + Nueva empresa contratista
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={exportar}
+            disabled={exportando}
+            className="rounded-lg border border-corp-border px-4 py-2 text-sm font-semibold text-corp-navy transition hover:border-corp-blue disabled:opacity-60"
+          >
+            {exportando ? "Exportando…" : "Exportar radicaciones (Excel)"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFormulario("nueva")}
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          >
+            + Nueva empresa contratista
+          </button>
+        </div>
       </div>
+
+      {indicadores && (indicadores.radicaciones_vencidas > 0 || indicadores.radicaciones_por_vencer > 0) && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {indicadores.radicaciones_vencidas > 0 && (
+            <p>
+              ⚠ <strong>{indicadores.radicaciones_vencidas}</strong> radicación
+              {indicadores.radicaciones_vencidas === 1 ? "" : "es"} de seguridad social{" "}
+              <strong>vencida{indicadores.radicaciones_vencidas === 1 ? "" : "s"}</strong>.
+            </p>
+          )}
+          {indicadores.radicaciones_por_vencer > 0 && (
+            <p>
+              {indicadores.radicaciones_vencidas > 0 && <br />}
+              <strong>{indicadores.radicaciones_por_vencer}</strong> radicación
+              {indicadores.radicaciones_por_vencer === 1 ? "" : "es"} por vencer en los próximos 15 días.
+            </p>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -159,6 +209,21 @@ function EstadoBadge({ estado }: { estado?: EstadoRadicacion }) {
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estilos[estado]}`}>{etiquetas[estado]}</span>
   );
+}
+
+function VencimientoBadge({ radicacion }: { radicacion: RadicacionSeguridadSocial }) {
+  if (!radicacion.fecha_vencimiento) return null;
+  if (radicacion.vencida) {
+    return <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">Vencida</span>;
+  }
+  if (radicacion.dias_para_vencer !== null && radicacion.dias_para_vencer <= 15) {
+    return (
+      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+        Vence en {radicacion.dias_para_vencer} día{radicacion.dias_para_vencer === 1 ? "" : "s"}
+      </span>
+    );
+  }
+  return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Vigente</span>;
 }
 
 function PanelContratista({
@@ -388,6 +453,7 @@ function PanelRadicaciones({ token, trabajador }: { token: string; trabajador: T
               {r.observaciones && <p className="mt-1 text-xs text-corp-muted">{r.observaciones}</p>}
             </div>
             <div className="flex shrink-0 items-center gap-3">
+              <VencimientoBadge radicacion={r} />
               <EstadoBadge estado={r.estado} />
               {r.estado === "pendiente" && (
                 <>

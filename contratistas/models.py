@@ -1,5 +1,6 @@
 from django.core.validators import FileExtensionValidator
 from django.db import models
+from django.utils import timezone
 
 from core.models import Empresa
 from core.validators import validar_tamano_archivo
@@ -114,6 +115,23 @@ class RadicacionSeguridadSocial(models.Model):
 
     def __str__(self):
         return f"{self.trabajador} — {self.mes} {self.anio}"
+
+    @property
+    def vencida(self):
+        """True si la planilla ya pasó su fecha de vencimiento — nada la
+        marca sola en la base, se calcula al vuelo contra la fecha de hoy."""
+        return bool(self.fecha_vencimiento and self.fecha_vencimiento < timezone.localdate())
+
+    @property
+    def dias_para_vencer(self):
+        """Días que faltan para vencer (negativo si ya venció). None si no
+        tiene fecha de vencimiento registrada."""
+        if not self.fecha_vencimiento:
+            return None
+        return (self.fecha_vencimiento - timezone.localdate()).days
+
+
+DIAS_ALERTA_VENCIMIENTO = 15  # a cuántos días de vencer se considera "por vencer" en los indicadores
 
 
 class DeclaracionMetodo(models.Model):

@@ -6,6 +6,7 @@ import {
   ApiError,
   actualizarDeclaracion,
   crearDeclaracion,
+  descargarDeclaracionPdf,
   firmarDeclaracion,
   listarContratistas,
   listarDeclaraciones,
@@ -271,6 +272,19 @@ function FormularioDeclaracion({
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
+
+  async function descargarPdf() {
+    if (!declaracion) return;
+    setDescargandoPdf(true);
+    try {
+      await descargarDeclaracionPdf(token, declaracion.id);
+    } catch {
+      setError("No se pudo descargar el PDF.");
+    } finally {
+      setDescargandoPdf(false);
+    }
+  }
 
   function actualizarActividad(indice: number, cambios: Partial<ActividadForm>) {
     setActividades((actual) => actual.map((a, i) => (i === indice ? { ...a, ...cambios } : a)));
@@ -345,9 +359,21 @@ function FormularioDeclaracion({
 
   return (
     <div>
-      <button type="button" onClick={onVolver} className="text-sm font-medium text-corp-blue hover:underline">
-        ← Volver a la lista
-      </button>
+      <div className="flex items-center justify-between">
+        <button type="button" onClick={onVolver} className="text-sm font-medium text-corp-blue hover:underline">
+          ← Volver a la lista
+        </button>
+        {declaracion && (
+          <button
+            type="button"
+            onClick={descargarPdf}
+            disabled={descargandoPdf}
+            className="rounded-lg border border-corp-border px-3 py-1.5 text-xs font-semibold text-corp-navy transition hover:border-corp-blue disabled:opacity-60"
+          >
+            {descargandoPdf ? "Generando…" : "Descargar PDF"}
+          </button>
+        )}
+      </div>
 
       <form onSubmit={guardar} className="mt-4 space-y-6">
         <div className="rounded-2xl border border-corp-border bg-white p-5">

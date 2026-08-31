@@ -30,6 +30,13 @@ frontend en Vercel — pero viven en el mismo repositorio.
     (R = Probabilidad × Frecuencia × Impacto, antes y después de mitigación),
     permisos de trabajo requeridos y firmas de aprobación — basado en el
     formato real `REG.MAZ.SAFE.2.5.2` que ya usa el cliente.
+  - Ambos módulos, además: vencimiento de la planilla PILA visible con
+    badge (Vigente/Por vencer/Vencida) y banner de aviso agregado; correo
+    automático (Brevo) al contacto de la empresa contratista al
+    aprobar/rechazar una radicación o una declaración de método; no se
+    puede aprobar una declaración sin al menos una firma registrada;
+    exportación a Excel de las radicaciones (`openpyxl`) y a PDF de la
+    declaración de método completa (`xhtml2pdf`).
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 
