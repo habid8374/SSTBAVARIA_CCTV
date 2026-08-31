@@ -268,7 +268,7 @@ const TEMAS: Tema[] = [
           <li><strong>Vigencia</strong> (fecha desde/hasta) y <strong>horario</strong> (hora desde/hasta) del
             ingreso autorizado.</li>
           <li><strong>Sitio de encuentro en caso de emergencia</strong> y datos del{" "}
-            <strong>responsable SISO del grupo</strong> (nombre y teléfono).</li>
+            <strong>responsable SISO del grupo</strong> (nombre, cargo y teléfono).</li>
           <li>Estado del documento (borrador / enviada / aprobada / rechazada), igual que en Declaración de
             Método.</li>
         </Ul>
@@ -283,6 +283,15 @@ const TEMAS: Tema[] = [
           El badge &quot;Vigente&quot;/&quot;Fuera de vigencia&quot; en la lista se calcula al vuelo contra la
           fecha de hoy, comparándola con el rango de vigencia — no hay que actualizarlo a mano.
         </Nota>
+        <Sub>Descargar PDF</Sub>
+        <P>
+          Botón <strong>&quot;Descargar PDF&quot;</strong> (arriba del formulario, una vez la autorización está
+          guardada) genera el documento con el mismo formato del &quot;AUTORIZACION DE INGRESO PERSONAL
+          CONTRATISTA — INCLUSIONES/EXCLUSIONES&quot; físico de la planta: encabezado con el código del
+          documento, datos generales, la tabla de trabajadores incluidos (con EPS/ARL/AFP y fecha de inicio de
+          contrato) y la de excluidos (con motivo), y las líneas en blanco para firma y sello de la empresa
+          contratista y del interventor — listo para imprimir y archivar junto con los demás soportes.
+        </P>
       </>
     ),
   },

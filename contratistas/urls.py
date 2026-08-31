@@ -39,4 +39,9 @@ urlpatterns = [
         views.AutorizacionIngresoDetalle.as_view(),
         name="autorizaciones_ingreso_detalle",
     ),
+    path(
+        "autorizaciones-ingreso/<int:pk>/pdf/",
+        views.autorizacion_ingreso_pdf,
+        name="autorizaciones_ingreso_pdf",
+    ),
 ]

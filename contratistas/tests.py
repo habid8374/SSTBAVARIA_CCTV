@@ -1265,3 +1265,17 @@ class AutorizacionIngresoTests(ApiTestsBase):
         )
         registro = RegistroAuditoria.objects.filter(modelo="AutorizacionIngreso", accion="creado").latest("fecha")
         self.assertEqual(registro.usuario, self.operador)
+
+    def test_descargar_pdf_con_inclusiones_y_exclusiones(self):
+        response = self.client.post(
+            reverse("contratistas:autorizaciones_ingreso_lista"),
+            self._payload(responsable_siso_cargo="Coordinadora SISO"),
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        autorizacion_id = response.data["id"]
+        url = reverse("contratistas:autorizaciones_ingreso_pdf", args=[autorizacion_id])
+        respuesta = self.client.get(url, **self._auth(self.operador))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta["Content-Type"], "application/pdf")
+        self.assertGreater(len(respuesta.content), 500)

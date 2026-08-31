@@ -7,6 +7,7 @@ import {
   ApiError,
   actualizarAutorizacionIngreso,
   crearAutorizacionIngreso,
+  descargarAutorizacionIngresoPdf,
   eliminarAutorizacionIngreso,
   listarAutorizacionesIngreso,
   listarContratistas,
@@ -226,6 +227,7 @@ function FormularioAutorizacion({
   const [areaTrabajo, setAreaTrabajo] = useState(autorizacionInicial?.area_trabajo ?? "");
   const [sitioEmergencia, setSitioEmergencia] = useState(autorizacionInicial?.sitio_encuentro_emergencia ?? "");
   const [responsableNombre, setResponsableNombre] = useState(autorizacionInicial?.responsable_siso_nombre ?? "");
+  const [responsableCargo, setResponsableCargo] = useState(autorizacionInicial?.responsable_siso_cargo ?? "");
   const [responsableTelefono, setResponsableTelefono] = useState(
     autorizacionInicial?.responsable_siso_telefono ?? ""
   );
@@ -238,6 +240,19 @@ function FormularioAutorizacion({
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
+
+  async function descargarPdf() {
+    if (!autorizacion) return;
+    setDescargandoPdf(true);
+    try {
+      await descargarAutorizacionIngresoPdf(token, autorizacion.id);
+    } catch {
+      setError("No se pudo descargar el PDF.");
+    } finally {
+      setDescargandoPdf(false);
+    }
+  }
 
   useEffect(() => {
     if (!contratistaId) return;
@@ -277,6 +292,7 @@ function FormularioAutorizacion({
       area_trabajo: areaTrabajo,
       sitio_encuentro_emergencia: sitioEmergencia,
       responsable_siso_nombre: responsableNombre,
+      responsable_siso_cargo: responsableCargo,
       responsable_siso_telefono: responsableTelefono,
       estado,
       observaciones,
@@ -302,9 +318,21 @@ function FormularioAutorizacion({
 
   return (
     <div>
-      <button type="button" onClick={onVolver} className="text-sm font-medium text-corp-blue hover:underline">
-        ← Volver a la lista
-      </button>
+      <div className="flex items-center justify-between">
+        <button type="button" onClick={onVolver} className="text-sm font-medium text-corp-blue hover:underline">
+          ← Volver a la lista
+        </button>
+        {autorizacion && (
+          <button
+            type="button"
+            onClick={descargarPdf}
+            disabled={descargandoPdf}
+            className="rounded-lg border border-corp-border px-3 py-1.5 text-xs font-semibold text-corp-navy transition hover:border-corp-blue disabled:opacity-60"
+          >
+            {descargandoPdf ? "Generando…" : "Descargar PDF"}
+          </button>
+        )}
+      </div>
 
       <form onSubmit={guardar} className="mt-4 space-y-6">
         <div className="rounded-2xl border border-corp-border bg-white p-5">
@@ -351,6 +379,9 @@ function FormularioAutorizacion({
             </Campo>
             <Campo label="Responsable SISO del grupo — nombre">
               <input required value={responsableNombre} onChange={(e) => setResponsableNombre(e.target.value)} className={INPUT} />
+            </Campo>
+            <Campo label="Responsable SISO del grupo — cargo">
+              <input value={responsableCargo} onChange={(e) => setResponsableCargo(e.target.value)} className={INPUT} />
             </Campo>
             <Campo label="Responsable SISO del grupo — teléfono">
               <input value={responsableTelefono} onChange={(e) => setResponsableTelefono(e.target.value)} className={INPUT} />

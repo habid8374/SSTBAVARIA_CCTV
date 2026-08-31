@@ -533,6 +533,7 @@ class AutorizacionIngreso(models.Model):
         "sitio de encuentro en caso de emergencia", max_length=200, blank=True
     )
     responsable_siso_nombre = models.CharField("responsable SISO del grupo", max_length=150)
+    responsable_siso_cargo = models.CharField("cargo del responsable SISO", max_length=150, blank=True)
     responsable_siso_telefono = models.CharField(max_length=30, blank=True)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.BORRADOR)
     observaciones = models.TextField(blank=True)

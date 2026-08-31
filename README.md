@@ -107,7 +107,14 @@ frontend en Vercel — pero viven en el mismo repositorio.
     La lista de trabajadores se reemplaza completa en cada guardado, igual
     que las actividades de una declaración de método. El badge de vigencia se
     calcula al vuelo contra la fecha de hoy. Incluida en la auditoría de
-    cambios (Fase 6).
+    cambios (Fase 6). **Descargar PDF** (`GET
+    /api/contratistas/autorizaciones-ingreso/<id>/pdf/`) genera el documento
+    con el mismo formato físico de la planta (código de documento, tabla de
+    inclusiones con EPS/ARL/AFP y fecha de inicio de contrato, tabla de
+    exclusiones con motivo, y las líneas de firma en blanco de la empresa
+    contratista y del interventor) — replicado a partir del formato Excel
+    real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA — INCLUSIONES/
+    EXCLUSIONES" de Bavaria.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada

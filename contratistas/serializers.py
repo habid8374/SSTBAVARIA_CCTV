@@ -418,6 +418,7 @@ class AutorizacionIngresoSerializer(serializers.ModelSerializer):
             "area_trabajo",
             "sitio_encuentro_emergencia",
             "responsable_siso_nombre",
+            "responsable_siso_cargo",
             "responsable_siso_telefono",
             "estado",
             "observaciones",

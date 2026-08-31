@@ -1138,6 +1138,7 @@ export type AutorizacionIngreso = {
   area_trabajo: string;
   sitio_encuentro_emergencia: string;
   responsable_siso_nombre: string;
+  responsable_siso_cargo: string;
   responsable_siso_telefono: string;
   estado: EstadoDeclaracion;
   observaciones: string;
@@ -1157,6 +1158,7 @@ export type NuevaAutorizacionIngreso = {
   area_trabajo: string;
   sitio_encuentro_emergencia?: string;
   responsable_siso_nombre: string;
+  responsable_siso_cargo?: string;
   responsable_siso_telefono?: string;
   estado?: EstadoDeclaracion;
   observaciones?: string;
@@ -1204,4 +1206,12 @@ export function eliminarAutorizacionIngreso(token: string, id: number): Promise<
     method: "DELETE",
     headers: authHeaders(token),
   });
+}
+
+export function descargarAutorizacionIngresoPdf(token: string, id: number): Promise<void> {
+  return descargarArchivo(
+    token,
+    `/api/contratistas/autorizaciones-ingreso/${id}/pdf/`,
+    `autorizacion-ingreso-${id}.pdf`
+  );
 }

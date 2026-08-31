@@ -609,3 +609,37 @@ def declaracion_pdf(request, pk):
     if resultado.err:
         return Response({"detail": "No se pudo generar el PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return respuesta
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def autorizacion_ingreso_pdf(request, pk):
+    """Documento imprimible con el mismo formato del "AUTORIZACION DE INGRESO
+    PERSONAL CONTRATISTA — INCLUSIONES/EXCLUSIONES" real de la planta:
+    encabezado con código de documento, datos generales, tabla de
+    inclusiones, tabla de exclusiones con motivo, y las líneas de firma en
+    blanco de la empresa contratista y del interventor."""
+    from django.http import HttpResponse
+    from django.template.loader import render_to_string
+    from xhtml2pdf import pisa
+
+    autorizacion = get_object_or_404(
+        AutorizacionIngreso.objects.select_related("contratista", "declaracion").prefetch_related(
+            "trabajadores__trabajador"
+        ),
+        pk=pk,
+    )
+    lineas = list(autorizacion.trabajadores.all())
+    incluidos = [linea for linea in lineas if linea.incluido]
+    excluidos = [linea for linea in lineas if not linea.incluido]
+
+    html = render_to_string(
+        "contratistas/autorizacion_ingreso_pdf.html",
+        {"autorizacion": autorizacion, "incluidos": incluidos, "excluidos": excluidos},
+    )
+    respuesta = HttpResponse(content_type="application/pdf")
+    respuesta["Content-Disposition"] = f'inline; filename="autorizacion-ingreso-{autorizacion.pk}.pdf"'
+    resultado = pisa.CreatePDF(html, dest=respuesta)
+    if resultado.err:
+        return Response({"detail": "No se pudo generar el PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return respuesta
