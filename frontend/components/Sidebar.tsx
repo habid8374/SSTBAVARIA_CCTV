@@ -30,7 +30,7 @@ const ITEMS: Item[] = [
 
 // Transición compartida por toda etiqueta de texto que aparece/desaparece
 // junto con el colapso del riel — mismo timing que el ancho del <aside>.
-const TEXTO_COLAPSABLE = "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out";
+const TEXTO_COLAPSABLE = "overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
 type Props = {
   seccionActiva: SeccionId;
@@ -57,7 +57,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`flex h-full flex-col bg-corp-navy text-white transition-[width] duration-300 ease-in-out ${
+      className={`flex h-full flex-col bg-corp-navy text-white transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         colapsado ? "w-[76px]" : "w-64"
       } ${className}`}
     >
@@ -101,7 +101,7 @@ export default function Sidebar({
           onClick={onToggleColapsado}
           className="hidden w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/70 hover:bg-white/10 md:flex"
         >
-          <IconChevronLeft className={`h-4 w-4 shrink-0 transition-transform duration-300 ${colapsado ? "rotate-180" : ""}`} />
+          <IconChevronLeft className={`h-4 w-4 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${colapsado ? "rotate-180" : ""}`} />
           <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}>
             Colapsar menú
           </span>

@@ -65,7 +65,7 @@ export default function AppShell({
       />
 
       <div
-        className={`fixed inset-0 z-40 transition-opacity duration-300 ease-in-out md:hidden ${
+        className={`fixed inset-0 z-40 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] md:hidden ${
           drawerAbierto ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         aria-hidden={!drawerAbierto}
@@ -77,7 +77,7 @@ export default function AppShell({
           onClick={() => setDrawerAbierto(false)}
         />
         <Sidebar
-          className={`absolute inset-y-0 left-0 z-50 shadow-2xl transition-transform duration-300 ease-in-out ${
+          className={`absolute inset-y-0 left-0 z-50 shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
             drawerAbierto ? "translate-x-0" : "-translate-x-full"
           }`}
           seccionActiva={seccionActiva}
