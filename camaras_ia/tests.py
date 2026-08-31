@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from core.models import Empresa
 
-from .models import Camara, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
 from .services import _regla_vigente, disparar_alerta, evaluar_zona_horario, punto_en_poligono
 
 Usuario = get_user_model()
@@ -179,7 +179,21 @@ class DispararAlertaCorreoTests(TestCase):
         disparar_alerta(self.evento, self.regla_correo)
         self.evento.refresh_from_db()
         self.assertFalse(self.evento.notificacion_enviada)
-        self.assertIn("BREVO_API_KEY", self.evento.notificacion_detalle)
+        self.assertIn("Brevo", self.evento.notificacion_detalle)
+
+    @override_settings(BREVO_API_KEY="desde-variable-de-entorno")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_api_key_de_la_bd_tiene_prioridad_sobre_settings(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        config = ConfiguracionNotificaciones.obtener()
+        config.brevo_api_key = "desde-la-bd"
+        config.save()
+
+        disparar_alerta(self.evento, self.regla_correo)
+
+        # urlopen(request, timeout=...) — la Request enviada queda en args[0]
+        request_enviado = mock_urlopen.call_args[0][0]
+        self.assertEqual(request_enviado.get_header("Api-key"), "desde-la-bd")
 
     @patch("camaras_ia.notificaciones.urllib.request.urlopen")
     def test_canal_whatsapp_no_intenta_enviar_correo(self, mock_urlopen):
@@ -458,3 +472,131 @@ class DashboardEndpointsTests(TestCase):
             url, {"activa": False}, content_type="application/json", **self._auth(self.operador)
         )
         self.assertEqual(response.status_code, 403)
+
+    # --- Sección Sistema: configuración de notificaciones ---
+
+    def test_operador_puede_leer_configuracion_notificaciones(self):
+        response = self.client.get(
+            reverse("camaras_ia:configuracion_notificaciones"), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("brevo_api_key_configurada", response.data)
+        self.assertNotIn("brevo_api_key", response.data)  # write_only: nunca se devuelve el secreto
+
+    def test_operador_no_puede_editar_configuracion_notificaciones(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_notificaciones"),
+            {"brevo_api_key": "xkeysib-nueva"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_guarda_api_key_de_brevo(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_notificaciones"),
+            {
+                "brevo_api_key": "xkeysib-nueva",
+                "brevo_remitente_email": "alertas@bavaria.com",
+                "brevo_remitente_nombre": "Bavaria SST",
+            },
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["brevo_api_key_configurada"])
+        self.assertEqual(response.data["brevo_remitente_email"], "alertas@bavaria.com")
+
+        config = ConfiguracionNotificaciones.obtener()
+        self.assertEqual(config.brevo_api_key, "xkeysib-nueva")
+
+    def test_sin_configurar_reporta_no_configurada(self):
+        response = self.client.get(
+            reverse("camaras_ia:configuracion_notificaciones"), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["brevo_api_key_configurada"])
+
+    @override_settings(BREVO_API_KEY="desde-variable-de-entorno")
+    def test_configurada_por_variable_de_entorno_cuenta_como_configurada(self):
+        response = self.client.get(
+            reverse("camaras_ia:configuracion_notificaciones"), **self._auth(self.admin)
+        )
+        self.assertTrue(response.data["brevo_api_key_configurada"])
+
+    # --- Sección Sistema: equipos locales ---
+
+    def test_operador_puede_listar_equipos_locales(self):
+        EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
+        response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertIn("api_key", response.data[0])
+
+    def test_operador_no_puede_crear_equipo_local(self):
+        response = self.client.post(
+            reverse("camaras_ia:equipos_locales_lista"),
+            {"nombre": "Equipo Bodega"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_crea_equipo_local_sin_empresa_previa(self):
+        response = self.client.post(
+            reverse("camaras_ia:equipos_locales_lista"),
+            {"nombre": "Equipo Bodega"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        equipo = EquipoLocal.objects.get(nombre="Equipo Bodega")
+        self.assertIsNotNone(equipo.empresa)
+        self.assertTrue(equipo.api_key)
+        self.assertFalse(response.data["conectado"])
+
+    def test_conectado_true_con_conexion_reciente(self):
+        equipo = EquipoLocal.objects.create(
+            empresa=self.empresa, nombre="Equipo Bodega", ultima_conexion=timezone.now()
+        )
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.admin)
+        )
+        self.assertTrue(response.data["conectado"])
+
+    def test_conectado_false_con_conexion_vieja(self):
+        equipo = EquipoLocal.objects.create(
+            empresa=self.empresa,
+            nombre="Equipo Bodega",
+            ultima_conexion=timezone.now() - datetime.timedelta(minutes=10),
+        )
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.admin)
+        )
+        self.assertFalse(response.data["conectado"])
+
+    def test_admin_desactiva_equipo_local(self):
+        equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
+        response = self.client.patch(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]),
+            {"activo": False},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        equipo.refresh_from_db()
+        self.assertFalse(equipo.activo)
+
+    def test_operador_no_puede_eliminar_equipo_local(self):
+        equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
+        response = self.client.delete(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_elimina_equipo_local(self):
+        equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
+        response = self.client.delete(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)

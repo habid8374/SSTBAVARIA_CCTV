@@ -226,9 +226,9 @@ creado ahí.
    | `CSRF_TRUSTED_ORIGINS` | `https://<mismo-dominio-de-arriba>` |
    | `CORS_ALLOWED_ORIGINS` | el dominio de Vercel del frontend, ej. `https://sstbavaria-cctv.vercel.app` (agrega también el dominio de preview si lo vas a usar) |
    | `DATABASE_URL` | la inyecta Railway automáticamente al agregar Postgres |
-   | `BREVO_API_KEY` | API key de [Brevo](https://app.brevo.com) (Settings → SMTP & API → API Keys) — sin esto, las alertas por correo quedan registradas como error pero no rompen nada |
-   | `BREVO_REMITENTE_EMAIL` | correo remitente verificado en Brevo (Settings → Senders) |
-   | `BREVO_REMITENTE_NOMBRE` | nombre que aparece como remitente, ej. `SST Bavaria — Cámaras IA` |
+   | `BREVO_API_KEY` | API key de [Brevo](https://app.brevo.com) (Settings → SMTP & API → API Keys) — opcional: también se puede digitar desde el dashboard (Sistema → Brevo), que tiene prioridad sobre esta variable; sin ninguna de las dos, las alertas por correo quedan registradas como error pero no rompen nada |
+   | `BREVO_REMITENTE_EMAIL` | correo remitente verificado en Brevo (Settings → Senders) — también configurable desde el dashboard |
+   | `BREVO_REMITENTE_NOMBRE` | nombre que aparece como remitente, ej. `SST Bavaria — Cámaras IA` — también configurable desde el dashboard |
 
 4. Railway detecta `railway.json` (build con Nixpacks) y corre
    automáticamente `migrate`, `collectstatic` y levanta `gunicorn` según el
@@ -284,11 +284,15 @@ una decisión de alcance/costo aparte, no un default de esta fase.
 ### Nota sobre `disparar_alerta`
 
 Canal **correo**: envío real vía la API HTTP de Brevo (`camaras_ia/notificaciones.py`,
-sin SDK ni dependencias nuevas — una sola llamada REST con `urllib`). El
-resultado (éxito o el motivo del error) queda en
-`EventoDetectado.notificacion_enviada`/`notificacion_detalle`, visible en la
-bandeja de Alertas del dashboard. Si falta `BREVO_API_KEY` o Brevo responde
-con error, se registra el error y sigue sin romper `recibir_evento_camara`.
+sin SDK ni dependencias nuevas — una sola llamada REST con `urllib`). La API
+key y el remitente se leen primero de `ConfiguracionNotificaciones` (fila
+única editable desde el dashboard en Sistema → Brevo) y si está vacía, caen
+de vuelta a `settings.BREVO_*` (variables de entorno). El resultado (éxito
+o el motivo del error) queda en
+`EventoDetectado.notificacion_enviada`/`notificacion_detalle`, visible en
+Notificaciones → Envíos del dashboard. Si falta la API key en ambos lados o
+Brevo responde con error, se registra el error y sigue sin romper
+`recibir_evento_camara`.
 
 Canal **whatsapp**: sigue siendo un stub — solo registra el intento en el
 log (`camaras_ia.alertas`). Conectar un proveedor real de WhatsApp (o el

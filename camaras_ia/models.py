@@ -62,6 +62,31 @@ class Camara(models.Model):
         return f"rtsp://{credenciales}{self.ip}:554/cam/realmonitor?channel=1&subtype=1"
 
 
+class ConfiguracionNotificaciones(models.Model):
+    """Fila única (singleton) con las credenciales de Brevo, editables desde
+    el dashboard (sección Sistema) en vez de solo por variable de entorno —
+    así el cliente no depende de que alguien le toque Railway para
+    activar/cambiar el envío de correos de alerta. Si queda vacío, se usa el
+    fallback de settings.BREVO_* (ver camaras_ia/notificaciones.py)."""
+
+    brevo_api_key = models.CharField("Brevo API key", max_length=255, blank=True)
+    brevo_remitente_email = models.EmailField("correo remitente", blank=True)
+    brevo_remitente_nombre = models.CharField("nombre remitente", max_length=150, blank=True)
+    actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
+
+    class Meta:
+        verbose_name = "configuración de notificaciones"
+        verbose_name_plural = "configuración de notificaciones"
+
+    def __str__(self):
+        return "Configuración de notificaciones"
+
+    @classmethod
+    def obtener(cls):
+        objeto, _ = cls.objects.get_or_create(pk=1)
+        return objeto
+
+
 class EquipoLocal(models.Model):
     """Mini-PC/equipo en sitio que reporta eventos. Se autentica con API key propia."""
 

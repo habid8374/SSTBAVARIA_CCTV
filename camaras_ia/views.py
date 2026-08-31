@@ -8,13 +8,16 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from core.models import Empresa
 from core.permissions import EsAdministrador, EsAdministradorOSoloLectura
 
-from .models import Camara, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
 from .serializers import (
     CamaraActivaSerializer,
     CamaraCrearSerializer,
     CamaraDashboardSerializer,
+    ConfiguracionNotificacionesSerializer,
+    EquipoLocalSerializer,
     EventoDashboardSerializer,
     EventoEntradaSerializer,
     ReglaAlertaSerializer,
@@ -264,4 +267,41 @@ class ReglaListaCrear(generics.ListCreateAPIView):
 class ReglaDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = ReglaAlerta.objects.select_related("zona")
     serializer_class = ReglaAlertaSerializer
+    permission_classes = [EsAdministradorOSoloLectura]
+
+
+# --- Sección Sistema: credenciales Brevo + gestión de equipos locales ---
+
+
+class ConfiguracionNotificacionesDetalle(generics.RetrieveUpdateAPIView):
+    """Fila única — el administrador digita acá la API key de Brevo en vez
+    de depender de una variable de entorno en Railway."""
+
+    serializer_class = ConfiguracionNotificacionesSerializer
+    permission_classes = [EsAdministradorOSoloLectura]
+
+    def get_object(self):
+        return ConfiguracionNotificaciones.obtener()
+
+
+class EquipoLocalListaCrear(generics.ListCreateAPIView):
+    """Alta y listado de equipos locales (mini-PC/DVR en sitio) desde el
+    dashboard — antes solo existía por el admin de Django."""
+
+    queryset = EquipoLocal.objects.order_by("nombre")
+    serializer_class = EquipoLocalSerializer
+    permission_classes = [EsAdministradorOSoloLectura]
+
+    def perform_create(self, serializer):
+        empresa = Empresa.objects.first()
+        if empresa is None:
+            empresa = Empresa.objects.create(nombre="Empresa")
+        serializer.save(empresa=empresa)
+
+
+class EquipoLocalDetalle(generics.RetrieveUpdateDestroyAPIView):
+    """Activar/desactivar o eliminar un equipo local."""
+
+    queryset = EquipoLocal.objects.all()
+    serializer_class = EquipoLocalSerializer
     permission_classes = [EsAdministradorOSoloLectura]

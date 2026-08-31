@@ -23,16 +23,31 @@ class ErrorEnvioCorreo(Exception):
     """El correo no se pudo enviar — falta configuración o Brevo respondió con error."""
 
 
+def _credenciales_brevo():
+    """La API key y el remitente se pueden digitar desde el dashboard
+    (Sistema → Brevo, tabla ConfiguracionNotificaciones) en vez de depender
+    de que alguien las configure como variable de entorno en Railway. Si esa
+    fila está vacía, se cae de vuelta a settings.BREVO_* (compatibilidad con
+    despliegues que sí las manejan por variable de entorno)."""
+    from .models import ConfiguracionNotificaciones
+
+    config = ConfiguracionNotificaciones.obtener()
+    api_key = config.brevo_api_key or settings.BREVO_API_KEY
+    remitente_email = config.brevo_remitente_email or settings.BREVO_REMITENTE_EMAIL
+    remitente_nombre = config.brevo_remitente_nombre or settings.BREVO_REMITENTE_NOMBRE
+    return api_key, remitente_email, remitente_nombre
+
+
 def enviar_correo_brevo(destinatario, asunto, contenido_html, adjunto_bytes=None, adjunto_nombre=None):
     """Envía un correo transaccional a `destinatario`. Lanza ErrorEnvioCorreo
     si falta la API key o si Brevo rechaza la solicitud — el llamador decide
     qué hacer con eso (acá no se traga el error silenciosamente)."""
-    api_key = settings.BREVO_API_KEY
+    api_key, remitente_email, remitente_nombre = _credenciales_brevo()
     if not api_key:
-        raise ErrorEnvioCorreo("BREVO_API_KEY no está configurada.")
+        raise ErrorEnvioCorreo("Falta configurar la API key de Brevo (Sistema → Brevo).")
 
     payload = {
-        "sender": {"name": settings.BREVO_REMITENTE_NOMBRE, "email": settings.BREVO_REMITENTE_EMAIL},
+        "sender": {"name": remitente_nombre, "email": remitente_email},
         "to": [{"email": destinatario}],
         "subject": asunto,
         "htmlContent": contenido_html,

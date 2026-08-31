@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Camara, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
 
 
 class ReglaAlertaInline(admin.TabularInline):
@@ -20,6 +20,11 @@ class CamaraAdmin(admin.ModelAdmin):
     list_filter = ("empresa", "activa")
     search_fields = ("nombre", "ip", "ubicacion")
     inlines = [ZonaRestringidaInline]
+
+
+@admin.register(ConfiguracionNotificaciones)
+class ConfiguracionNotificacionesAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "brevo_remitente_email", "actualizada_en")
 
 
 @admin.register(EquipoLocal)

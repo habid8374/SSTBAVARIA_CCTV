@@ -22,8 +22,9 @@ class Config:
     # URL base del backend Django (Railway en producción, 127.0.0.1:8000 en pruebas locales).
     API_BASE_URL = os.environ.get("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
-    # API key de este EquipoLocal — se genera al crear el registro en el
-    # admin de Django (/admin/camaras_ia/equipolocal/add/) y se copia acá.
+    # API key de este EquipoLocal — se genera al crear el registro desde el
+    # dashboard (Sistema → Equipo local) o, alternativamente, en el admin de
+    # Django (/admin/camaras_ia/equipolocal/add/), y se copia acá.
     API_KEY = os.environ.get("API_KEY", "")
 
     # Cada cuánto se refresca la lista de cámaras/zonas/horarios a vigilar.
@@ -59,6 +60,7 @@ class Config:
     def validar(cls):
         if not cls.API_KEY:
             raise ValueError(
-                "Falta API_KEY. Créala en el admin de Django "
-                "(/admin/camaras_ia/equipolocal/add/) y configúrala como variable de entorno."
+                "Falta API_KEY. Créala desde el dashboard (Sistema → Equipo local) "
+                "o en el admin de Django (/admin/camaras_ia/equipolocal/add/) "
+                "y configúrala como variable de entorno."
             )

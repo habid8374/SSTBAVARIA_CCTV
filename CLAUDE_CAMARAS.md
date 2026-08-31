@@ -102,6 +102,10 @@ Proyecto nuevo (no una app dentro de otro proyecto). Apps internas:
   canal de notificación (WhatsApp/correo), destinatario
 - `EventoDetectado`: FK a Camara y ZonaRestringida (si aplica), timestamp,
   snapshot (imagen), si disparó alerta o no, estado (nuevo/revisado)
+- `ConfiguracionNotificaciones`: fila única (singleton) con la API key de
+  Brevo y el remitente — editable desde el dashboard (Sistema → Brevo) en
+  vez de solo por variable de entorno; si queda vacía, cae de vuelta a
+  settings.BREVO_* (compatibilidad con quien sí las maneja por Railway)
 
 ## Funciones/servicios clave
 
@@ -149,10 +153,20 @@ También la Fase 4 completa (ver más abajo):
   filtrable por canal. Pestaña "Configuración": la misma
   `ConfiguracionAlertasView` de siempre (horario/canal/destinatario por
   zona), movida aquí desde lo que antes era "Alertas → Configuración".
+- **Sistema** (solo Administrador): dos pestañas.
+  - "Brevo (correo)": formulario para digitar/actualizar la API key y el
+    remitente sin tocar variables de entorno en Railway. La API key nunca
+    se devuelve al navegador (write-only) — el formulario solo muestra si
+    hay una configurada o no.
+  - "Equipo local": alta/listado/baja de `EquipoLocal` (antes solo existía
+    por el admin de Django) — nombre, `api_key` generado (para copiar al
+    `.env` del equipo local), activar/desactivar, eliminar, y un badge de
+    "Conectado" si `ultima_conexion` fue hace menos de 5 minutos.
 
-Operador ve todas las secciones pero no puede crear/editar/eliminar zonas
-ni reglas (`EsAdministradorOSoloLectura` en el backend) ni gestionar
-usuarios — solo Administrador.
+Operador ve todas las secciones excepto Sistema y Usuarios. No puede
+crear/editar/eliminar zonas ni reglas (`EsAdministradorOSoloLectura` en el
+backend) ni gestionar usuarios, credenciales de Brevo o equipos locales —
+todo eso es solo Administrador.
 
 ## Fases de entrega (del alcance cotizado al cliente)
 

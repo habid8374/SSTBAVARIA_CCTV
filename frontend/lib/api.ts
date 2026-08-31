@@ -389,6 +389,79 @@ export function eliminarRegla(token: string, id: number): Promise<void> {
   });
 }
 
+// --- Sistema: credenciales Brevo + gestión de equipos locales ---
+
+export type ConfiguracionNotificaciones = {
+  brevo_api_key_configurada: boolean;
+  brevo_remitente_email: string;
+  brevo_remitente_nombre: string;
+  actualizada_en: string;
+};
+
+export type CambiosConfiguracionNotificaciones = {
+  brevo_api_key?: string;
+  brevo_remitente_email?: string;
+  brevo_remitente_nombre?: string;
+};
+
+export function obtenerConfiguracionNotificaciones(token: string): Promise<ConfiguracionNotificaciones> {
+  return request<ConfiguracionNotificaciones>("/api/camaras-ia/dashboard/configuracion-notificaciones/", {
+    headers: authHeaders(token),
+  });
+}
+
+export function actualizarConfiguracionNotificaciones(
+  token: string,
+  cambios: CambiosConfiguracionNotificaciones
+): Promise<ConfiguracionNotificaciones> {
+  return request<ConfiguracionNotificaciones>("/api/camaras-ia/dashboard/configuracion-notificaciones/", {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export type EquipoLocal = {
+  id: number;
+  nombre: string;
+  api_key: string;
+  activo: boolean;
+  ultima_conexion: string | null;
+  conectado: boolean;
+  creado_en: string;
+};
+
+export function listarEquiposLocales(token: string): Promise<EquipoLocal[]> {
+  return request<EquipoLocal[]>("/api/camaras-ia/dashboard/equipos-locales/", { headers: authHeaders(token) });
+}
+
+export function crearEquipoLocal(token: string, nombre: string): Promise<EquipoLocal> {
+  return request<EquipoLocal>("/api/camaras-ia/dashboard/equipos-locales/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ nombre }),
+  });
+}
+
+export function actualizarEquipoLocal(
+  token: string,
+  id: number,
+  cambios: Partial<Pick<EquipoLocal, "nombre" | "activo">>
+): Promise<EquipoLocal> {
+  return request<EquipoLocal>(`/api/camaras-ia/dashboard/equipos-locales/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarEquipoLocal(token: string, id: number): Promise<void> {
+  return request<void>(`/api/camaras-ia/dashboard/equipos-locales/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
 // --- Contratistas: empresas, trabajadores, seguridad social, declaración de método ---
 
 export type Opcion = { clave: string; etiqueta: string };

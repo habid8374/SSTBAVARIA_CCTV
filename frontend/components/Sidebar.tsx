@@ -10,6 +10,7 @@ import {
   IconLogout,
   IconNotificacion,
   IconResumen,
+  IconSistema,
   IconUsuarios,
   IconZona,
 } from "./icons";
@@ -22,6 +23,7 @@ export type SeccionId =
   | "notificaciones"
   | "contratistas"
   | "declaracion-metodo"
+  | "sistema"
   | "usuarios";
 
 type Item = {
@@ -39,6 +41,7 @@ const ITEMS: Item[] = [
   { id: "notificaciones", label: "Notificaciones", icon: IconNotificacion },
   { id: "contratistas", label: "Contratistas", icon: IconContratista },
   { id: "declaracion-metodo", label: "Declaración de Método", icon: IconDeclaracionMetodo },
+  { id: "sistema", label: "Sistema", icon: IconSistema, adminOnly: true },
   { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true },
 ];
 

@@ -10,6 +10,7 @@ import CamarasView from "@/components/views/CamarasView";
 import ContratistasView from "@/components/views/ContratistasView";
 import DeclaracionMetodoView from "@/components/views/DeclaracionMetodoView";
 import NotificacionesView from "@/components/views/NotificacionesView";
+import SistemaView from "@/components/views/SistemaView";
 import TableroView from "@/components/views/TableroView";
 import UsuariosView from "@/components/views/UsuariosView";
 import ZonasView from "@/components/views/ZonasView";
@@ -24,6 +25,7 @@ const TITULOS: Record<SeccionId, string> = {
   notificaciones: "Notificaciones",
   contratistas: "Contratistas",
   "declaracion-metodo": "Declaración de Método",
+  sistema: "Sistema",
   usuarios: "Gestión de usuarios",
 };
 
@@ -80,6 +82,7 @@ export default function DashboardPage() {
       {seccion === "notificaciones" && <NotificacionesView token={token} rol={usuario.rol} />}
       {seccion === "contratistas" && <ContratistasView token={token} rol={usuario.rol} />}
       {seccion === "declaracion-metodo" && <DeclaracionMetodoView token={token} rol={usuario.rol} />}
+      {seccion === "sistema" && usuario.rol === "administrador" && <SistemaView token={token} />}
       {seccion === "usuarios" && usuario.rol === "administrador" && (
         <UsuariosView token={token} usuarioActualId={usuario.id} />
       )}

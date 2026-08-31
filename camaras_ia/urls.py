@@ -24,4 +24,12 @@ urlpatterns = [
     path("dashboard/zonas/<int:pk>/", views.ZonaDetalle.as_view(), name="zonas_detalle"),
     path("dashboard/reglas/", views.ReglaListaCrear.as_view(), name="reglas_lista"),
     path("dashboard/reglas/<int:pk>/", views.ReglaDetalle.as_view(), name="reglas_detalle"),
+    # Sistema: credenciales Brevo + gestión de equipos locales
+    path(
+        "dashboard/configuracion-notificaciones/",
+        views.ConfiguracionNotificacionesDetalle.as_view(),
+        name="configuracion_notificaciones",
+    ),
+    path("dashboard/equipos-locales/", views.EquipoLocalListaCrear.as_view(), name="equipos_locales_lista"),
+    path("dashboard/equipos-locales/<int:pk>/", views.EquipoLocalDetalle.as_view(), name="equipos_locales_detalle"),
 ]

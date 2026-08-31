@@ -67,9 +67,12 @@ pip install -r requirements.txt
 
 ## Configuración
 
-1. Crear el registro de este equipo en el admin de Django:
-   `/admin/camaras_ia/equipolocal/add/` — nombre descriptivo (ej. "NVR Planta
-   Tocancipá") y guardar. Django genera la `api_key` sola; copiarla.
+1. Crear el registro de este equipo — dos formas, misma tabla:
+   - **Dashboard** (recomendado): sección **Sistema → Equipo local** →
+     "+ Nuevo equipo", solo el nombre (ej. "NVR Planta Tocancipá"). La
+     `api_key` se genera sola y aparece en la tabla con un botón "Copiar".
+   - **Admin de Django**: `/admin/camaras_ia/equipolocal/add/`, mismo
+     resultado.
 2. Copiar `.env.example` a `.env` en esta misma carpeta y completar:
 
    | Variable | Valor |

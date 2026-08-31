@@ -1,9 +1,13 @@
+from datetime import timedelta
+
+from django.conf import settings
+from django.utils import timezone
 from rest_framework import serializers
 
 from core.models import Empresa
 from core.validators import validar_tamano_archivo
 
-from .models import Camara, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
 
 
 class EventoEntradaSerializer(serializers.Serializer):
@@ -218,3 +222,49 @@ class CamaraCrearSerializer(serializers.ModelSerializer):
         if empresa is None:
             empresa = Empresa.objects.create(nombre="Empresa")
         return Camara.objects.create(empresa=empresa, **validated_data)
+
+
+# --- Sección Sistema: credenciales Brevo + gestión de equipos locales ---
+
+
+class ConfiguracionNotificacionesSerializer(serializers.ModelSerializer):
+    """La API key nunca se devuelve en la respuesta (write-only) — solo se
+    informa si hay una configurada (en la BD o por variable de entorno) para
+    que el formulario del dashboard pueda mostrar el estado sin exponer el
+    secreto de vuelta al navegador en cada GET."""
+
+    brevo_api_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    brevo_api_key_configurada = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConfiguracionNotificaciones
+        fields = [
+            "brevo_api_key",
+            "brevo_api_key_configurada",
+            "brevo_remitente_email",
+            "brevo_remitente_nombre",
+            "actualizada_en",
+        ]
+        read_only_fields = ["actualizada_en"]
+
+    def get_brevo_api_key_configurada(self, obj):
+        return bool(obj.brevo_api_key or settings.BREVO_API_KEY)
+
+
+class EquipoLocalSerializer(serializers.ModelSerializer):
+    """CRUD de equipos locales (mini-PC/DVR en sitio) desde el dashboard —
+    antes solo se podían crear desde el admin de Django. api_key se genera
+    sola al crear el registro (ver models.generar_api_key) y se muestra acá
+    para que el administrador la copie al .env del equipo local."""
+
+    conectado = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EquipoLocal
+        fields = ["id", "nombre", "api_key", "activo", "ultima_conexion", "conectado", "creado_en"]
+        read_only_fields = ["id", "api_key", "ultima_conexion", "creado_en"]
+
+    def get_conectado(self, equipo):
+        if not equipo.ultima_conexion:
+            return False
+        return (timezone.now() - equipo.ultima_conexion) < timedelta(minutes=5)
