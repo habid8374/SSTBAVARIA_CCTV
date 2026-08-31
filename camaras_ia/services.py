@@ -9,6 +9,8 @@ import logging
 
 from django.utils import timezone
 
+from .notificaciones import ErrorEnvioCorreo, enviar_correo_brevo
+
 logger = logging.getLogger("camaras_ia.alertas")
 
 
@@ -77,10 +79,12 @@ def evaluar_zona_horario(camara, punto, momento=None):
 def disparar_alerta(evento, regla):
     """Dispara la notificación de una alerta.
 
-    Stub por ahora: solo registra el intento en el log, con todo lo que
-    necesitaría un envío real (canal, destinatario, evento, zona). Conectar
-    un proveedor real de WhatsApp/correo es una decisión de proveedor aparte
-    que todavía no se ha tomado.
+    Canal "correo": envío real vía Brevo, con el resultado (éxito o el
+    motivo del error) guardado en evento.notificacion_enviada/_detalle para
+    que se vea en la bandeja de Alertas del dashboard.
+    Canal "whatsapp": sigue siendo un stub — solo el log de abajo. Conectar
+    un proveedor real de WhatsApp es una decisión de proveedor aparte que
+    todavía no se ha tomado.
     """
     logger.warning(
         "ALERTA disparada: evento_id=%s camara=%s zona=%s canal=%s destinatario=%s",
@@ -90,3 +94,38 @@ def disparar_alerta(evento, regla):
         regla.canal_notificacion,
         regla.destinatario,
     )
+
+    if regla.canal_notificacion == "correo":  # ReglaAlerta.Canal.CORREO
+        _enviar_notificacion_correo(evento, regla)
+
+
+def _enviar_notificacion_correo(evento, regla):
+    zona_nombre = evento.zona.nombre if evento.zona else "zona restringida"
+    momento = timezone.localtime(evento.timestamp)
+    asunto = f"Alerta SST Bavaria — {zona_nombre}"
+    contenido_html = (
+        f"<p>Se detectó una persona en <strong>{zona_nombre}</strong> "
+        f"(cámara <strong>{evento.camara.nombre}</strong>) fuera del horario permitido.</p>"
+        f"<p>Fecha y hora: {momento:%Y-%m-%d %H:%M:%S}</p>"
+    )
+
+    adjunto_bytes = None
+    adjunto_nombre = None
+    if evento.snapshot:
+        try:
+            evento.snapshot.open("rb")
+            adjunto_bytes = evento.snapshot.read()
+            adjunto_nombre = evento.snapshot.name.rsplit("/", 1)[-1]
+        finally:
+            evento.snapshot.close()
+
+    try:
+        enviar_correo_brevo(regla.destinatario, asunto, contenido_html, adjunto_bytes, adjunto_nombre)
+    except ErrorEnvioCorreo as err:
+        logger.error("No se pudo enviar la alerta por correo (evento_id=%s): %s", evento.pk, err)
+        evento.notificacion_enviada = False
+        evento.notificacion_detalle = str(err)[:255]
+    else:
+        evento.notificacion_enviada = True
+        evento.notificacion_detalle = f"Correo enviado a {regla.destinatario}"[:255]
+    evento.save(update_fields=["notificacion_enviada", "notificacion_detalle"])

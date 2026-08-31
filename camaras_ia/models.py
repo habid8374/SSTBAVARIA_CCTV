@@ -147,6 +147,14 @@ class EventoDetectado(models.Model):
     punto_y = models.FloatField("punto detectado (y)", null=True, blank=True)
     disparo_alerta = models.BooleanField(default=False)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.NUEVO)
+    notificacion_enviada = models.BooleanField(
+        "notificación enviada",
+        default=False,
+        help_text="True si disparar_alerta logró enviar la notificación (hoy solo canal correo, vía Brevo)",
+    )
+    notificacion_detalle = models.CharField(
+        "detalle de la notificación", max_length=255, blank=True
+    )
 
     class Meta:
         verbose_name = "evento detectado"

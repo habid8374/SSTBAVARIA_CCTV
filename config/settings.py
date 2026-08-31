@@ -163,6 +163,15 @@ USE_I18N = True
 USE_TZ = True
 
 
+# Notificaciones por correo (canal "correo" de ReglaAlerta), vía la API HTTP
+# de Brevo — ver camaras_ia/notificaciones.py. Sin BREVO_API_KEY el envío
+# simplemente falla y queda registrado en el evento (notificacion_detalle),
+# no rompe el flujo de recibir_evento_camara.
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+BREVO_REMITENTE_EMAIL = os.environ.get("BREVO_REMITENTE_EMAIL", "alertas@sstbavaria.com")
+BREVO_REMITENTE_NOMBRE = os.environ.get("BREVO_REMITENTE_NOMBRE", "SST Bavaria — Cámaras IA")
+
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 

@@ -180,6 +180,8 @@ export type EventoDashboard = {
   punto_x: number | null;
   punto_y: number | null;
   disparo_alerta: boolean;
+  notificacion_enviada: boolean;
+  notificacion_detalle: string;
   estado: EstadoEvento;
 };
 

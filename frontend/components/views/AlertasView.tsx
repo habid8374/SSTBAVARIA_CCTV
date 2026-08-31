@@ -60,6 +60,34 @@ function BotonPestana({
   );
 }
 
+function BadgeNotificacion({ evento }: { evento: EventoDashboard }) {
+  if (!evento.disparo_alerta) {
+    return <span className="text-xs text-corp-muted">—</span>;
+  }
+  if (evento.notificacion_enviada) {
+    return (
+      <span
+        title={evento.notificacion_detalle}
+        className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+      >
+        Enviada
+      </span>
+    );
+  }
+  if (evento.notificacion_detalle) {
+    return (
+      <span
+        title={evento.notificacion_detalle}
+        className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+      >
+        Error
+      </span>
+    );
+  }
+  // Canal WhatsApp: sigue siendo un stub, no hay envío real que reportar.
+  return <span className="text-xs text-corp-muted">N/D</span>;
+}
+
 function BandejaAlertas({ token }: { token: string }) {
   const [eventos, setEventos] = useState<EventoDashboard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +157,7 @@ function BandejaAlertas({ token }: { token: string }) {
               <th className="px-4 py-3">Zona</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Alerta</th>
+              <th className="px-4 py-3">Notificación</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -165,6 +194,9 @@ function BandejaAlertas({ token }: { token: string }) {
                   >
                     {evento.disparo_alerta ? "Alerta" : "Normal"}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  <BadgeNotificacion evento={evento} />
                 </td>
                 <td className="px-4 py-3">
                   <span

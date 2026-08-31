@@ -1,15 +1,17 @@
 import datetime
+import urllib.error
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from core.models import Empresa
 
 from .models import Camara, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
-from .services import _regla_vigente, evaluar_zona_horario, punto_en_poligono
+from .services import _regla_vigente, disparar_alerta, evaluar_zona_horario, punto_en_poligono
 
 Usuario = get_user_model()
 
@@ -102,6 +104,62 @@ class EvaluarZonaHorarioTests(TestCase):
         zona, regla = evaluar_zona_horario(self.camara, (5, 5))
         self.assertIsNone(zona)
         self.assertIsNone(regla)
+
+
+@override_settings(BREVO_API_KEY="clave-de-prueba", BREVO_REMITENTE_EMAIL="a@x.com", BREVO_REMITENTE_NOMBRE="Test")
+class DispararAlertaCorreoTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.regla_correo = ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            canal_notificacion=ReglaAlerta.Canal.CORREO,
+            destinatario="seguridad@bavaria.com",
+        )
+        self.regla_whatsapp = ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            canal_notificacion=ReglaAlerta.Canal.WHATSAPP,
+            destinatario="+573000000000",
+        )
+        self.evento = EventoDetectado.objects.create(camara=self.camara, zona=self.zona, punto_x=1, punto_y=1)
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_correo_exitoso_marca_evento(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        disparar_alerta(self.evento, self.regla_correo)
+        self.evento.refresh_from_db()
+        self.assertTrue(self.evento.notificacion_enviada)
+        self.assertIn("seguridad@bavaria.com", self.evento.notificacion_detalle)
+        mock_urlopen.assert_called_once()
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_correo_fallido_registra_el_error(self, mock_urlopen):
+        mock_urlopen.side_effect = urllib.error.URLError("timeout")
+        disparar_alerta(self.evento, self.regla_correo)
+        self.evento.refresh_from_db()
+        self.assertFalse(self.evento.notificacion_enviada)
+        self.assertTrue(self.evento.notificacion_detalle)
+
+    @override_settings(BREVO_API_KEY="")
+    def test_sin_api_key_no_rompe_y_queda_registrado(self):
+        disparar_alerta(self.evento, self.regla_correo)
+        self.evento.refresh_from_db()
+        self.assertFalse(self.evento.notificacion_enviada)
+        self.assertIn("BREVO_API_KEY", self.evento.notificacion_detalle)
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_canal_whatsapp_no_intenta_enviar_correo(self, mock_urlopen):
+        disparar_alerta(self.evento, self.regla_whatsapp)
+        mock_urlopen.assert_not_called()
+        self.evento.refresh_from_db()
+        self.assertFalse(self.evento.notificacion_enviada)
 
 
 class RecibirEventoCamaraViewTests(TestCase):

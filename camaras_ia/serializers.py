@@ -118,6 +118,8 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
             "punto_x",
             "punto_y",
             "disparo_alerta",
+            "notificacion_enviada",
+            "notificacion_detalle",
             "estado",
         ]
         read_only_fields = [
@@ -131,6 +133,8 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
             "punto_x",
             "punto_y",
             "disparo_alerta",
+            "notificacion_enviada",
+            "notificacion_detalle",
         ]
 
 
