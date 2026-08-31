@@ -1,6 +1,8 @@
+from django.core.validators import FileExtensionValidator
 from django.db import models
 
 from core.models import Empresa
+from core.validators import validar_tamano_archivo
 
 
 class EmpresaContratista(models.Model):
@@ -93,6 +95,10 @@ class RadicacionSeguridadSocial(models.Model):
         upload_to=soporte_pago_upload_to,
         null=True,
         blank=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=["pdf", "jpg", "jpeg", "png"]),
+            validar_tamano_archivo,
+        ],
         help_text="PDF de la planilla integrada de autoliquidación de aportes (PILA)",
     )
     interventor = models.CharField(max_length=150, blank=True)

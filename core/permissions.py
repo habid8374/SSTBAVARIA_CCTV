@@ -32,3 +32,20 @@ class EsAdministradorOSoloLectura(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         return EsAdministrador().has_permission(request, view)
+
+
+class EsAdministradorParaEliminar(BasePermission):
+    """Cualquier usuario autenticado puede crear/leer/editar; eliminar (acción
+    destructiva e irreversible) requiere rol Administrador — para datos
+    operativos (contratistas, trabajadores, declaraciones) que un Operador
+    llena en el día a día pero no debería poder borrar."""
+
+    message = "Se requiere rol de administrador para eliminar esto."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method != "DELETE":
+            return True
+        return EsAdministrador().has_permission(request, view)

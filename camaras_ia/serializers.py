@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from core.models import Empresa
+from core.validators import validar_tamano_archivo
 
 from .models import Camara, EventoDetectado, ReglaAlerta, ZonaRestringida
 
@@ -16,7 +17,16 @@ class EventoEntradaSerializer(serializers.Serializer):
     camara = serializers.PrimaryKeyRelatedField(queryset=Camara.objects.filter(activa=True))
     punto_x = serializers.FloatField()
     punto_y = serializers.FloatField()
-    snapshot = serializers.ImageField(required=False, allow_null=True)
+    snapshot = serializers.ImageField(required=False, allow_null=True, validators=[validar_tamano_archivo])
+
+
+class SnapshotReferenciaSerializer(serializers.Serializer):
+    """Validación del archivo subido para el encuadre de referencia de una
+    cámara (mismos límites de tamaño/tipo que el ImageField del modelo, pero
+    esto se guarda con .save() directo en vez de por un ModelSerializer, así
+    que hay que declarar los validadores acá también)."""
+
+    snapshot_referencia = serializers.ImageField(validators=[validar_tamano_archivo])
 
 
 class ReglaAlertaActivaSerializer(serializers.ModelSerializer):

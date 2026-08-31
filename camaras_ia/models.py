@@ -3,6 +3,7 @@ import secrets
 from django.db import models
 
 from core.models import Empresa
+from core.validators import validar_tamano_archivo
 
 
 def generar_api_key():
@@ -24,6 +25,7 @@ class Camara(models.Model):
         upload_to="camaras/referencia",
         null=True,
         blank=True,
+        validators=[validar_tamano_archivo],
         help_text="Encuadre fijo de la cámara sobre el que se dibujan las zonas restringidas",
     )
     activa = models.BooleanField(default=True)
@@ -133,7 +135,9 @@ class EventoDetectado(models.Model):
         ZonaRestringida, on_delete=models.SET_NULL, related_name="eventos", null=True, blank=True
     )
     timestamp = models.DateTimeField(auto_now_add=True)
-    snapshot = models.ImageField(upload_to=snapshot_upload_to, null=True, blank=True)
+    snapshot = models.ImageField(
+        upload_to=snapshot_upload_to, null=True, blank=True, validators=[validar_tamano_archivo]
+    )
     punto_x = models.FloatField(
         "punto detectado (x)",
         null=True,

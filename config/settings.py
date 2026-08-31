@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,10 +21,21 @@ def env_bool(name, default=False):
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-changeme-en-produccion")
-
 DEBUG = env_bool("DEBUG", default=False)
+
+# SECURITY WARNING: keep the secret key used in production secret! Un valor
+# por defecto conocido públicamente (como el que traía este archivo antes)
+# permitiría falsificar sesiones/tokens de reseteo de contraseña si alguien
+# olvida configurar la variable de entorno — por eso solo se permite un
+# fallback en desarrollo local (DEBUG=True); en producción es obligatorio.
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-insecure-solo-para-desarrollo-local"
+    else:
+        raise ImproperlyConfigured(
+            "La variable de entorno SECRET_KEY es obligatoria cuando DEBUG=False."
+        )
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -204,18 +216,43 @@ LOGGING = {
 
 
 # Django REST Framework
+#
+# DEFAULT_PERMISSION_CLASSES es IsAuthenticated (no AllowAny): así, cualquier
+# vista nueva que alguien agregue sin pensarlo dos veces queda protegida por
+# defecto en vez de quedar pública por accidente. Las dos únicas vistas que sí
+# deben ser públicas (los endpoints del equipo local, que se autentican con
+# su propia API key en vez de con el login de usuario) declaran
+# @permission_classes([AllowAny]) explícitamente en camaras_ia/views.py.
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_THROTTLE_RATES": {
+        # Límite de intentos de login por IP, para dificultar fuerza bruta de
+        # contraseñas — ver core.throttling.LoginRateThrottle.
+        "login": "10/min",
+    },
 }
+
+# Cabeceras de seguridad HTTP — activas siempre (no solo en producción), no
+# tienen costo en desarrollo y evitan que alguien las desactive sin darse
+# cuenta al tocar el bloque de abajo.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # HSTS: le dice al navegador que recuerde usar siempre HTTPS con este
+    # host. Empieza en 1 día — subir a 1 año (31536000) una vez confirmado
+    # que HTTPS funciona bien en todos los subdominios usados.
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "86400"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
+    SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", default=False)

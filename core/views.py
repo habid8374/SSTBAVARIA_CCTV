@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate, get_user_model
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -11,6 +11,7 @@ from camaras_ia.models import Camara, EventoDetectado
 
 from .permissions import EsAdministrador
 from .serializers import UsuarioCrearSerializer, UsuarioSerializer
+from .throttling import LoginRateThrottle
 
 Usuario = get_user_model()
 
@@ -29,6 +30,7 @@ def _serializar_usuario(user):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def login(request):
     """Login del dashboard: usuario/contraseña de Django -> token de API."""
     username = request.data.get("username", "")

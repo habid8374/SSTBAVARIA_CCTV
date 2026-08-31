@@ -1,10 +1,27 @@
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
 from .models import PerfilUsuario
+from .validators import MAX_UPLOAD_MB, validar_tamano_archivo
 
 Usuario = get_user_model()
+
+
+class _ArchivoFalso:
+    def __init__(self, tamano_bytes):
+        self.size = tamano_bytes
+
+
+class ValidarTamanoArchivoTests(TestCase):
+    def test_acepta_archivo_dentro_del_limite(self):
+        validar_tamano_archivo(_ArchivoFalso((MAX_UPLOAD_MB - 1) * 1024 * 1024))
+
+    def test_rechaza_archivo_que_excede_el_limite(self):
+        with self.assertRaises(ValidationError):
+            validar_tamano_archivo(_ArchivoFalso((MAX_UPLOAD_MB + 1) * 1024 * 1024))
 
 
 class PerfilUsuarioSignalTests(TestCase):
@@ -19,6 +36,7 @@ class PerfilUsuarioSignalTests(TestCase):
 
 class LoginViewTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.url = reverse("core:login")
 
@@ -37,8 +55,33 @@ class LoginViewTests(TestCase):
         self.assertEqual(response.status_code, 401)
 
 
+class LoginThrottleTests(TestCase):
+    """Verifica que el límite de intentos de login (fuerza bruta) funciona."""
+
+    def setUp(self):
+        cache.clear()
+        Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.url = reverse("core:login")
+
+    def test_bloquea_despues_del_limite_de_intentos(self):
+        from rest_framework.settings import api_settings
+
+        limite = int(api_settings.DEFAULT_THROTTLE_RATES["login"].split("/")[0])
+        for _ in range(limite):
+            response = self.client.post(
+                self.url, {"username": "admin", "password": "mala"}, content_type="application/json"
+            )
+            self.assertEqual(response.status_code, 401)
+
+        bloqueado = self.client.post(
+            self.url, {"username": "admin", "password": "clave12345"}, content_type="application/json"
+        )
+        self.assertEqual(bloqueado.status_code, 429)
+
+
 class UsuarioManagementTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
         self.lista_url = reverse("core:usuarios_lista")

@@ -271,3 +271,42 @@ Por ahora es un stub: registra el intento de notificación en el log
 (`camaras_ia.alertas`) pero no envía WhatsApp/correo de verdad. Conectar un
 proveedor real (o el sistema de notificaciones del proyecto principal, vía
 API) es una decisión de proveedor aparte, todavía no tomada.
+
+## Seguridad (OWASP Top 10)
+
+Controles aplicados, con su categoría OWASP correspondiente:
+
+- **A05 Configuración de seguridad**: `SECRET_KEY` ya no tiene un valor por
+  defecto conocido en producción — si `DEBUG=False` y falta la variable de
+  entorno, el arranque falla explícitamente en vez de correr con un secreto
+  público. Cabeceras HTTP de refuerzo activas siempre
+  (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`) y
+  HSTS en producción; el frontend agrega las mismas cabeceras equivalentes
+  vía `next.config.ts` (Vercel ya agrega HSTS por su cuenta).
+- **A01 Control de acceso roto**: `DEFAULT_PERMISSION_CLASSES` es
+  `IsAuthenticated` (no `AllowAny`) — cualquier vista nueva queda protegida
+  por defecto. Los dos endpoints del equipo local (que se autentican con su
+  propia API key, no con el login de usuario) declaran `AllowAny`
+  explícitamente. Eliminar contratistas, trabajadores, radicaciones y
+  declaraciones de método requiere rol Administrador
+  (`EsAdministradorParaEliminar`) — crear/editar sigue abierto a cualquier
+  usuario autenticado, para no frenar el trabajo operativo diario.
+- **A07 Fallas de identificación y autenticación**: el login tiene límite de
+  intentos por IP (`core.throttling.LoginRateThrottle`, 10/min) para
+  dificultar fuerza bruta de contraseñas — solo en ese endpoint, no en el
+  resto de la API, para no interferir con el polling normal del equipo
+  local.
+- **A04/A05 Archivos subidos**: el soporte de pago de seguridad social
+  (`RadicacionSeguridadSocial.soporte_pago`) valida extensión permitida
+  (pdf/jpg/jpeg/png) y tamaño máximo (10 MB, `core.validators`). Los
+  snapshots de cámara ya se validaban como imagen real (Pillow, vía
+  `ImageField`); ahora también tienen tope de tamaño.
+- **A03/A06**: sin SQL crudo en todo el proyecto (solo ORM), sin
+  `eval`/`exec`/deserialización insegura. `pip-audit` y `npm audit` no
+  reportan vulnerabilidades conocidas en las dependencias actuales.
+
+Pendiente, fuera de alcance de este pase (se puede retomar cuando haga
+falta): tokens de sesión con expiración (DRF `TokenAuthentication` no expira
+por defecto), Content-Security-Policy en el frontend, y cifrado en reposo de
+`password_onvif` (hoy se guarda en texto plano porque el equipo local
+necesita leerlo para conectarse a la cámara).

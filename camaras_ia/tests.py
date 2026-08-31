@@ -1,6 +1,7 @@
 import datetime
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -193,6 +194,9 @@ class ObtenerReglasActivasViewTests(TestCase):
 
 class DashboardEndpointsTests(TestCase):
     def setUp(self):
+        # El throttle de login cuenta por IP y el test client siempre usa la
+        # misma — sin esto, los _token() de tests anteriores se acumularían.
+        cache.clear()
         self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")

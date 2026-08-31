@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.permissions import EsAdministrador, EsAdministradorOSoloLectura
@@ -18,6 +18,7 @@ from .serializers import (
     EventoDashboardSerializer,
     EventoEntradaSerializer,
     ReglaAlertaSerializer,
+    SnapshotReferenciaSerializer,
     ZonaDashboardSerializer,
 )
 from .services import disparar_alerta, evaluar_zona_horario
@@ -32,6 +33,7 @@ def _equipo_desde_api_key(request):
 
 
 @api_view(["POST"])
+@permission_classes([AllowAny])  # se autentica con su propia API key, no con el login de usuario
 def recibir_evento_camara(request):
     """Recibe un evento de movimiento del equipo local: cámara, punto
     detectado y snapshot. Cruza el punto contra las zonas restringidas de la
@@ -84,6 +86,7 @@ def recibir_evento_camara(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])  # se autentica con su propia API key, no con el login de usuario
 def obtener_reglas_activas(request):
     """El equipo local consulta esto periódicamente para sincronizar qué
     cámaras/zonas/horarios debe vigilar, sin tocar el equipo físicamente.
@@ -220,10 +223,9 @@ def subir_snapshot_referencia(request, pk):
     """Sube/reemplaza el encuadre de referencia de una cámara, sobre el que
     se dibujan las zonas restringidas en el editor visual."""
     camara = get_object_or_404(Camara, pk=pk)
-    archivo = request.FILES.get("snapshot_referencia")
-    if not archivo:
-        return Response({"detail": "Falta el archivo snapshot_referencia."}, status=status.HTTP_400_BAD_REQUEST)
-    camara.snapshot_referencia = archivo
+    entrada = SnapshotReferenciaSerializer(data=request.data)
+    entrada.is_valid(raise_exception=True)
+    camara.snapshot_referencia = entrada.validated_data["snapshot_referencia"]
     camara.save(update_fields=["snapshot_referencia"])
     return Response(CamaraDashboardSerializer(camara, context={"request": request}).data)
 

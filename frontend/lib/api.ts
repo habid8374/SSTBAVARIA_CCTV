@@ -9,6 +9,21 @@ export class ApiError extends Error {
   }
 }
 
+/** DRF devuelve errores como {"detail": "..."} (permisos, throttle, etc.) o
+ * como {"campo": ["mensaje", ...], ...} (errores de validación por campo,
+ * p. ej. un archivo con extensión no permitida) — ambos formatos posibles. */
+function extraerMensajeError(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const registro = body as Record<string, unknown>;
+  if (typeof registro.detail === "string") return registro.detail;
+  for (const valor of Object.values(registro)) {
+    if (Array.isArray(valor) && typeof valor[0] === "string") {
+      return valor[0];
+    }
+  }
+  return null;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const esFormData = options.body instanceof FormData;
   const response = await fetch(`${API_URL}${path}`, {
@@ -23,7 +38,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     let detail = "Ocurrió un error inesperado.";
     try {
       const body = await response.json();
-      detail = body.detail ?? detail;
+      detail = extraerMensajeError(body) ?? detail;
     } catch {
       // sin cuerpo JSON, se usa el mensaje genérico
     }

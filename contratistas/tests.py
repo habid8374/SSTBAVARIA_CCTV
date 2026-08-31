@@ -1,6 +1,7 @@
 import datetime
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
@@ -53,6 +54,9 @@ class ActividadMetodoCalculoTests(TestCase):
 
 class ApiTestsBase(TestCase):
     def setUp(self):
+        # El throttle de login cuenta por IP y el test client siempre usa la
+        # misma — sin esto, los _token() de tests anteriores se acumularían.
+        cache.clear()
         self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
@@ -109,6 +113,18 @@ class EmpresaContratistaTests(ApiTestsBase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(EmpresaContratista.objects.count(), 2)
+
+    def test_operador_no_puede_eliminar_empresa(self):
+        url = reverse("contratistas:empresas_detalle", args=[self.contratista.pk])
+        response = self.client.delete(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(EmpresaContratista.objects.filter(pk=self.contratista.pk).exists())
+
+    def test_admin_puede_eliminar_empresa(self):
+        url = reverse("contratistas:empresas_detalle", args=[self.contratista.pk])
+        response = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(EmpresaContratista.objects.filter(pk=self.contratista.pk).exists())
 
 
 class TrabajadorTests(ApiTestsBase):
@@ -186,6 +202,30 @@ class RadicacionSeguridadSocialTests(ApiTestsBase):
     def test_requiere_autenticacion(self):
         response = self.client.get(reverse("contratistas:radicaciones_lista"))
         self.assertEqual(response.status_code, 401)
+
+    def test_rechaza_extension_de_archivo_no_permitida(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("malware.exe", b"MZ contenido falso", content_type="application/octet-stream")
+        response = self.client.post(
+            reverse("contratistas:radicaciones_lista"),
+            {"trabajador": self.trabajador.pk, "anio": 2026, "mes": "AGOSTO", "soporte_pago": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("soporte_pago", response.data)
+
+    def test_solo_admin_puede_eliminar_radicacion(self):
+        radicacion = RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador, anio=2026, mes="AGOSTO"
+        )
+        url = reverse("contratistas:radicaciones_detalle", args=[radicacion.pk])
+
+        respuesta_operador = self.client.delete(url, **self._auth(self.operador))
+        self.assertEqual(respuesta_operador.status_code, 403)
+
+        respuesta_admin = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(respuesta_admin.status_code, 204)
 
 
 class DeclaracionMetodoTests(ApiTestsBase):

@@ -5,6 +5,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.permissions import EsAdministradorParaEliminar
+
 from .models import DeclaracionMetodo, EmpresaContratista, FirmaMetodo, RadicacionSeguridadSocial, Trabajador
 from .serializers import (
     CatalogosSerializer,
@@ -49,7 +51,7 @@ class EmpresaContratistaListaDashboard(generics.ListCreateAPIView):
 class EmpresaContratistaDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = EmpresaContratista.objects.all()
     serializer_class = EmpresaContratistaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsAdministradorParaEliminar]
 
 
 # --- Trabajadores ---
@@ -70,7 +72,7 @@ class TrabajadorListaDashboard(generics.ListCreateAPIView):
 class TrabajadorDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = Trabajador.objects.select_related("contratista")
     serializer_class = TrabajadorSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsAdministradorParaEliminar]
 
 
 # --- Radicaciones de seguridad social ---
@@ -97,7 +99,7 @@ class RadicacionListaDashboard(generics.ListCreateAPIView):
 class RadicacionDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista")
     serializer_class = RadicacionSeguridadSocialSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsAdministradorParaEliminar]
 
 
 def _decidir_radicacion(request, pk, nuevo_estado):
@@ -144,7 +146,7 @@ class DeclaracionMetodoListaDashboard(generics.ListCreateAPIView):
 class DeclaracionMetodoDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas")
     serializer_class = DeclaracionMetodoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsAdministradorParaEliminar]
 
 
 @api_view(["POST"])
