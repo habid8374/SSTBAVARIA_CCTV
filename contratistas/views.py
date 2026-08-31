@@ -154,10 +154,21 @@ def indicadores_dashboard(request):
             }
         )
 
+    claves_obligatorias = list(
+        CursoSafetyAcademy.objects.filter(activo=True, obligatorio=True).values_list("clave", flat=True)
+    )
+    trabajadores_activos = list(Trabajador.objects.filter(activo=True).only("cursos_safety_academy"))
+    trabajadores_con_cursos_pendientes = sum(
+        1
+        for t in trabajadores_activos
+        if any(not (t.cursos_safety_academy or {}).get(clave) for clave in claves_obligatorias)
+    )
+
     return Response(
         {
             "contratistas_activos": len(contratistas_activos),
-            "trabajadores_activos": Trabajador.objects.filter(activo=True).count(),
+            "trabajadores_activos": len(trabajadores_activos),
+            "trabajadores_con_cursos_pendientes": trabajadores_con_cursos_pendientes,
             "radicaciones_por_estado": radicaciones_por_estado,
             "declaraciones_por_estado": declaraciones_por_estado,
             "riesgo_promedio_sin": round(sum(riesgos_sin) / len(riesgos_sin), 1) if riesgos_sin else 0,

@@ -79,6 +79,7 @@ class RadicacionResumenSerializer(serializers.ModelSerializer):
 class TrabajadorSerializer(serializers.ModelSerializer):
     contratista_nombre = serializers.CharField(source="contratista.nombre", read_only=True)
     ultima_radicacion = serializers.SerializerMethodField()
+    cursos_pendientes = serializers.ReadOnlyField()
 
     class Meta:
         model = Trabajador
@@ -95,6 +96,7 @@ class TrabajadorSerializer(serializers.ModelSerializer):
             "tipo_vinculacion",
             "fecha_inicio_contrato",
             "cursos_safety_academy",
+            "cursos_pendientes",
             "activo",
             "creado_en",
             "autorizacion_datos",
@@ -323,7 +325,7 @@ class CatalogosSerializer(serializers.Serializer):
 
     def get_cursos_safety_academy(self, obj):
         return [
-            {"clave": c.clave, "etiqueta": c.etiqueta}
+            {"clave": c.clave, "etiqueta": c.etiqueta, "obligatorio": c.obligatorio}
             for c in CursoSafetyAcademy.objects.filter(activo=True)
         ]
 
@@ -352,7 +354,7 @@ class FuncionarioSerializer(serializers.ModelSerializer):
 class CursoSafetyAcademySerializer(serializers.ModelSerializer):
     class Meta:
         model = CursoSafetyAcademy
-        fields = ["id", "clave", "etiqueta", "activo", "orden"]
+        fields = ["id", "clave", "etiqueta", "activo", "obligatorio", "orden"]
         read_only_fields = ["id"]
 
 

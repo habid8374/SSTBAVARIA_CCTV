@@ -323,6 +323,16 @@ function PanelContratista({
                   <tr key={t.id} className={seleccionado === t.id ? "bg-corp-blue-light/60" : undefined}>
                     <td className="px-4 py-2.5 font-medium text-corp-navy">
                       {t.apellidos} {t.nombres}
+                      {t.cursos_pendientes.length > 0 && (
+                        <p
+                          className="mt-0.5 text-xs font-normal text-amber-700"
+                          title={t.cursos_pendientes.map((c) => c.etiqueta).join(", ")}
+                        >
+                          ⚠ {t.cursos_pendientes.length} curso{t.cursos_pendientes.length === 1 ? "" : "s"}{" "}
+                          obligatorio{t.cursos_pendientes.length === 1 ? "" : "s"} pendiente
+                          {t.cursos_pendientes.length === 1 ? "" : "s"}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">{t.documento}</td>
                     <td className="px-4 py-2.5 text-xs text-corp-muted">
@@ -754,6 +764,9 @@ function FormularioTrabajador({
 
           <div>
             <span className="text-sm font-medium text-corp-navy">Cursos Safety Academy</span>
+            {catalogos.cursos_safety_academy.some((c) => c.obligatorio) && (
+              <span className="ml-2 text-xs text-amber-700">* obligatorio</span>
+            )}
             <div className="mt-2 space-y-2 rounded-lg border border-corp-border p-3">
               {catalogos.cursos_safety_academy.map((curso) => {
                 const completado = cursos[curso.clave] != null;
@@ -767,6 +780,7 @@ function FormularioTrabajador({
                         className="h-4 w-4 rounded border-corp-border accent-corp-blue"
                       />
                       {curso.etiqueta}
+                      {curso.obligatorio && <span className="text-amber-700">*</span>}
                     </label>
                     {completado && (
                       <input

@@ -467,7 +467,7 @@ export function eliminarEquipoLocal(token: string, id: number): Promise<void> {
 export type Opcion = { clave: string; etiqueta: string };
 
 export type Catalogos = {
-  cursos_safety_academy: Opcion[];
+  cursos_safety_academy: (Opcion & { obligatorio: boolean })[];
   permisos_trabajo: string[];
   roles_firma: Opcion[];
 };
@@ -481,10 +481,17 @@ export type CursoSafetyAcademy = {
   clave: string;
   etiqueta: string;
   activo: boolean;
+  obligatorio: boolean;
   orden: number;
 };
 
-export type NuevoCursoSafetyAcademy = { clave: string; etiqueta: string; activo?: boolean; orden?: number };
+export type NuevoCursoSafetyAcademy = {
+  clave: string;
+  etiqueta: string;
+  activo?: boolean;
+  obligatorio?: boolean;
+  orden?: number;
+};
 
 export function listarCursos(token: string): Promise<CursoSafetyAcademy[]> {
   return request<CursoSafetyAcademy[]>("/api/contratistas/cursos/", { headers: authHeaders(token) });
@@ -637,6 +644,7 @@ export type Trabajador = {
   tipo_vinculacion: TipoVinculacion;
   fecha_inicio_contrato: string | null;
   cursos_safety_academy: Record<string, string | null>;
+  cursos_pendientes: Opcion[];
   activo: boolean;
   creado_en: string;
   autorizacion_datos: boolean;
@@ -811,6 +819,7 @@ export type MesResumen = {
 export type IndicadoresDashboard = {
   contratistas_activos: number;
   trabajadores_activos: number;
+  trabajadores_con_cursos_pendientes: number;
   radicaciones_por_estado: Record<EstadoRadicacion, number>;
   declaraciones_por_estado: Record<EstadoDeclaracion, number>;
   riesgo_promedio_sin: number;

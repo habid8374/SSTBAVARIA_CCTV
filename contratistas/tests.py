@@ -182,6 +182,14 @@ class IndicadoresDashboardTests(ApiTestsBase):
         response = self.client.get(reverse("contratistas:indicadores_dashboard"))
         self.assertEqual(response.status_code, 401)
 
+    def test_cuenta_trabajadores_con_cursos_obligatorios_pendientes(self):
+        from .models import CursoSafetyAcademy
+
+        CursoSafetyAcademy.objects.filter(clave="induccion_sst").update(obligatorio=True)
+        # self.trabajador (de ApiTestsBase) no tiene ningún curso completado.
+        response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
+        self.assertEqual(response.data["trabajadores_con_cursos_pendientes"], 1)
+
     def test_estructura_basica_sin_datos(self):
         response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
         self.assertEqual(response.status_code, 200, response.data)
@@ -391,6 +399,29 @@ class EmpresaContratistaTests(ApiTestsBase):
 
 
 class TrabajadorTests(ApiTestsBase):
+    def test_cursos_pendientes_lista_obligatorios_incompletos(self):
+        from .models import CursoSafetyAcademy
+
+        CursoSafetyAcademy.objects.filter(clave__in=["induccion_sst", "epp"]).update(obligatorio=True)
+        self.trabajador.cursos_safety_academy = {"induccion_sst": "2026-01-01", "epp": None}
+        self.trabajador.save()
+
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        claves = [c["clave"] for c in response.data["cursos_pendientes"]]
+        self.assertEqual(claves, ["epp"])
+
+    def test_curso_no_obligatorio_no_cuenta_como_pendiente(self):
+        from .models import CursoSafetyAcademy
+
+        CursoSafetyAcademy.objects.filter(clave="epp").update(obligatorio=False)
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.data["cursos_pendientes"], [])
+
     def test_crear_trabajador(self):
         response = self.client.post(
             reverse("contratistas:trabajadores_lista"),

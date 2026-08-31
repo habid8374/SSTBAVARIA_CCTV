@@ -68,6 +68,12 @@ frontend en Vercel — pero viven en el mismo repositorio.
     siembra los valores que antes estaban hardcodeados, así los
     trabajadores/actividades ya guardados siguen encontrando su curso o
     permiso por la misma clave/nombre.
+  - **Validación de cursos obligatorios**: un curso Safety Academy se puede
+    marcar `obligatorio` (misma pestaña). El campo calculado
+    `Trabajador.cursos_pendientes` avisa (⚠ en la lista de trabajadores y
+    un KPI en amarillo en Indicadores) cuando un trabajador activo no
+    tiene completado algún curso obligatorio — es un aviso, no bloquea el
+    registro ni la radicación.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada

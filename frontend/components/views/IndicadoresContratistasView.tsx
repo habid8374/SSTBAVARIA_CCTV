@@ -80,6 +80,12 @@ export default function IndicadoresContratistasView({ token }: { token: string }
               }
               nota="declaraciones aprobadas"
             />
+            <Kpi
+              titulo="Trabajadores con cursos pendientes"
+              valor={String(datos.trabajadores_con_cursos_pendientes)}
+              nota="cursos Safety Academy marcados como obligatorios"
+              alerta={datos.trabajadores_con_cursos_pendientes > 0}
+            />
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -179,11 +185,25 @@ export default function IndicadoresContratistasView({ token }: { token: string }
   );
 }
 
-function Kpi({ titulo, valor, nota }: { titulo: string; valor: string; nota?: string }) {
+function Kpi({
+  titulo,
+  valor,
+  nota,
+  alerta,
+}: {
+  titulo: string;
+  valor: string;
+  nota?: string;
+  alerta?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-corp-border bg-white p-5 shadow-sm">
+    <div
+      className={`rounded-xl border p-5 shadow-sm ${
+        alerta ? "border-amber-300 bg-amber-50" : "border-corp-border bg-white"
+      }`}
+    >
       <p className="text-sm text-corp-muted">{titulo}</p>
-      <p className="mt-2 text-2xl font-semibold text-corp-navy">{valor}</p>
+      <p className={`mt-2 text-2xl font-semibold ${alerta ? "text-amber-800" : "text-corp-navy"}`}>{valor}</p>
       {nota && <p className="mt-1 text-xs text-corp-muted">{nota}</p>}
     </div>
   );

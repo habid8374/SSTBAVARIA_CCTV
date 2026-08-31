@@ -106,6 +106,20 @@ class Trabajador(models.Model):
     def __str__(self):
         return f"{self.apellidos} {self.nombres} ({self.documento})"
 
+    @property
+    def cursos_pendientes(self):
+        """Cursos Safety Academy marcados como obligatorios que este
+        trabajador todavía no tiene completados (sin fecha registrada).
+        Se calcula al vuelo contra el catálogo actual — nada queda
+        guardado, así que un curso recién marcado obligatorio aplica a
+        todos los trabajadores activos sin necesidad de tocarlos uno por uno."""
+        completados = self.cursos_safety_academy or {}
+        return [
+            {"clave": c.clave, "etiqueta": c.etiqueta}
+            for c in CursoSafetyAcademy.objects.filter(activo=True, obligatorio=True)
+            if not completados.get(c.clave)
+        ]
+
 
 def soporte_pago_upload_to(instance, filename):
     return f"seguridad_social/{instance.trabajador.contratista_id}/{filename}"
@@ -388,6 +402,11 @@ class CursoSafetyAcademy(models.Model):
     clave = models.SlugField(max_length=50, unique=True)
     etiqueta = models.CharField(max_length=150)
     activo = models.BooleanField(default=True)
+    obligatorio = models.BooleanField(
+        "obligatorio para todo trabajador",
+        default=False,
+        help_text="Si está marcado, se avisa cuando un trabajador activo no lo tiene completado.",
+    )
     orden = models.PositiveIntegerField(default=0)
 
     class Meta:

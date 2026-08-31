@@ -141,6 +141,15 @@ function Cursos({ token }: { token: string }) {
     }
   }
 
+  async function alternarObligatorio(curso: CursoSafetyAcademy) {
+    try {
+      await actualizarCurso(token, curso.id, { obligatorio: !curso.obligatorio });
+      cargar();
+    } catch {
+      setError("No se pudo actualizar el curso.");
+    }
+  }
+
   async function eliminar(curso: CursoSafetyAcademy) {
     const ok = await confirmar({
       titulo: "Eliminar curso",
@@ -160,6 +169,10 @@ function Cursos({ token }: { token: string }) {
   return (
     <div className="rounded-xl border border-corp-border bg-white p-5 shadow-sm">
       <h3 className="text-sm font-semibold text-corp-navy">Cursos Safety Academy</h3>
+      <p className="mt-1 text-sm text-corp-muted">
+        Marcar un curso como obligatorio avisa (en Indicadores y en la ficha del trabajador) cuando algún
+        trabajador activo no lo tiene completado.
+      </p>
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       <div className="mt-3 space-y-2">
         {cursos?.map((c) => (
@@ -167,8 +180,16 @@ function Cursos({ token }: { token: string }) {
             <div>
               <span className={c.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{c.etiqueta}</span>
               <span className="ml-2 text-xs text-corp-muted">({c.clave})</span>
+              {c.obligatorio && (
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                  Obligatorio
+                </span>
+              )}
             </div>
             <div className="flex gap-3">
+              <button type="button" onClick={() => alternarObligatorio(c)} className="text-corp-blue hover:underline">
+                {c.obligatorio ? "Quitar obligatoriedad" : "Marcar obligatorio"}
+              </button>
               <button type="button" onClick={() => alternarActivo(c)} className="text-corp-blue hover:underline">
                 {c.activo ? "Desactivar" : "Activar"}
               </button>

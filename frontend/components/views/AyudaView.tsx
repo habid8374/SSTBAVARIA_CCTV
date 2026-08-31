@@ -176,7 +176,9 @@ const TEMAS: Tema[] = [
         <Ol>
           <li><strong>Empresa contratista</strong>: nombre, NIT, contactos, responsable SST.</li>
           <li><strong>Trabajadores</strong> de esa empresa: documento, EPS/ARL/AFP, tipo de vinculación,
-            cursos de Safety Academy.</li>
+            cursos de Safety Academy — los cursos marcados con <span className="text-amber-700">*</span>{" "}
+            son obligatorios (se configuran en Sistema → Reglas de contratistas); si a un trabajador activo
+            le falta alguno, aparece un aviso ⚠ junto a su nombre en la lista.</li>
           <li><strong>Radicación de seguridad social</strong>: por cada trabajador y mes, se sube el
             comprobante de pago (PDF o foto) con número de planilla y fecha de vencimiento.</li>
         </Ol>
@@ -287,8 +289,9 @@ const TEMAS: Tema[] = [
           datos actuales, no hay resúmenes guardados que se puedan desactualizar.
         </P>
         <Ul>
-          <li>Contratistas y trabajadores activos, riesgo Kinney promedio (sin vs. con mitigación) y tiempo
-            promedio de aprobación de declaraciones.</li>
+          <li>Contratistas y trabajadores activos, riesgo Kinney promedio (sin vs. con mitigación), tiempo
+            promedio de aprobación de declaraciones y cuántos trabajadores activos tienen algún curso
+            Safety Academy obligatorio pendiente (se pone en amarillo si es mayor a cero).</li>
           <li>Radicaciones y declaraciones por estado, en barras.</li>
           <li>Tendencia de los últimos 6 meses (declaraciones y radicaciones creadas por mes).</li>
           <li>Cumplimiento por contratista (trabajadores, radicaciones y declaraciones pendientes) y el
