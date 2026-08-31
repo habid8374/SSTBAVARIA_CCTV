@@ -355,7 +355,8 @@ const TEMAS: Tema[] = [
         <P>
           El módulo de Contratistas guarda datos personales de los trabajadores, incluidos datos de
           afiliación a seguridad social (EPS, ARL, AFP) — datos sensibles bajo la Ley 1581 de 2012
-          (&quot;Habeas Data&quot;) en Colombia.
+          (&quot;Habeas Data&quot;) en Colombia. El módulo de Cámaras IA también trata datos personales:
+          las imágenes que captura cuando detecta una condición de riesgo.
         </P>
         <Ul>
           <li>
@@ -372,11 +373,22 @@ const TEMAS: Tema[] = [
             </Link>
             , y enlazado también desde la pantalla de inicio de sesión.
           </li>
+          <li>
+            Para las cámaras, el mecanismo de consentimiento es distinto al de los trabajadores: en vez de
+            un formulario, la norma exige un <strong>aviso físico visible</strong> en cada zona monitoreada
+            (&quot;Zona vigilada por cámaras con IA&quot;), porque cualquier persona que entre a esa zona —
+            no solo trabajadores registrados en el sistema — puede quedar captada. Hay un cartel listo para
+            imprimir en{" "}
+            <Link href="/politica-privacidad/cartel" target="_blank" className="text-corp-blue hover:underline">
+              /politica-privacidad/cartel
+            </Link>
+            , también enlazado desde la sección Cámaras.
+          </li>
         </Ul>
         <Nota tipo="aviso">
-          El texto de la política es un borrador técnico — todavía tiene datos de la empresa (NIT, razón
-          social, contacto) pendientes por completar y una revisión legal pendiente antes de considerarse
-          definitivo.
+          El texto de la política y el cartel son un borrador técnico — todavía tienen datos de la empresa
+          (NIT, razón social, contacto) pendientes por completar y una revisión legal pendiente antes de
+          considerarse definitivos.
         </Nota>
       </>
     ),

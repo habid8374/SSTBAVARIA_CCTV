@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
+import { Nota } from "@/components/DocTexto";
 import PoligonoOverlay from "@/components/PoligonoOverlay";
 import {
   ApiError,
@@ -51,6 +53,18 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
             + Nueva cámara
           </button>
         )}
+      </div>
+
+      <div className="mt-4">
+        <Nota tipo="aviso">
+          Tratamiento de datos personales: cada zona cubierta por estas cámaras debe tener un aviso físico
+          visible (&quot;Zona vigilada por cámaras con IA&quot;) antes de que la persona ingrese, conforme a
+          la{" "}
+          <Link href="/politica-privacidad" target="_blank" className="font-medium text-corp-blue hover:underline">
+            política de tratamiento de datos personales
+          </Link>
+          . Descarga el cartel para imprimir desde Ayuda → Política de privacidad.
+        </Nota>
       </div>
 
       {error && (

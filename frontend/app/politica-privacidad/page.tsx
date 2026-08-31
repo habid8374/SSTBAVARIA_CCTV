@@ -23,8 +23,13 @@ export default function PoliticaPrivacidadPage() {
         <h1 className="mb-1 text-2xl font-semibold text-corp-navy">
           Política de tratamiento de datos personales
         </h1>
-        <p className="mb-6 text-sm text-corp-muted">
+        <p className="mb-2 text-sm text-corp-muted">
           Sistema SST Bavaria Cámaras IA — Ley 1581 de 2012 (Habeas Data) y Decreto 1377 de 2013.
+        </p>
+        <p className="mb-6 text-sm">
+          <Link href="/politica-privacidad/cartel" target="_blank" className="font-medium text-corp-blue hover:underline">
+            Descargar/imprimir cartel de aviso de videovigilancia →
+          </Link>
         </p>
         <PoliticaPrivacidadContenido />
       </main>
