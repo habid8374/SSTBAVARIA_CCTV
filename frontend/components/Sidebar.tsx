@@ -28,6 +28,10 @@ const ITEMS: Item[] = [
   { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true },
 ];
 
+// Transición compartida por toda etiqueta de texto que aparece/desaparece
+// junto con el colapso del riel — mismo timing que el ancho del <aside>.
+const TEXTO_COLAPSABLE = "overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out";
+
 type Props = {
   seccionActiva: SeccionId;
   onSeleccionar: (id: SeccionId) => void;
@@ -53,19 +57,17 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`flex h-full flex-col bg-corp-navy text-white transition-[width] duration-200 ${
+      className={`flex h-full flex-col bg-corp-navy text-white transition-[width] duration-300 ease-in-out ${
         colapsado ? "w-[76px]" : "w-64"
       } ${className}`}
     >
       <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-sstbavaria.png" alt="SST Bavaria" className="h-9 w-9 shrink-0 rounded-lg" />
-        {!colapsado && (
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">SST BAVARIA</p>
-            <p className="truncate text-xs text-white/60">Cámaras IA</p>
-          </div>
-        )}
+        <div className={`min-w-0 ${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[160px] opacity-100"}`}>
+          <p className="truncate text-sm font-semibold">SST BAVARIA</p>
+          <p className="truncate text-xs text-white/60">Cámaras IA</p>
+        </div>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
@@ -83,7 +85,11 @@ export default function Sidebar({
               }`}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              {!colapsado && <span className="flex-1 truncate text-left">{item.label}</span>}
+              <span
+                className={`text-left ${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}
+              >
+                {item.label}
+              </span>
             </button>
           );
         })}
@@ -95,15 +101,19 @@ export default function Sidebar({
           onClick={onToggleColapsado}
           className="hidden w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/70 hover:bg-white/10 md:flex"
         >
-          <IconChevronLeft className={`h-4 w-4 transition-transform ${colapsado ? "rotate-180" : ""}`} />
-          {!colapsado && <span>Colapsar menú</span>}
+          <IconChevronLeft className={`h-4 w-4 shrink-0 transition-transform duration-300 ${colapsado ? "rotate-180" : ""}`} />
+          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}>
+            Colapsar menú
+          </span>
         </button>
 
         <div className="mt-1 flex items-center gap-3 rounded-lg px-3 py-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold">
             {nombre.slice(0, 2).toUpperCase()}
           </div>
-          {!colapsado && <span className="truncate text-sm">{nombre}</span>}
+          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}>
+            {nombre}
+          </span>
         </div>
 
         <button
@@ -112,7 +122,9 @@ export default function Sidebar({
           className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/70 hover:bg-white/10"
         >
           <IconLogout className="h-5 w-5 shrink-0" />
-          {!colapsado && <span>Cerrar sesión</span>}
+          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}>
+            Cerrar sesión
+          </span>
         </button>
       </div>
     </aside>

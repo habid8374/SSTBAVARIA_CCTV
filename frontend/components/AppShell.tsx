@@ -64,25 +64,31 @@ export default function AppShell({
         nombre={nombre}
       />
 
-      {drawerAbierto && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <button
-            aria-label="Cerrar menú"
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setDrawerAbierto(false)}
-          />
-          <Sidebar
-            className="absolute inset-y-0 left-0 z-50 shadow-2xl"
-            seccionActiva={seccionActiva}
-            onSeleccionar={seleccionar}
-            rol={rol}
-            colapsado={false}
-            onToggleColapsado={toggleColapsado}
-            onCerrarSesion={onCerrarSesion}
-            nombre={nombre}
-          />
-        </div>
-      )}
+      <div
+        className={`fixed inset-0 z-40 transition-opacity duration-300 ease-in-out md:hidden ${
+          drawerAbierto ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        aria-hidden={!drawerAbierto}
+        inert={!drawerAbierto}
+      >
+        <button
+          aria-label="Cerrar menú"
+          className="absolute inset-0 bg-black/50"
+          onClick={() => setDrawerAbierto(false)}
+        />
+        <Sidebar
+          className={`absolute inset-y-0 left-0 z-50 shadow-2xl transition-transform duration-300 ease-in-out ${
+            drawerAbierto ? "translate-x-0" : "-translate-x-full"
+          }`}
+          seccionActiva={seccionActiva}
+          onSeleccionar={seleccionar}
+          rol={rol}
+          colapsado={false}
+          onToggleColapsado={toggleColapsado}
+          onCerrarSesion={onCerrarSesion}
+          nombre={nombre}
+        />
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-corp-border bg-white px-4 py-3 md:px-8">
