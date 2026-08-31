@@ -1,3 +1,7 @@
+import hashlib
+import json
+
+from django.conf import settings
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
@@ -259,8 +263,48 @@ def nivel_riesgo(valor):
     return "bajo", "Riesgo bajo — aceptable"
 
 
+def calcular_hash_declaracion(declaracion):
+    """Huella digital (sha256) del contenido de la declaración en un momento
+    dado — encabezado + actividades, en un orden fijo — para poder detectar
+    después si el documento cambió tras haber sido firmado."""
+    actividades = [
+        {
+            "orden": a.orden,
+            "secuencia": a.secuencia,
+            "tecnicas_herramientas": a.tecnicas_herramientas,
+            "descripcion_riesgo": a.descripcion_riesgo,
+            "probabilidad_sin": a.probabilidad_sin,
+            "frecuencia_sin": a.frecuencia_sin,
+            "impacto_sin": a.impacto_sin,
+            "medidas_mitigacion": a.medidas_mitigacion,
+            "probabilidad_con": a.probabilidad_con,
+            "frecuencia_con": a.frecuencia_con,
+            "impacto_con": a.impacto_con,
+            "permisos_requeridos": a.permisos_requeridos,
+            "tarea_sif": a.tarea_sif,
+        }
+        for a in declaracion.actividades.order_by("orden")
+    ]
+    contenido = {
+        "planta_area": declaracion.planta_area,
+        "numero_pedido": declaracion.numero_pedido,
+        "gerente_proyecto": declaracion.gerente_proyecto,
+        "contacto_nombre": declaracion.contacto_nombre,
+        "contacto_telefono": declaracion.contacto_telefono,
+        "fecha_elaboracion": str(declaracion.fecha_elaboracion),
+        "duracion_dias": declaracion.duracion_dias,
+        "descripcion_trabajo": declaracion.descripcion_trabajo,
+        "actividades": actividades,
+    }
+    bruto = json.dumps(contenido, sort_keys=True, ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(bruto).hexdigest()
+
+
 class FirmaMetodo(models.Model):
-    """Firma/aprobación de uno de los roles requeridos en la declaración de método."""
+    """Firma electrónica de uno de los roles requeridos en la declaración de
+    método: queda ligada a la cuenta autenticada que firmó (no a un texto
+    libre que cualquiera podría escribir) y a una huella del documento en
+    el momento de la firma, para poder detectar cambios posteriores."""
 
     class Rol(models.TextChoices):
         SUPERVISOR_CONTRATISTA = "supervisor_contratista", "Supervisor de Seguridad del Contratista"
@@ -272,6 +316,22 @@ class FirmaMetodo(models.Model):
     declaracion = models.ForeignKey(DeclaracionMetodo, on_delete=models.CASCADE, related_name="firmas")
     rol = models.CharField(max_length=30, choices=Rol.choices)
     nombre_firmante = models.CharField(max_length=150)
+    firmante_usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="firmas_metodo",
+        null=True,
+        blank=True,
+        help_text=(
+            "Cuenta autenticada que ejecutó la firma — no se puede eliminar mientras tenga firmas "
+            "registradas. Nulo solo en firmas anteriores a este control."
+        ),
+    )
+    hash_documento = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text="Huella sha256 de la declaración en el momento de esta firma.",
+    )
     firmado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -282,3 +342,11 @@ class FirmaMetodo(models.Model):
 
     def __str__(self):
         return f"{self.get_rol_display()}: {self.nombre_firmante}"
+
+    @property
+    def documento_modificado_despues_de_firmar(self):
+        """True si la declaración cambió después de esta firma — compara la
+        huella guardada al firmar contra el contenido actual."""
+        if not self.hash_documento:
+            return False
+        return self.hash_documento != calcular_hash_declaracion(self.declaracion)

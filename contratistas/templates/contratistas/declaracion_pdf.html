@@ -91,14 +91,24 @@
   <p>No se registraron actividades.</p>
   {% endfor %}
 
-  <h2>Firmas</h2>
+  <h2>Firmas electrónicas</h2>
   <table class="firmas">
-    <tr><th>Rol</th><th>Nombre</th><th>Fecha</th></tr>
+    <tr><th>Rol</th><th>Nombre</th><th>Cuenta que firmó</th><th>Fecha</th><th>Integridad</th></tr>
     {% for firma in declaracion.firmas.all %}
-    <tr><td>{{ firma.get_rol_display }}</td><td>{{ firma.nombre_firmante }}</td><td>{{ firma.firmado_en|date:"d/m/Y H:i" }}</td></tr>
+    <tr>
+      <td>{{ firma.get_rol_display }}</td>
+      <td>{{ firma.nombre_firmante }}</td>
+      <td>{{ firma.firmante_usuario.username|default:"—" }}</td>
+      <td>{{ firma.firmado_en|date:"d/m/Y H:i" }}</td>
+      <td>{% if firma.documento_modificado_despues_de_firmar %}⚠ documento modificado tras firmar{% else %}✓ sin cambios{% endif %}</td>
+    </tr>
     {% empty %}
-    <tr><td colspan="3">Sin firmas registradas.</td></tr>
+    <tr><td colspan="5">Sin firmas registradas.</td></tr>
     {% endfor %}
   </table>
+  <p class="permisos">
+    Firma electrónica: cada registro queda ligado a la cuenta autenticada que ejecutó la acción y a una
+    huella (hash sha256) del contenido de la declaración en ese momento, para detectar cambios posteriores.
+  </p>
 </body>
 </html>

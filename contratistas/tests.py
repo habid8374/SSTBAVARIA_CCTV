@@ -591,7 +591,9 @@ class DeclaracionMetodoTests(ApiTestsBase):
             fecha_elaboracion=datetime.date(2026, 7, 11),
             descripcion_trabajo="Instalación de pórtico",
         )
-        FirmaMetodo.objects.create(declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana")
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
         response = self.client.patch(
             reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
             {"estado": "aprobada"},
@@ -612,7 +614,9 @@ class DeclaracionMetodoTests(ApiTestsBase):
             fecha_elaboracion=datetime.date(2026, 7, 11),
             descripcion_trabajo="Instalación de pórtico",
         )
-        FirmaMetodo.objects.create(declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana")
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
 
         response = self.client.patch(
             reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
@@ -630,7 +634,9 @@ class DeclaracionMetodoTests(ApiTestsBase):
             fecha_elaboracion=datetime.date(2026, 7, 11),
             descripcion_trabajo="Instalación de pórtico",
         )
-        FirmaMetodo.objects.create(declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana")
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
 
         response = self.client.patch(
             reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
@@ -671,7 +677,9 @@ class DeclaracionMetodoTests(ApiTestsBase):
             frecuencia_sin=3,
             impacto_sin=3,
         )
-        FirmaMetodo.objects.create(declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana")
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
 
         response = self.client.get(
             reverse("contratistas:declaraciones_pdf", args=[declaracion.pk]), **self._auth(self.operador)
@@ -697,20 +705,75 @@ class DeclaracionMetodoTests(ApiTestsBase):
         )
         response = self.client.post(
             reverse("contratistas:declaraciones_firmar", args=[declaracion.pk]),
-            {"rol": "supervisor_contratista", "nombre_firmante": "Andres Felipe Lujan"},
+            {"rol": "supervisor_contratista", "nombre_firmante": "Andres Felipe Lujan", "consiento_firma": True},
             content_type="application/json",
             **self._auth(self.operador),
         )
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(FirmaMetodo.objects.count(), 1)
+        firma = FirmaMetodo.objects.first()
+        self.assertEqual(firma.firmante_usuario, self.operador)
+        self.assertTrue(firma.hash_documento)
+        self.assertFalse(response.data["documento_modificado_despues_de_firmar"])
+        self.assertEqual(response.data["firmante_usuario_nombre"], "operador1")
 
         # Firmar de nuevo el mismo rol reemplaza en vez de duplicar.
         response = self.client.post(
             reverse("contratistas:declaraciones_firmar", args=[declaracion.pk]),
-            {"rol": "supervisor_contratista", "nombre_firmante": "Otro Nombre"},
+            {"rol": "supervisor_contratista", "nombre_firmante": "Otro Nombre", "consiento_firma": True},
             content_type="application/json",
             **self._auth(self.operador),
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(FirmaMetodo.objects.count(), 1)
         self.assertEqual(FirmaMetodo.objects.first().nombre_firmante, "Otro Nombre")
+
+    def test_firmar_sin_consentimiento_devuelve_400(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.post(
+            reverse("contratistas:declaraciones_firmar", args=[declaracion.pk]),
+            {"rol": "supervisor_contratista", "nombre_firmante": "Andres Felipe Lujan", "consiento_firma": False},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("consiento_firma", response.data)
+        self.assertEqual(FirmaMetodo.objects.count(), 0)
+
+    def test_editar_declaracion_despues_de_firmar_marca_documento_modificado(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        self.client.post(
+            reverse("contratistas:declaraciones_firmar", args=[declaracion.pk]),
+            {"rol": "supervisor_contratista", "nombre_firmante": "Ana", "consiento_firma": True},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        firma = FirmaMetodo.objects.first()
+        self.assertFalse(firma.documento_modificado_despues_de_firmar)
+
+        self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"descripcion_trabajo": "Instalación de pórtico modificada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        firma.refresh_from_db()
+        self.assertTrue(firma.documento_modificado_despues_de_firmar)
+
+        # Aprobar ya no debería dejarse — la firma quedó desactualizada.
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("estado", response.data)

@@ -170,11 +170,31 @@ class DecisionRadicacionSerializer(serializers.Serializer):
 
 class FirmaMetodoSerializer(serializers.ModelSerializer):
     rol_display = serializers.CharField(source="get_rol_display", read_only=True)
+    firmante_usuario_nombre = serializers.CharField(source="firmante_usuario.username", read_only=True)
+    documento_modificado_despues_de_firmar = serializers.BooleanField(read_only=True)
+    consiento_firma = serializers.BooleanField(write_only=True, required=True)
 
     class Meta:
         model = FirmaMetodo
-        fields = ["id", "rol", "rol_display", "nombre_firmante", "firmado_en"]
-        read_only_fields = ["id", "firmado_en"]
+        fields = [
+            "id",
+            "rol",
+            "rol_display",
+            "nombre_firmante",
+            "firmante_usuario_nombre",
+            "hash_documento",
+            "documento_modificado_despues_de_firmar",
+            "firmado_en",
+            "consiento_firma",
+        ]
+        read_only_fields = ["id", "hash_documento", "firmado_en"]
+
+    def validate_consiento_firma(self, valor):
+        if not valor:
+            raise serializers.ValidationError(
+                "Debes confirmar que firmas electrónicamente esta declaración a nombre propio."
+            )
+        return valor
 
 
 class ActividadMetodoSerializer(serializers.ModelSerializer):
@@ -251,10 +271,19 @@ class DeclaracionMetodoSerializer(serializers.ModelSerializer):
 
     def validate(self, datos):
         if datos.get("estado") == DeclaracionMetodo.Estado.APROBADA:
-            tiene_firmas = self.instance is not None and self.instance.firmas.exists()
-            if not tiene_firmas:
+            firmas = list(self.instance.firmas.all()) if self.instance is not None else []
+            if not firmas:
                 raise serializers.ValidationError(
                     {"estado": "No se puede aprobar sin al menos una firma registrada."}
+                )
+            if any(firma.documento_modificado_despues_de_firmar for firma in firmas):
+                raise serializers.ValidationError(
+                    {
+                        "estado": (
+                            "El documento cambió después de alguna de las firmas registradas — "
+                            "pide que vuelvan a firmar antes de aprobar."
+                        )
+                    }
                 )
         return datos
 

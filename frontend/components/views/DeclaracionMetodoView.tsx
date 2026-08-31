@@ -707,18 +707,26 @@ function PanelFirmas({
   const [firmas, setFirmas] = useState<FirmaMetodo[]>(declaracion.firmas);
   const [rol, setRol] = useState<RolFirma>((rolesFirma[0]?.clave as RolFirma) ?? "supervisor_contratista");
   const [nombreFirmante, setNombreFirmante] = useState("");
+  const [consientoFirma, setConsientoFirma] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
+  const hayDocumentoModificado = firmas.some((f) => f.documento_modificado_despues_de_firmar);
+
   async function firmar(event: FormEvent) {
     event.preventDefault();
-    if (!nombreFirmante.trim()) return;
+    if (!nombreFirmante.trim() || !consientoFirma) return;
     setError(null);
     setEnviando(true);
     try {
-      const firma = await firmarDeclaracion(token, declaracion.id, { rol, nombre_firmante: nombreFirmante });
+      const firma = await firmarDeclaracion(token, declaracion.id, {
+        rol,
+        nombre_firmante: nombreFirmante,
+        consiento_firma: consientoFirma,
+      });
       setFirmas((actual) => [...actual.filter((f) => f.rol !== firma.rol), firma]);
       setNombreFirmante("");
+      setConsientoFirma(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar la firma.");
     } finally {
@@ -728,48 +736,80 @@ function PanelFirmas({
 
   return (
     <div className="mt-6 rounded-2xl border border-corp-border bg-white p-5">
-      <h3 className="text-base font-semibold text-corp-navy">Firmas</h3>
+      <h3 className="text-base font-semibold text-corp-navy">Firmas electrónicas</h3>
+
+      {hayDocumentoModificado && (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          ⚠ La declaración se editó después de al menos una firma — esa firma quedó desactualizada. No se
+          podrá aprobar hasta que la persona vuelva a firmar sobre la versión actual.
+        </div>
+      )}
 
       {firmas.length > 0 && (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {firmas.map((f) => (
-            <div key={f.id} className="rounded-lg border border-corp-border px-3 py-2 text-sm">
+            <div
+              key={f.id}
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                f.documento_modificado_despues_de_firmar ? "border-amber-300 bg-amber-50" : "border-corp-border"
+              }`}
+            >
               <p className="font-medium text-corp-navy">{f.rol_display}</p>
               <p className="text-corp-muted">
                 {f.nombre_firmante} · {new Date(f.firmado_en).toLocaleString("es-CO")}
+              </p>
+              <p className="text-xs text-corp-muted">
+                Cuenta: {f.firmante_usuario_nombre || "—"}
+                {f.documento_modificado_despues_de_firmar && " · ⚠ documento modificado después de firmar"}
               </p>
             </div>
           ))}
         </div>
       )}
 
-      <form onSubmit={firmar} className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="space-y-1.5">
-          <span className="text-sm font-medium text-corp-navy">Rol</span>
-          <select value={rol} onChange={(e) => setRol(e.target.value as RolFirma)} className={INPUT}>
-            {rolesFirma.map((r) => (
-              <option key={r.clave} value={r.clave}>
-                {r.etiqueta}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex-1 space-y-1.5">
-          <span className="text-sm font-medium text-corp-navy">Nombre de quien firma</span>
+      <form onSubmit={firmar} className="mt-4 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="space-y-1.5">
+            <span className="text-sm font-medium text-corp-navy">Rol</span>
+            <select value={rol} onChange={(e) => setRol(e.target.value as RolFirma)} className={INPUT}>
+              {rolesFirma.map((r) => (
+                <option key={r.clave} value={r.clave}>
+                  {r.etiqueta}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex-1 space-y-1.5">
+            <span className="text-sm font-medium text-corp-navy">Nombre de quien firma</span>
+            <input
+              value={nombreFirmante}
+              onChange={(e) => setNombreFirmante(e.target.value)}
+              className={INPUT}
+              placeholder="Nombre completo"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={enviando || !consientoFirma}
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {enviando ? "Firmando…" : "Firmar"}
+          </button>
+        </div>
+        <label className="flex items-start gap-2 text-sm text-corp-navy">
           <input
-            value={nombreFirmante}
-            onChange={(e) => setNombreFirmante(e.target.value)}
-            className={INPUT}
-            placeholder="Nombre completo"
+            type="checkbox"
+            required
+            checked={consientoFirma}
+            onChange={(e) => setConsientoFirma(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-corp-border accent-corp-blue"
           />
+          <span>
+            Confirmo que firmo electrónicamente esta declaración con mi propia cuenta —{" "}
+            <strong>quedará registrada como quien ejecutó esta firma</strong> — a nombre de la persona
+            indicada arriba.
+          </span>
         </label>
-        <button
-          type="submit"
-          disabled={enviando}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
-        >
-          {enviando ? "Firmando…" : "Firmar"}
-        </button>
       </form>
 
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}

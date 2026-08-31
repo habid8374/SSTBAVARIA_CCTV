@@ -218,13 +218,27 @@ const TEMAS: Tema[] = [
             <strong>con</strong> ellas aplicadas — el nivel de riesgo (bajo/medio/alto/crítico) se calcula
             solo según el puntaje.</li>
           <li>Permisos de trabajo requeridos por actividad (altura, caliente, espacio confinado, etc.).</li>
-          <li>Firmas por rol (supervisor del contratista, delegado ABI, seguridad de planta, etc.) y estado
-            general del documento (borrador / enviada / aprobada / rechazada).</li>
+          <li>Firmas electrónicas por rol (supervisor del contratista, delegado ABI, seguridad de planta,
+            etc.) y estado general del documento (borrador / enviada / aprobada / rechazada).</li>
         </Ul>
-        <Sub>Aprobar exige al menos una firma</Sub>
+        <Sub>Firmas electrónicas — no son solo un nombre escrito</Sub>
+        <P>
+          Al firmar, además del nombre de la persona hay que marcar una casilla de consentimiento explícito
+          (&quot;confirmo que firmo electrónicamente...&quot;). El sistema registra <strong>qué cuenta del
+          dashboard</strong> ejecutó esa firma (no se puede firmar a nombre de otra cuenta) y guarda una
+          huella (hash) del contenido de la declaración en ese momento.
+        </P>
+        <P>
+          Si la declaración se edita después de que alguien firmó, esa firma queda marcada como
+          &quot;documento modificado después de firmar&quot; (aviso en amarillo) y el sistema{" "}
+          <strong>no deja aprobar</strong> hasta que esa persona vuelva a firmar sobre la versión actual —
+          así una firma nunca queda vinculada a un contenido distinto al que realmente se firmó.
+        </P>
+        <Sub>Aprobar exige al menos una firma vigente</Sub>
         <P>
           El sistema no deja marcar una declaración como &quot;Aprobada&quot; si todavía no tiene ninguna
-          firma registrada — evita aprobar un documento vacío por error.
+          firma registrada, o si alguna firma quedó desactualizada por una edición posterior — evita aprobar
+          un documento vacío o distinto al que se firmó.
         </P>
         <Sub>Notificación y descarga en PDF</Sub>
         <P>

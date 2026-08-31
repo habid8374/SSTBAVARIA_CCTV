@@ -28,15 +28,23 @@ frontend en Vercel — pero viven en el mismo repositorio.
   - **Declaración de Método**: formulario dinámico de secuencia de
     actividades con evaluación de riesgo por el método Kinney
     (R = Probabilidad × Frecuencia × Impacto, antes y después de mitigación),
-    permisos de trabajo requeridos y firmas de aprobación — basado en el
+    permisos de trabajo requeridos y **firmas electrónicas** — basado en el
     formato real `REG.MAZ.SAFE.2.5.2` que ya usa el cliente.
   - Ambos módulos, además: vencimiento de la planilla PILA visible con
     badge (Vigente/Por vencer/Vencida) y banner de aviso agregado; correo
     automático (Brevo) al contacto de la empresa contratista al
     aprobar/rechazar una radicación o una declaración de método; no se
-    puede aprobar una declaración sin al menos una firma registrada;
+    puede aprobar una declaración sin al menos una firma vigente;
     exportación a Excel de las radicaciones (`openpyxl`) y a PDF de la
     declaración de método completa (`xhtml2pdf`).
+  - **Firma electrónica de la Declaración de Método**: cada firma queda
+    ligada a la cuenta autenticada que la ejecutó (`FirmaMetodo.firmante_usuario`,
+    tomado de `request.user` — nunca del cliente) más un consentimiento
+    explícito (`consiento_firma`) y una huella sha256 del contenido de la
+    declaración en ese momento (`calcular_hash_declaracion`). Si la
+    declaración se edita después de firmada, la firma queda marcada
+    `documento_modificado_despues_de_firmar` y bloquea la aprobación hasta
+    que se vuelva a firmar sobre la versión actual.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada

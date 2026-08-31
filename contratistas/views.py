@@ -18,6 +18,7 @@ from .models import (
     FirmaMetodo,
     RadicacionSeguridadSocial,
     Trabajador,
+    calcular_hash_declaracion,
     nivel_riesgo,
 )
 from .notificaciones import notificar_decision_declaracion, notificar_decision_radicacion
@@ -269,14 +270,24 @@ class DeclaracionMetodoDetalle(generics.RetrieveUpdateDestroyAPIView):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def firmar_declaracion(request, pk):
-    """Agrega (o reemplaza, si ya existía) la firma de un rol para esta declaración."""
-    declaracion = get_object_or_404(DeclaracionMetodo, pk=pk)
+    """Agrega (o reemplaza, si ya existía) la firma electrónica de un rol
+    para esta declaración. La cuenta que firma es siempre request.user — el
+    cliente nunca puede suplantar a otra persona — y queda registrada la
+    huella del documento en ese momento, para poder detectar cambios
+    posteriores (ver FirmaMetodo.documento_modificado_despues_de_firmar)."""
+    declaracion = get_object_or_404(
+        DeclaracionMetodo.objects.prefetch_related("actividades"), pk=pk
+    )
     entrada = FirmaMetodoSerializer(data=request.data)
     entrada.is_valid(raise_exception=True)
     firma, _ = FirmaMetodo.objects.update_or_create(
         declaracion=declaracion,
         rol=entrada.validated_data["rol"],
-        defaults={"nombre_firmante": entrada.validated_data["nombre_firmante"]},
+        defaults={
+            "nombre_firmante": entrada.validated_data["nombre_firmante"],
+            "firmante_usuario": request.user,
+            "hash_documento": calcular_hash_declaracion(declaracion),
+        },
     )
     return Response(FirmaMetodoSerializer(firma).data, status=status.HTTP_201_CREATED)
 

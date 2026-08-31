@@ -784,6 +784,9 @@ export type FirmaMetodo = {
   rol: RolFirma;
   rol_display: string;
   nombre_firmante: string;
+  firmante_usuario_nombre: string;
+  hash_documento: string;
+  documento_modificado_despues_de_firmar: boolean;
   firmado_en: string;
 };
 
@@ -866,7 +869,7 @@ export function actualizarDeclaracion(
 export function firmarDeclaracion(
   token: string,
   id: number,
-  datos: { rol: RolFirma; nombre_firmante: string }
+  datos: { rol: RolFirma; nombre_firmante: string; consiento_firma: boolean }
 ): Promise<FirmaMetodo> {
   return request<FirmaMetodo>(`/api/contratistas/declaraciones/${id}/firmar/`, {
     method: "POST",
