@@ -1111,3 +1111,97 @@ export function firmarDeclaracion(
 export function descargarDeclaracionPdf(token: string, id: number): Promise<void> {
   return descargarArchivo(token, `/api/contratistas/declaraciones/${id}/pdf/`, `declaracion-metodo-${id}.pdf`);
 }
+
+export type TrabajadorAutorizacionIngreso = {
+  id: number;
+  trabajador: number;
+  trabajador_nombre: string;
+  trabajador_documento: string;
+  incluido: boolean;
+  motivo_exclusion: string;
+};
+
+export type NuevoTrabajadorAutorizacionIngreso = Omit<
+  TrabajadorAutorizacionIngreso,
+  "id" | "trabajador_nombre" | "trabajador_documento"
+>;
+
+export type AutorizacionIngreso = {
+  id: number;
+  contratista: number;
+  contratista_nombre: string;
+  declaracion: number | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  area_trabajo: string;
+  sitio_encuentro_emergencia: string;
+  responsable_siso_nombre: string;
+  responsable_siso_telefono: string;
+  estado: EstadoDeclaracion;
+  observaciones: string;
+  vigente: boolean;
+  creada_en: string;
+  actualizada_en: string;
+  trabajadores: TrabajadorAutorizacionIngreso[];
+};
+
+export type NuevaAutorizacionIngreso = {
+  contratista: number;
+  declaracion?: number | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  hora_inicio?: string | null;
+  hora_fin?: string | null;
+  area_trabajo: string;
+  sitio_encuentro_emergencia?: string;
+  responsable_siso_nombre: string;
+  responsable_siso_telefono?: string;
+  estado?: EstadoDeclaracion;
+  observaciones?: string;
+  trabajadores?: Partial<NuevoTrabajadorAutorizacionIngreso>[];
+};
+
+export function listarAutorizacionesIngreso(
+  token: string,
+  filtros: { contratista?: number; estado?: EstadoDeclaracion } = {}
+): Promise<AutorizacionIngreso[]> {
+  const params = new URLSearchParams();
+  if (filtros.contratista !== undefined) params.set("contratista", String(filtros.contratista));
+  if (filtros.estado) params.set("estado", filtros.estado);
+  const query = params.toString();
+  return request<AutorizacionIngreso[]>(`/api/contratistas/autorizaciones-ingreso/${query ? `?${query}` : ""}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function crearAutorizacionIngreso(
+  token: string,
+  datos: NuevaAutorizacionIngreso
+): Promise<AutorizacionIngreso> {
+  return request<AutorizacionIngreso>("/api/contratistas/autorizaciones-ingreso/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarAutorizacionIngreso(
+  token: string,
+  id: number,
+  cambios: Partial<NuevaAutorizacionIngreso>
+): Promise<AutorizacionIngreso> {
+  return request<AutorizacionIngreso>(`/api/contratistas/autorizaciones-ingreso/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarAutorizacionIngreso(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/autorizaciones-ingreso/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}

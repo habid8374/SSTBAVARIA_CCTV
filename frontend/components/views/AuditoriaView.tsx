@@ -10,6 +10,7 @@ const MODELOS: { valor: string; etiqueta: string }[] = [
   { valor: "Trabajador", etiqueta: "Trabajadores" },
   { valor: "RadicacionSeguridadSocial", etiqueta: "Radicaciones de seguridad social" },
   { valor: "DeclaracionMetodo", etiqueta: "Declaraciones de método" },
+  { valor: "AutorizacionIngreso", etiqueta: "Autorizaciones de ingreso" },
   { valor: "Funcionario", etiqueta: "Funcionarios firmantes" },
 ];
 

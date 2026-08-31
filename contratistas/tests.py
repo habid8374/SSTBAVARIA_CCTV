@@ -11,6 +11,7 @@ from core.models import Empresa
 
 from .models import (
     ActividadMetodo,
+    AutorizacionIngreso,
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
@@ -1142,3 +1143,125 @@ class DeclaracionMetodoTests(ApiTestsBase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("estado", response.data)
+
+
+class AutorizacionIngresoTests(ApiTestsBase):
+    def setUp(self):
+        super().setUp()
+        self.trabajador2 = Trabajador.objects.create(
+            contratista=self.contratista, nombres="Laura", apellidos="Pinzón", documento="99887766"
+        )
+
+    def _payload(self, **extra):
+        payload = {
+            "contratista": self.contratista.pk,
+            "fecha_inicio": "2026-08-01",
+            "fecha_fin": "2026-08-31",
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00",
+            "area_trabajo": "Envasado — línea 3",
+            "sitio_encuentro_emergencia": "Punto de encuentro Portería 2",
+            "responsable_siso_nombre": "Carlos Pardo",
+            "responsable_siso_telefono": "3001234567",
+            "trabajadores": [
+                {"trabajador": self.trabajador.pk, "incluido": True},
+                {"trabajador": self.trabajador2.pk, "incluido": False, "motivo_exclusion": "Curso vencido"},
+            ],
+        }
+        payload.update(extra)
+        return payload
+
+    def test_crear_con_inclusiones_y_exclusiones(self):
+        response = self.client.post(
+            reverse("contratistas:autorizaciones_ingreso_lista"),
+            self._payload(),
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(len(response.data["trabajadores"]), 2)
+        autorizacion = AutorizacionIngreso.objects.get(pk=response.data["id"])
+        self.assertEqual(autorizacion.trabajadores.filter(incluido=True).count(), 1)
+        self.assertEqual(autorizacion.trabajadores.filter(incluido=False).count(), 1)
+
+    def test_excluir_sin_motivo_devuelve_400(self):
+        payload = self._payload(
+            trabajadores=[{"trabajador": self.trabajador.pk, "incluido": False, "motivo_exclusion": ""}]
+        )
+        response = self.client.post(
+            reverse("contratistas:autorizaciones_ingreso_lista"),
+            payload,
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_fecha_fin_anterior_a_inicio_devuelve_400(self):
+        payload = self._payload(fecha_inicio="2026-08-31", fecha_fin="2026-08-01")
+        response = self.client.post(
+            reverse("contratistas:autorizaciones_ingreso_lista"),
+            payload,
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("fecha_fin", response.data)
+
+    def test_vigente_segun_fechas(self):
+        hoy = timezone.localdate()
+        vigente = AutorizacionIngreso.objects.create(
+            contratista=self.contratista,
+            fecha_inicio=hoy - datetime.timedelta(days=1),
+            fecha_fin=hoy + datetime.timedelta(days=1),
+            area_trabajo="Bodega",
+            responsable_siso_nombre="Ana",
+        )
+        vencida = AutorizacionIngreso.objects.create(
+            contratista=self.contratista,
+            fecha_inicio=hoy - datetime.timedelta(days=10),
+            fecha_fin=hoy - datetime.timedelta(days=5),
+            area_trabajo="Bodega",
+            responsable_siso_nombre="Ana",
+        )
+        self.assertTrue(vigente.vigente)
+        self.assertFalse(vencida.vigente)
+
+    def test_editar_reemplaza_lista_de_trabajadores(self):
+        response = self.client.post(
+            reverse("contratistas:autorizaciones_ingreso_lista"),
+            self._payload(),
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        autorizacion_id = response.data["id"]
+
+        response = self.client.patch(
+            reverse("contratistas:autorizaciones_ingreso_detalle", args=[autorizacion_id]),
+            {"trabajadores": [{"trabajador": self.trabajador.pk, "incluido": True}]},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        autorizacion = AutorizacionIngreso.objects.get(pk=autorizacion_id)
+        self.assertEqual(autorizacion.trabajadores.count(), 1)
+
+    def test_operador_no_puede_eliminar(self):
+        response = self.client.post(
+            reverse("contratistas:autorizaciones_ingreso_lista"),
+            self._payload(),
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        url = reverse("contratistas:autorizaciones_ingreso_detalle", args=[response.data["id"]])
+        respuesta = self.client.delete(url, **self._auth(self.operador))
+        self.assertEqual(respuesta.status_code, 403)
+
+    def test_crear_queda_registrado_en_auditoria(self):
+        self.client.post(
+            reverse("contratistas:autorizaciones_ingreso_lista"),
+            self._payload(),
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        registro = RegistroAuditoria.objects.filter(modelo="AutorizacionIngreso", accion="creado").latest("fecha")
+        self.assertEqual(registro.usuario, self.operador)

@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     ActividadMetodo,
+    AutorizacionIngreso,
     ConfiguracionAlertas,
     CursoSafetyAcademy,
     DeclaracionMetodo,
@@ -12,6 +13,7 @@ from .models import (
     RadicacionSeguridadSocial,
     RegistroAuditoria,
     Trabajador,
+    TrabajadorAutorizacionIngreso,
 )
 
 
@@ -105,6 +107,19 @@ class PermisoTrabajoAdmin(admin.ModelAdmin):
 @admin.register(ConfiguracionAlertas)
 class ConfiguracionAlertasAdmin(admin.ModelAdmin):
     list_display = ("dias_alerta_vencimiento", "actualizada_en")
+
+
+class TrabajadorAutorizacionIngresoInline(admin.TabularInline):
+    model = TrabajadorAutorizacionIngreso
+    extra = 0
+
+
+@admin.register(AutorizacionIngreso)
+class AutorizacionIngresoAdmin(admin.ModelAdmin):
+    list_display = ("contratista", "fecha_inicio", "fecha_fin", "area_trabajo", "estado")
+    list_filter = ("estado", "contratista")
+    search_fields = ("contratista__nombre", "area_trabajo", "responsable_siso_nombre")
+    inlines = [TrabajadorAutorizacionIngresoInline]
 
 
 @admin.register(RegistroAuditoria)

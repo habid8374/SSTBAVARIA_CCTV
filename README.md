@@ -96,6 +96,18 @@ frontend en Vercel — pero viven en el mismo repositorio.
     una foto del objeto (`objeto_str`) para seguir siendo legible aunque el
     registro original se elimine después. Es de solo lectura — nada se
     edita ni se borra desde el dashboard ni desde el admin de Django.
+  - **Autorización de Ingreso** (sección "Autorización de Ingreso" en el sidebar;
+    `contratistas.AutorizacionIngreso`/`TrabajadorAutorizacionIngreso`): réplica del
+    formato real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA" — vigencia
+    (fecha desde/hasta), horario, área de trabajo, sitio de encuentro en caso
+    de emergencia, responsable SISO del grupo, y la lista de
+    **inclusiones/exclusiones**: cada trabajador del contratista queda
+    explícitamente incluido o excluido del ingreso, con motivo obligatorio en
+    caso de exclusión (validado tanto en el serializer como en el formulario).
+    La lista de trabajadores se reemplaza completa en cada guardado, igual
+    que las actividades de una declaración de método. El badge de vigencia se
+    calcula al vuelo contra la fecha de hoy. Incluida en la auditoría de
+    cambios (Fase 6).
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada

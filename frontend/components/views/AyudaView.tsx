@@ -35,6 +35,8 @@ const TEMAS: Tema[] = [
           <li><strong>Notificaciones</strong>: historial de correos enviados + configuración de reglas.</li>
           <li><strong>Contratistas</strong>: empresas, trabajadores y radicación de seguridad social.</li>
           <li><strong>Declaración de Método</strong>: formulario de riesgo (método Kinney) por trabajo.</li>
+          <li><strong>Autorización de Ingreso</strong>: quién queda autorizado a entrar a planta, cuándo y en
+            qué área — con inclusiones y exclusiones de trabajadores.</li>
           <li><strong>Sistema</strong> (solo Administrador): credenciales de Brevo y equipos locales.</li>
           <li><strong>Usuarios</strong> (solo Administrador): quién tiene acceso y con qué rol.</li>
           <li><strong>Ayuda</strong>: esta sección.</li>
@@ -253,6 +255,38 @@ const TEMAS: Tema[] = [
     ),
   },
   {
+    id: "autorizacion-ingreso",
+    titulo: "Autorización de Ingreso",
+    contenido: (
+      <>
+        <P>
+          Formato de autorización de ingreso de personal contratista a la planta — quién queda autorizado a
+          entrar, cuándo, en qué área y con qué responsable SISO a cargo del grupo.
+        </P>
+        <Ul>
+          <li>Empresa contratista y área de trabajo.</li>
+          <li><strong>Vigencia</strong> (fecha desde/hasta) y <strong>horario</strong> (hora desde/hasta) del
+            ingreso autorizado.</li>
+          <li><strong>Sitio de encuentro en caso de emergencia</strong> y datos del{" "}
+            <strong>responsable SISO del grupo</strong> (nombre y teléfono).</li>
+          <li>Estado del documento (borrador / enviada / aprobada / rechazada), igual que en Declaración de
+            Método.</li>
+        </Ul>
+        <Sub>Inclusiones y exclusiones</Sub>
+        <P>
+          Al elegir la empresa contratista aparece la lista de sus trabajadores registrados; se marca cada uno
+          que queda <strong>incluido</strong> (autorizado a ingresar). Si un trabajador queda{" "}
+          <strong>excluido</strong> — se desmarca, o nunca se marca — el sistema exige indicar el motivo de la
+          exclusión antes de guardar, para que quede constancia de por qué esa persona no entra.
+        </P>
+        <Nota>
+          El badge &quot;Vigente&quot;/&quot;Fuera de vigencia&quot; en la lista se calcula al vuelo contra la
+          fecha de hoy, comparándola con el rango de vigencia — no hay que actualizarlo a mano.
+        </Nota>
+      </>
+    ),
+  },
+  {
     id: "funcionarios",
     titulo: "Funcionarios firmantes",
     contenido: (
@@ -343,8 +377,9 @@ const TEMAS: Tema[] = [
         <Sub>Auditoría</Sub>
         <P>
           Traza de solo lectura de quién creó, editó o eliminó cada registro crítico de cumplimiento: empresas
-          contratistas, trabajadores, radicaciones de seguridad social, declaraciones de método y funcionarios
-          firmantes. Cada fila muestra fecha, tipo de acción, qué registro fue y qué usuario lo hizo; en{" "}
+          contratistas, trabajadores, radicaciones de seguridad social, declaraciones de método, autorizaciones
+          de ingreso y funcionarios firmantes. Cada fila muestra fecha, tipo de acción, qué registro fue y qué
+          usuario lo hizo; en{" "}
           <strong>&quot;Ver cambios&quot;</strong> se ve exactamente qué campos cambiaron y sus valores antes/
           después. Se puede filtrar por tipo de registro. Un registro se guarda aunque el registro original se
           elimine después (para no perder el rastro), y nada acá se puede editar ni borrar.

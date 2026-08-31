@@ -14,6 +14,7 @@ from core.permissions import EsAdministrador, EsAdministradorOSoloLectura, EsAdm
 from .auditoria import capturar_snapshot, registrar_auditoria
 from .models import (
     ActividadMetodo,
+    AutorizacionIngreso,
     ConfiguracionAlertas,
     CursoSafetyAcademy,
     DeclaracionMetodo,
@@ -34,6 +35,7 @@ from .notificaciones import (
     notificar_radicacion_pendiente,
 )
 from .serializers import (
+    AutorizacionIngresoSerializer,
     CatalogosSerializer,
     ConfiguracionAlertasSerializer,
     CursoSafetyAcademySerializer,
@@ -489,6 +491,30 @@ class DeclaracionMetodoDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPI
             notificar_decision_declaracion(declaracion)
         elif declaracion.estado == DeclaracionMetodo.Estado.ENVIADA:
             notificar_declaracion_pendiente(declaracion)
+
+
+# --- Autorización de ingreso (inclusiones/exclusiones) ---
+
+
+class AutorizacionIngresoListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
+    serializer_class = AutorizacionIngresoSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = AutorizacionIngreso.objects.select_related("contratista").prefetch_related("trabajadores__trabajador")
+        contratista_id = self.request.query_params.get("contratista")
+        if contratista_id:
+            qs = qs.filter(contratista_id=contratista_id)
+        estado = self.request.query_params.get("estado")
+        if estado:
+            qs = qs.filter(estado=estado)
+        return qs
+
+
+class AutorizacionIngresoDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
+    queryset = AutorizacionIngreso.objects.select_related("contratista").prefetch_related("trabajadores__trabajador")
+    serializer_class = AutorizacionIngresoSerializer
+    permission_classes = [EsAdministradorParaEliminar]
 
 
 @api_view(["POST"])

@@ -498,3 +498,76 @@ class RegistroAuditoria(models.Model):
 
     def __str__(self):
         return f"{self.get_accion_display()} — {self.modelo} #{self.objeto_id}"
+
+
+class AutorizacionIngreso(models.Model):
+    """Autorización de ingreso de personal contratista a la planta —
+    formato real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA": vigencia,
+    horario, área de trabajo, sitio de encuentro en emergencia y
+    responsable SISO del grupo, con la lista de trabajadores incluidos o
+    excluidos del ingreso (ver TrabajadorAutorizacionIngreso)."""
+
+    class Estado(models.TextChoices):
+        BORRADOR = "borrador", "Borrador"
+        ENVIADA = "enviada", "Enviada"
+        APROBADA = "aprobada", "Aprobada"
+        RECHAZADA = "rechazada", "Rechazada"
+
+    contratista = models.ForeignKey(
+        EmpresaContratista, on_delete=models.CASCADE, related_name="autorizaciones_ingreso"
+    )
+    declaracion = models.ForeignKey(
+        DeclaracionMetodo,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="autorizaciones_ingreso",
+        help_text="Declaración de método a la que corresponde este trabajo, si aplica.",
+    )
+    fecha_inicio = models.DateField("vigencia — desde")
+    fecha_fin = models.DateField("vigencia — hasta")
+    hora_inicio = models.TimeField("horario — desde", null=True, blank=True)
+    hora_fin = models.TimeField("horario — hasta", null=True, blank=True)
+    area_trabajo = models.CharField(max_length=200)
+    sitio_encuentro_emergencia = models.CharField(
+        "sitio de encuentro en caso de emergencia", max_length=200, blank=True
+    )
+    responsable_siso_nombre = models.CharField("responsable SISO del grupo", max_length=150)
+    responsable_siso_telefono = models.CharField(max_length=30, blank=True)
+    estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.BORRADOR)
+    observaciones = models.TextField(blank=True)
+    creada_en = models.DateTimeField(auto_now_add=True)
+    actualizada_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "autorización de ingreso"
+        verbose_name_plural = "autorizaciones de ingreso"
+        ordering = ["-creada_en"]
+
+    def __str__(self):
+        return f"Ingreso {self.contratista.nombre} ({self.fecha_inicio} a {self.fecha_fin})"
+
+    @property
+    def vigente(self):
+        hoy = timezone.localdate()
+        return self.fecha_inicio <= hoy <= self.fecha_fin
+
+
+class TrabajadorAutorizacionIngreso(models.Model):
+    """Una línea de la lista de inclusiones/exclusiones: cada trabajador
+    queda explícitamente incluido o excluido del ingreso autorizado, con
+    motivo obligatorio cuando queda excluido."""
+
+    autorizacion = models.ForeignKey(AutorizacionIngreso, on_delete=models.CASCADE, related_name="trabajadores")
+    trabajador = models.ForeignKey(Trabajador, on_delete=models.CASCADE, related_name="autorizaciones_ingreso")
+    incluido = models.BooleanField(default=True)
+    motivo_exclusion = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        verbose_name = "trabajador en autorización de ingreso"
+        verbose_name_plural = "trabajadores en autorización de ingreso"
+        unique_together = [("autorizacion", "trabajador")]
+        ordering = ["-incluido", "trabajador__apellidos"]
+
+    def __str__(self):
+        return f"{self.trabajador} — {'Incluido' if self.incluido else 'Excluido'}"

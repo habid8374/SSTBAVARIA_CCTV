@@ -29,4 +29,14 @@ urlpatterns = [
     path("declaraciones/<int:pk>/", views.DeclaracionMetodoDetalle.as_view(), name="declaraciones_detalle"),
     path("declaraciones/<int:pk>/firmar/", views.firmar_declaracion, name="declaraciones_firmar"),
     path("declaraciones/<int:pk>/pdf/", views.declaracion_pdf, name="declaraciones_pdf"),
+    path(
+        "autorizaciones-ingreso/",
+        views.AutorizacionIngresoListaDashboard.as_view(),
+        name="autorizaciones_ingreso_lista",
+    ),
+    path(
+        "autorizaciones-ingreso/<int:pk>/",
+        views.AutorizacionIngresoDetalle.as_view(),
+        name="autorizaciones_ingreso_detalle",
+    ),
 ]

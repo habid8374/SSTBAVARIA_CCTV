@@ -5,6 +5,7 @@ from core.models import Empresa
 
 from .models import (
     ActividadMetodo,
+    AutorizacionIngreso,
     ConfiguracionAlertas,
     CursoSafetyAcademy,
     DeclaracionMetodo,
@@ -15,6 +16,7 @@ from .models import (
     RadicacionSeguridadSocial,
     RegistroAuditoria,
     Trabajador,
+    TrabajadorAutorizacionIngreso,
     nivel_riesgo,
 )
 
@@ -371,6 +373,88 @@ class ConfiguracionAlertasSerializer(serializers.ModelSerializer):
         model = ConfiguracionAlertas
         fields = ["dias_alerta_vencimiento", "correo_revisor", "actualizada_en"]
         read_only_fields = ["actualizada_en"]
+
+
+class TrabajadorAutorizacionIngresoSerializer(serializers.ModelSerializer):
+    trabajador_nombre = serializers.SerializerMethodField()
+    trabajador_documento = serializers.CharField(source="trabajador.documento", read_only=True)
+
+    class Meta:
+        model = TrabajadorAutorizacionIngreso
+        fields = ["id", "trabajador", "trabajador_nombre", "trabajador_documento", "incluido", "motivo_exclusion"]
+        read_only_fields = ["id"]
+
+    def get_trabajador_nombre(self, linea):
+        return f"{linea.trabajador.nombres} {linea.trabajador.apellidos}"
+
+    def validate(self, datos):
+        incluido = datos.get("incluido", True)
+        motivo = datos.get("motivo_exclusion", "").strip()
+        if not incluido and not motivo:
+            raise serializers.ValidationError({"motivo_exclusion": "Hay que indicar el motivo de la exclusión."})
+        return datos
+
+
+class AutorizacionIngresoSerializer(serializers.ModelSerializer):
+    """Autorización completa, con la lista de trabajadores escribible de
+    forma anidada — se reemplaza toda en cada guardado, igual que las
+    actividades de una declaración de método."""
+
+    contratista_nombre = serializers.CharField(source="contratista.nombre", read_only=True)
+    vigente = serializers.BooleanField(read_only=True)
+    trabajadores = TrabajadorAutorizacionIngresoSerializer(many=True, required=False)
+
+    class Meta:
+        model = AutorizacionIngreso
+        fields = [
+            "id",
+            "contratista",
+            "contratista_nombre",
+            "declaracion",
+            "fecha_inicio",
+            "fecha_fin",
+            "hora_inicio",
+            "hora_fin",
+            "area_trabajo",
+            "sitio_encuentro_emergencia",
+            "responsable_siso_nombre",
+            "responsable_siso_telefono",
+            "estado",
+            "observaciones",
+            "vigente",
+            "creada_en",
+            "actualizada_en",
+            "trabajadores",
+        ]
+        read_only_fields = ["id", "creada_en", "actualizada_en"]
+
+    def validate(self, datos):
+        fecha_inicio = datos.get("fecha_inicio", getattr(self.instance, "fecha_inicio", None))
+        fecha_fin = datos.get("fecha_fin", getattr(self.instance, "fecha_fin", None))
+        if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
+            raise serializers.ValidationError({"fecha_fin": "La fecha de fin no puede ser anterior a la de inicio."})
+        return datos
+
+    def create(self, validated_data):
+        trabajadores_data = validated_data.pop("trabajadores", [])
+        autorizacion = AutorizacionIngreso.objects.create(**validated_data)
+        self._guardar_trabajadores(autorizacion, trabajadores_data)
+        return autorizacion
+
+    def update(self, instance, validated_data):
+        trabajadores_data = validated_data.pop("trabajadores", None)
+        for atributo, valor in validated_data.items():
+            setattr(instance, atributo, valor)
+        instance.save()
+        if trabajadores_data is not None:
+            instance.trabajadores.all().delete()
+            self._guardar_trabajadores(instance, trabajadores_data)
+        return instance
+
+    def _guardar_trabajadores(self, autorizacion, trabajadores_data):
+        for linea in trabajadores_data:
+            linea.pop("id", None)
+            TrabajadorAutorizacionIngreso.objects.create(autorizacion=autorizacion, **linea)
 
 
 class RegistroAuditoriaSerializer(serializers.ModelSerializer):

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import type { SeccionId } from "@/components/Sidebar";
 import AlertasView from "@/components/views/AlertasView";
+import AutorizacionIngresoView from "@/components/views/AutorizacionIngresoView";
 import AyudaView from "@/components/views/AyudaView";
 import CamarasView from "@/components/views/CamarasView";
 import ContratistasView from "@/components/views/ContratistasView";
@@ -28,6 +29,7 @@ const TITULOS: Record<SeccionId, string> = {
   notificaciones: "Notificaciones",
   contratistas: "Contratistas",
   "declaracion-metodo": "Declaración de Método",
+  "autorizacion-ingreso": "Autorización de Ingreso",
   funcionarios: "Funcionarios firmantes",
   "indicadores-contratistas": "Indicadores",
   sistema: "Sistema",
@@ -88,6 +90,7 @@ export default function DashboardPage() {
       {seccion === "notificaciones" && <NotificacionesView token={token} rol={usuario.rol} />}
       {seccion === "contratistas" && <ContratistasView token={token} rol={usuario.rol} />}
       {seccion === "declaracion-metodo" && <DeclaracionMetodoView token={token} rol={usuario.rol} />}
+      {seccion === "autorizacion-ingreso" && <AutorizacionIngresoView token={token} rol={usuario.rol} />}
       {seccion === "funcionarios" && <FuncionariosView token={token} rol={usuario.rol} />}
       {seccion === "indicadores-contratistas" && <IndicadoresContratistasView token={token} />}
       {seccion === "sistema" && usuario.rol === "administrador" && <SistemaView token={token} />}

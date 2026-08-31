@@ -180,3 +180,14 @@ export function IconIndicadores({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconAutorizacionIngreso({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="9" cy="10.5" r="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 16c.5-2 1.7-3 3-3s2.5 1 3 3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m14.5 10 1.3 1.3L18.5 8.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

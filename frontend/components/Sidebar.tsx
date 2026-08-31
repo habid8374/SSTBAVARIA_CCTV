@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import { API_URL, type Rol } from "@/lib/api";
 import {
   IconAlerta,
+  IconAutorizacionIngreso,
   IconAyuda,
   IconCamara,
   IconChevronLeft,
@@ -26,6 +27,7 @@ export type SeccionId =
   | "notificaciones"
   | "contratistas"
   | "declaracion-metodo"
+  | "autorizacion-ingreso"
   | "funcionarios"
   | "indicadores-contratistas"
   | "sistema"
@@ -47,6 +49,7 @@ const ITEMS: Item[] = [
   { id: "notificaciones", label: "Notificaciones", icon: IconNotificacion },
   { id: "contratistas", label: "Contratistas", icon: IconContratista },
   { id: "declaracion-metodo", label: "Declaración de Método", icon: IconDeclaracionMetodo },
+  { id: "autorizacion-ingreso", label: "Autorización de Ingreso", icon: IconAutorizacionIngreso },
   { id: "funcionarios", label: "Funcionarios firmantes", icon: IconUsuarios },
   { id: "indicadores-contratistas", label: "Indicadores", icon: IconIndicadores },
   { id: "sistema", label: "Sistema", icon: IconSistema, adminOnly: true },
