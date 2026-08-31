@@ -2,10 +2,13 @@ from django.contrib import admin
 
 from .models import (
     ActividadMetodo,
+    ConfiguracionAlertas,
+    CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
     Funcionario,
+    PermisoTrabajo,
     RadicacionSeguridadSocial,
     Trabajador,
 )
@@ -84,3 +87,20 @@ class FuncionarioAdmin(admin.ModelAdmin):
     list_display = ("nombre", "cargo", "rol_firma", "correo", "activo")
     list_filter = ("rol_firma", "activo")
     search_fields = ("nombre", "cargo", "correo")
+
+
+@admin.register(CursoSafetyAcademy)
+class CursoSafetyAcademyAdmin(admin.ModelAdmin):
+    list_display = ("etiqueta", "clave", "activo", "orden")
+    list_editable = ("activo", "orden")
+
+
+@admin.register(PermisoTrabajo)
+class PermisoTrabajoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "activo", "orden")
+    list_editable = ("activo", "orden")
+
+
+@admin.register(ConfiguracionAlertas)
+class ConfiguracionAlertasAdmin(admin.ModelAdmin):
+    list_display = ("dias_alerta_vencimiento", "actualizada_en")

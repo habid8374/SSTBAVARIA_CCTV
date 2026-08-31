@@ -240,6 +240,78 @@ class IndicadoresDashboardTests(ApiTestsBase):
         self.assertEqual(response.data["tendencia_mensual"][-1]["declaraciones"], 1)
 
 
+class ReglasConfigurablesTests(ApiTestsBase):
+    def test_catalogos_solo_incluye_cursos_y_permisos_activos(self):
+        from .models import ConfiguracionAlertas, CursoSafetyAcademy, PermisoTrabajo
+
+        CursoSafetyAcademy.objects.create(clave="curso_inactivo", etiqueta="Curso inactivo", activo=False)
+        PermisoTrabajo.objects.create(nombre="Permiso inactivo", activo=False)
+        response = self.client.get(reverse("contratistas:catalogos"), **self._auth(self.operador))
+        claves = [c["clave"] for c in response.data["cursos_safety_academy"]]
+        self.assertNotIn("curso_inactivo", claves)
+        self.assertNotIn("Permiso inactivo", response.data["permisos_trabajo"])
+
+    def test_crear_curso(self):
+        response = self.client.post(
+            reverse("contratistas:cursos_lista"),
+            {"clave": "nuevo_curso", "etiqueta": "Nuevo curso", "orden": 10},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_operador_no_puede_eliminar_curso(self):
+        from .models import CursoSafetyAcademy
+
+        curso = CursoSafetyAcademy.objects.create(clave="x", etiqueta="X")
+        response = self.client.delete(
+            reverse("contratistas:cursos_detalle", args=[curso.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_puede_eliminar_permiso(self):
+        from .models import PermisoTrabajo
+
+        permiso = PermisoTrabajo.objects.create(nombre="X")
+        response = self.client.delete(
+            reverse("contratistas:permisos_detalle", args=[permiso.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+
+    def test_configuracion_alertas_operador_solo_lee(self):
+        response = self.client.get(reverse("contratistas:configuracion_alertas"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["dias_alerta_vencimiento"], 15)
+
+        response = self.client.patch(
+            reverse("contratistas:configuracion_alertas"),
+            {"dias_alerta_vencimiento": 30},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_configuracion_alertas_admin_puede_editar_y_afecta_indicadores(self):
+        response = self.client.patch(
+            reverse("contratistas:configuracion_alertas"),
+            {"dias_alerta_vencimiento": 30},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador,
+            anio=2026,
+            mes="ENERO",
+            fecha_vencimiento=timezone.localdate() + datetime.timedelta(days=25),
+        )
+        response = self.client.get(reverse("contratistas:indicadores"), **self._auth(self.operador))
+        # con el umbral por defecto (15 días) esta planilla NO contaría como "por vencer";
+        # con el nuevo umbral configurado (30 días) sí debe contar.
+        self.assertEqual(response.data["radicaciones_por_vencer"], 1)
+
+
 class FuncionarioTests(ApiTestsBase):
     def test_crear_funcionario(self):
         response = self.client.post(

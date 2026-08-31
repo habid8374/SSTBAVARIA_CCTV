@@ -15,8 +15,9 @@ import {
   type ConfiguracionNotificaciones,
   type EquipoLocal,
 } from "@/lib/api";
+import ReglasContratistasView from "./ReglasContratistasView";
 
-type Pestana = "brevo" | "equipo-local";
+type Pestana = "brevo" | "equipo-local" | "reglas";
 
 export default function SistemaView({ token }: { token: string }) {
   const [pestana, setPestana] = useState<Pestana>("brevo");
@@ -30,9 +31,14 @@ export default function SistemaView({ token }: { token: string }) {
         <BotonPestana activa={pestana === "equipo-local"} onClick={() => setPestana("equipo-local")}>
           Equipo local
         </BotonPestana>
+        <BotonPestana activa={pestana === "reglas"} onClick={() => setPestana("reglas")}>
+          Reglas de contratistas
+        </BotonPestana>
       </div>
 
-      {pestana === "brevo" ? <ConfiguracionBrevo token={token} /> : <EquiposLocales token={token} />}
+      {pestana === "brevo" && <ConfiguracionBrevo token={token} />}
+      {pestana === "equipo-local" && <EquiposLocales token={token} />}
+      {pestana === "reglas" && <ReglasContratistasView token={token} />}
     </div>
   );
 }

@@ -9,15 +9,17 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.permissions import EsAdministradorParaEliminar
+from core.permissions import EsAdministradorOSoloLectura, EsAdministradorParaEliminar
 
 from .models import (
     ActividadMetodo,
-    DIAS_ALERTA_VENCIMIENTO,
+    ConfiguracionAlertas,
+    CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
     Funcionario,
+    PermisoTrabajo,
     RadicacionSeguridadSocial,
     Trabajador,
     calcular_hash_declaracion,
@@ -26,12 +28,15 @@ from .models import (
 from .notificaciones import notificar_decision_declaracion, notificar_decision_radicacion
 from .serializers import (
     CatalogosSerializer,
+    ConfiguracionAlertasSerializer,
+    CursoSafetyAcademySerializer,
     DecisionRadicacionSerializer,
     DeclaracionMetodoSerializer,
     EmpresaContratistaCrearSerializer,
     EmpresaContratistaSerializer,
     FirmaMetodoSerializer,
     FuncionarioSerializer,
+    PermisoTrabajoSerializer,
     RadicacionSeguridadSocialSerializer,
     TrabajadorSerializer,
 )
@@ -52,7 +57,8 @@ def indicadores(request):
     para el banner de aviso en la vista de Contratistas. Nada se marca solo
     en la base; se calcula al vuelo contra la fecha de hoy."""
     hoy = timezone.localdate()
-    limite_por_vencer = hoy + timedelta(days=DIAS_ALERTA_VENCIMIENTO)
+    dias_alerta = ConfiguracionAlertas.obtener().dias_alerta_vencimiento
+    limite_por_vencer = hoy + timedelta(days=dias_alerta)
     radicaciones = RadicacionSeguridadSocial.objects.exclude(estado=RadicacionSeguridadSocial.Estado.RECHAZADA)
     return Response(
         {
@@ -188,6 +194,44 @@ class FuncionarioDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = Funcionario.objects.all()
     serializer_class = FuncionarioSerializer
     permission_classes = [EsAdministradorParaEliminar]
+
+
+# --- Motor de reglas (cursos, permisos de trabajo, días de alerta) ---
+
+
+class CursoSafetyAcademyListaDashboard(generics.ListCreateAPIView):
+    queryset = CursoSafetyAcademy.objects.all()
+    serializer_class = CursoSafetyAcademySerializer
+    permission_classes = [IsAuthenticated]
+
+
+class CursoSafetyAcademyDetalle(generics.RetrieveUpdateDestroyAPIView):
+    queryset = CursoSafetyAcademy.objects.all()
+    serializer_class = CursoSafetyAcademySerializer
+    permission_classes = [EsAdministradorParaEliminar]
+
+
+class PermisoTrabajoListaDashboard(generics.ListCreateAPIView):
+    queryset = PermisoTrabajo.objects.all()
+    serializer_class = PermisoTrabajoSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class PermisoTrabajoDetalle(generics.RetrieveUpdateDestroyAPIView):
+    queryset = PermisoTrabajo.objects.all()
+    serializer_class = PermisoTrabajoSerializer
+    permission_classes = [EsAdministradorParaEliminar]
+
+
+class ConfiguracionAlertasDetalle(generics.RetrieveUpdateAPIView):
+    """Fila única — a cuántos días de vencer se considera "por vencer" una
+    planilla, editable por un Administrador en vez de fijo en el código."""
+
+    serializer_class = ConfiguracionAlertasSerializer
+    permission_classes = [EsAdministradorOSoloLectura]
+
+    def get_object(self):
+        return ConfiguracionAlertas.obtener()
 
 
 # --- Empresas contratistas ---

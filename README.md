@@ -58,6 +58,16 @@ frontend en Vercel — pero viven en el mismo repositorio.
     por estado, tendencia de los últimos 6 meses, cumplimiento por
     contratista y el top 5 de actividades de mayor riesgo. Todo calculado
     al vuelo, sin tablas de resumen que se puedan desincronizar.
+  - **Motor de reglas configurable** (pestaña "Reglas de contratistas" en
+    Sistema, solo Administrador): los cursos Safety Academy
+    (`contratistas.CursoSafetyAcademy`), los permisos de trabajo
+    (`contratistas.PermisoTrabajo`) y los días de alerta de vencimiento
+    (`contratistas.ConfiguracionAlertas`) dejaron de ser constantes fijas
+    en el código — ahora son catálogos editables (agregar/desactivar/
+    eliminar) desde el dashboard. La migración `0008_sembrar_cursos_y_permisos`
+    siembra los valores que antes estaban hardcodeados, así los
+    trabajadores/actividades ya guardados siguen encontrando su curso o
+    permiso por la misma clave/nombre.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada

@@ -4,12 +4,14 @@ from rest_framework import serializers
 from core.models import Empresa
 
 from .models import (
-    PERMISOS_TRABAJO,
     ActividadMetodo,
+    ConfiguracionAlertas,
+    CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
     Funcionario,
+    PermisoTrabajo,
     RadicacionSeguridadSocial,
     Trabajador,
     nivel_riesgo,
@@ -320,10 +322,13 @@ class CatalogosSerializer(serializers.Serializer):
     roles_firma = serializers.SerializerMethodField()
 
     def get_cursos_safety_academy(self, obj):
-        return [{"clave": clave, "etiqueta": etiqueta} for clave, etiqueta in Trabajador.CURSOS.items()]
+        return [
+            {"clave": c.clave, "etiqueta": c.etiqueta}
+            for c in CursoSafetyAcademy.objects.filter(activo=True)
+        ]
 
     def get_permisos_trabajo(self, obj):
-        return PERMISOS_TRABAJO
+        return list(PermisoTrabajo.objects.filter(activo=True).values_list("nombre", flat=True))
 
     def get_roles_firma(self, obj):
         return [{"clave": clave, "etiqueta": etiqueta} for clave, etiqueta in FirmaMetodo.Rol.choices]
@@ -342,3 +347,24 @@ class FuncionarioSerializer(serializers.ModelSerializer):
         if empresa is None:
             empresa = Empresa.objects.create(nombre="Empresa")
         return Funcionario.objects.create(empresa=empresa, **validated_data)
+
+
+class CursoSafetyAcademySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CursoSafetyAcademy
+        fields = ["id", "clave", "etiqueta", "activo", "orden"]
+        read_only_fields = ["id"]
+
+
+class PermisoTrabajoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PermisoTrabajo
+        fields = ["id", "nombre", "activo", "orden"]
+        read_only_fields = ["id"]
+
+
+class ConfiguracionAlertasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracionAlertas
+        fields = ["dias_alerta_vencimiento", "actualizada_en"]
+        read_only_fields = ["actualizada_en"]

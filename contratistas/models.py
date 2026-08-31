@@ -377,3 +377,65 @@ class Funcionario(models.Model):
 
     def __str__(self):
         return f"{self.nombre} — {self.get_rol_firma_display()}"
+
+
+class CursoSafetyAcademy(models.Model):
+    """Catálogo editable de cursos Safety Academy — reemplaza el diccionario
+    fijo Trabajador.CURSOS para que un Administrador pueda agregar o
+    desactivar cursos sin tocar código. La clave sigue siendo la que se
+    guarda en Trabajador.cursos_safety_academy."""
+
+    clave = models.SlugField(max_length=50, unique=True)
+    etiqueta = models.CharField(max_length=150)
+    activo = models.BooleanField(default=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "curso Safety Academy"
+        verbose_name_plural = "cursos Safety Academy"
+        ordering = ["orden", "etiqueta"]
+
+    def __str__(self):
+        return self.etiqueta
+
+
+class PermisoTrabajo(models.Model):
+    """Catálogo editable de permisos de trabajo/certificados requeridos —
+    reemplaza la lista fija PERMISOS_TRABAJO."""
+
+    nombre = models.CharField(max_length=200, unique=True)
+    activo = models.BooleanField(default=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "permiso de trabajo"
+        verbose_name_plural = "permisos de trabajo"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class ConfiguracionAlertas(models.Model):
+    """Fila única (singleton), igual que ConfiguracionNotificaciones en
+    camaras_ia — a cuántos días de vencer una planilla se considera "por
+    vencer" en los indicadores, editable desde el dashboard."""
+
+    dias_alerta_vencimiento = models.PositiveIntegerField(
+        "días de alerta antes de vencer",
+        default=DIAS_ALERTA_VENCIMIENTO,
+        help_text="A cuántos días de vencer una planilla se considera 'por vencer' en los indicadores.",
+    )
+    actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
+
+    class Meta:
+        verbose_name = "configuración de alertas"
+        verbose_name_plural = "configuración de alertas"
+
+    def __str__(self):
+        return "Configuración de alertas"
+
+    @classmethod
+    def obtener(cls):
+        objeto, _ = cls.objects.get_or_create(pk=1)
+        return objeto

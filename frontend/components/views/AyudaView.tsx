@@ -303,7 +303,7 @@ const TEMAS: Tema[] = [
     soloAdmin: true,
     contenido: (
       <>
-        <P>Solo Administrador. Dos pestañas:</P>
+        <P>Solo Administrador. Tres pestañas:</P>
         <Sub>Brevo (correo)</Sub>
         <P>
           Acá se digita la API key de Brevo (el proveedor que envía los correos de alerta) y el remitente —
@@ -318,6 +318,15 @@ const TEMAS: Tema[] = [
           nada a mano. El badge <strong>Conectado</strong> se pone verde cuando ese equipo sincronizó hace
           menos de 5 minutos. Ver el tema <strong>&quot;El equipo local&quot;</strong> más abajo para el flujo
           completo de cómo se conecta a las cámaras y cómo ver el video en vivo.
+        </P>
+        <Sub>Reglas de contratistas</Sub>
+        <P>
+          Catálogos que antes estaban fijos en el código, ahora editables acá: los <strong>cursos Safety
+          Academy</strong> que aparecen al registrar un trabajador, los <strong>permisos de trabajo /
+          certificados requeridos</strong> que aparecen en las actividades de una declaración de método, y
+          los <strong>días de alerta de vencimiento</strong> (a cuántos días de vencer una planilla se
+          considera &quot;por vencer&quot; en el banner de Contratistas). Se pueden desactivar sin borrar el
+          historial de trabajadores/actividades que ya los tenían marcados.
         </P>
       </>
     ),

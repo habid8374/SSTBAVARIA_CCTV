@@ -476,6 +476,96 @@ export function obtenerCatalogosContratistas(token: string): Promise<Catalogos> 
   return request<Catalogos>("/api/contratistas/catalogos/", { headers: authHeaders(token) });
 }
 
+export type CursoSafetyAcademy = {
+  id: number;
+  clave: string;
+  etiqueta: string;
+  activo: boolean;
+  orden: number;
+};
+
+export type NuevoCursoSafetyAcademy = { clave: string; etiqueta: string; activo?: boolean; orden?: number };
+
+export function listarCursos(token: string): Promise<CursoSafetyAcademy[]> {
+  return request<CursoSafetyAcademy[]>("/api/contratistas/cursos/", { headers: authHeaders(token) });
+}
+
+export function crearCurso(token: string, datos: NuevoCursoSafetyAcademy): Promise<CursoSafetyAcademy> {
+  return request<CursoSafetyAcademy>("/api/contratistas/cursos/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarCurso(
+  token: string,
+  id: number,
+  cambios: Partial<NuevoCursoSafetyAcademy>
+): Promise<CursoSafetyAcademy> {
+  return request<CursoSafetyAcademy>(`/api/contratistas/cursos/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarCurso(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/cursos/${id}/`, { method: "DELETE", headers: authHeaders(token) });
+}
+
+export type PermisoTrabajo = { id: number; nombre: string; activo: boolean; orden: number };
+
+export type NuevoPermisoTrabajo = { nombre: string; activo?: boolean; orden?: number };
+
+export function listarPermisosTrabajo(token: string): Promise<PermisoTrabajo[]> {
+  return request<PermisoTrabajo[]>("/api/contratistas/permisos-trabajo/", { headers: authHeaders(token) });
+}
+
+export function crearPermisoTrabajo(token: string, datos: NuevoPermisoTrabajo): Promise<PermisoTrabajo> {
+  return request<PermisoTrabajo>("/api/contratistas/permisos-trabajo/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarPermisoTrabajo(
+  token: string,
+  id: number,
+  cambios: Partial<NuevoPermisoTrabajo>
+): Promise<PermisoTrabajo> {
+  return request<PermisoTrabajo>(`/api/contratistas/permisos-trabajo/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarPermisoTrabajo(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/permisos-trabajo/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
+export type ConfiguracionAlertas = { dias_alerta_vencimiento: number; actualizada_en: string };
+
+export function obtenerConfiguracionAlertas(token: string): Promise<ConfiguracionAlertas> {
+  return request<ConfiguracionAlertas>("/api/contratistas/configuracion-alertas/", { headers: authHeaders(token) });
+}
+
+export function actualizarConfiguracionAlertas(
+  token: string,
+  cambios: Partial<ConfiguracionAlertas>
+): Promise<ConfiguracionAlertas> {
+  return request<ConfiguracionAlertas>("/api/contratistas/configuracion-alertas/", {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
 export type EmpresaContratista = {
   id: number;
   nombre: string;
