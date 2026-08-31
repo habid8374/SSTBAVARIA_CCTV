@@ -368,5 +368,5 @@ class PermisoTrabajoSerializer(serializers.ModelSerializer):
 class ConfiguracionAlertasSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConfiguracionAlertas
-        fields = ["dias_alerta_vencimiento", "actualizada_en"]
+        fields = ["dias_alerta_vencimiento", "correo_revisor", "actualizada_en"]
         read_only_fields = ["actualizada_en"]

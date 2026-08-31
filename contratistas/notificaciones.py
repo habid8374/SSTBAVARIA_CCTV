@@ -30,6 +30,42 @@ def notificar_decision_radicacion(radicacion):
     _enviar(destinatario, asunto, contenido_html, contexto=f"radicación #{radicacion.pk}")
 
 
+def notificar_radicacion_pendiente(radicacion):
+    """Avisa al correo configurado en ConfiguracionAlertas (Sistema → Reglas
+    de contratistas) que una radicación nueva quedó pendiente de revisión —
+    a diferencia de notificar_decision_radicacion, este correo se dispara al
+    entrar la radicación, no al decidirla."""
+    from .models import ConfiguracionAlertas
+
+    destinatario = ConfiguracionAlertas.obtener().correo_revisor
+    if not destinatario:
+        return
+
+    asunto = f"Nueva radicación pendiente de revisión — {radicacion.trabajador}"
+    contenido_html = (
+        f"<p>Se radicó seguridad social de <strong>{radicacion.trabajador}</strong> "
+        f"({radicacion.mes} {radicacion.anio}) y quedó <strong>pendiente de revisión</strong>.</p>"
+    )
+    _enviar(destinatario, asunto, contenido_html, contexto=f"radicación pendiente #{radicacion.pk}")
+
+
+def notificar_declaracion_pendiente(declaracion):
+    """Igual que notificar_radicacion_pendiente, pero para una declaración
+    de método que se envió a revisión (transición borrador → enviada)."""
+    from .models import ConfiguracionAlertas
+
+    destinatario = ConfiguracionAlertas.obtener().correo_revisor
+    if not destinatario:
+        return
+
+    asunto = f"Nueva declaración de método pendiente de revisión — {declaracion.contratista.nombre}"
+    contenido_html = (
+        f"<p>La declaración de método &laquo;{declaracion.descripcion_trabajo}&raquo; de "
+        f"<strong>{declaracion.contratista.nombre}</strong> quedó <strong>pendiente de revisión</strong>.</p>"
+    )
+    _enviar(destinatario, asunto, contenido_html, contexto=f"declaración pendiente #{declaracion.pk}")
+
+
 def notificar_decision_declaracion(declaracion):
     destinatario = declaracion.contratista.contacto_correo
     if not destinatario:

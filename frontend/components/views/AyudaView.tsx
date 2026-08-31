@@ -328,8 +328,17 @@ const TEMAS: Tema[] = [
           Academy</strong> que aparecen al registrar un trabajador, los <strong>permisos de trabajo /
           certificados requeridos</strong> que aparecen en las actividades de una declaración de método, y
           los <strong>días de alerta de vencimiento</strong> (a cuántos días de vencer una planilla se
-          considera &quot;por vencer&quot; en el banner de Contratistas). Se pueden desactivar sin borrar el
-          historial de trabajadores/actividades que ya los tenían marcados.
+          considera &quot;por vencer&quot; en el banner de Contratistas), y el <strong>correo para avisos
+          de revisión pendiente</strong>. Se pueden desactivar sin borrar el historial de
+          trabajadores/actividades que ya los tenían marcados.
+        </P>
+        <Sub>Aviso al radicar/enviar (no solo al aprobar/rechazar)</Sub>
+        <P>
+          Si se configura el correo de revisión, además del aviso que ya se manda al contacto de la
+          empresa contratista al aprobar o rechazar, ahora también se avisa a ese correo{" "}
+          <strong>apenas queda algo pendiente de revisar</strong>: al radicar seguridad social (queda en
+          &quot;Pendiente&quot;) y al pasar una declaración de método a &quot;Enviada&quot;. Así quien
+          revisa no tiene que estar entrando al sistema a cada rato para enterarse de que hay algo nuevo.
         </P>
       </>
     ),

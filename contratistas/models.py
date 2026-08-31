@@ -445,6 +445,15 @@ class ConfiguracionAlertas(models.Model):
         default=DIAS_ALERTA_VENCIMIENTO,
         help_text="A cuántos días de vencer una planilla se considera 'por vencer' en los indicadores.",
     )
+    correo_revisor = models.EmailField(
+        "correo para avisos de revisión pendiente",
+        blank=True,
+        help_text=(
+            "A dónde avisar cuando se radica seguridad social o se envía una declaración de método que "
+            "queda pendiente de revisión. Vacío = no se envía ese aviso (el de aprobado/rechazado sigue "
+            "yendo siempre al contacto de la empresa contratista)."
+        ),
+    )
     actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
 
     class Meta:

@@ -74,6 +74,15 @@ frontend en Vercel — pero viven en el mismo repositorio.
     un KPI en amarillo en Indicadores) cuando un trabajador activo no
     tiene completado algún curso obligatorio — es un aviso, no bloquea el
     registro ni la radicación.
+  - **Aviso de pendiente por revisar**: si se configura un
+    `ConfiguracionAlertas.correo_revisor` (misma pestaña), se envía un
+    correo a ese destinatario apenas algo queda pendiente de revisión —
+    al radicar seguridad social (`RadicacionListaDashboard.perform_create`)
+    y al pasar una declaración de método a "Enviada"
+    (`DeclaracionMetodoDetalle.perform_update`) — sin esperar a que alguien
+    entre al sistema a notar que hay algo nuevo. Es independiente del
+    aviso de aprobado/rechazado, que sigue yendo siempre al contacto de la
+    empresa contratista.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada

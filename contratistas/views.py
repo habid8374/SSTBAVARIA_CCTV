@@ -25,7 +25,12 @@ from .models import (
     calcular_hash_declaracion,
     nivel_riesgo,
 )
-from .notificaciones import notificar_decision_declaracion, notificar_decision_radicacion
+from .notificaciones import (
+    notificar_decision_declaracion,
+    notificar_decision_radicacion,
+    notificar_declaracion_pendiente,
+    notificar_radicacion_pendiente,
+)
 from .serializers import (
     CatalogosSerializer,
     ConfiguracionAlertasSerializer,
@@ -325,6 +330,11 @@ class RadicacionListaDashboard(generics.ListCreateAPIView):
         qs = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista").order_by("-radicada_en")
         return _filtrar_radicaciones(qs, self.request.query_params)
 
+    def perform_create(self, serializer):
+        radicacion = serializer.save()
+        if radicacion.estado == RadicacionSeguridadSocial.Estado.PENDIENTE:
+            notificar_radicacion_pendiente(radicacion)
+
 
 class RadicacionDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista")
@@ -444,11 +454,12 @@ class DeclaracionMetodoDetalle(generics.RetrieveUpdateDestroyAPIView):
     def perform_update(self, serializer):
         estado_anterior = serializer.instance.estado
         declaracion = serializer.save()
-        if declaracion.estado != estado_anterior and declaracion.estado in (
-            DeclaracionMetodo.Estado.APROBADA,
-            DeclaracionMetodo.Estado.RECHAZADA,
-        ):
+        if declaracion.estado == estado_anterior:
+            return
+        if declaracion.estado in (DeclaracionMetodo.Estado.APROBADA, DeclaracionMetodo.Estado.RECHAZADA):
             notificar_decision_declaracion(declaracion)
+        elif declaracion.estado == DeclaracionMetodo.Estado.ENVIADA:
+            notificar_declaracion_pendiente(declaracion)
 
 
 @api_view(["POST"])

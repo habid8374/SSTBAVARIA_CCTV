@@ -369,6 +369,81 @@ class FuncionarioTests(ApiTestsBase):
         self.assertEqual(response.status_code, 401)
 
 
+class NotificacionPendienteTests(ApiTestsBase):
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_radicar_avisa_al_correo_revisor_configurado(self, mock_urlopen):
+        from .models import ConfiguracionAlertas
+
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        ConfiguracionAlertas.obtener()
+        ConfiguracionAlertas.objects.update(correo_revisor="revisor@empresa.com")
+
+        response = self.client.post(
+            reverse("contratistas:radicaciones_lista"),
+            {"trabajador": self.trabajador.pk, "anio": 2026, "mes": "AGOSTO"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        mock_urlopen.assert_called_once()
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_radicar_sin_correo_revisor_configurado_no_avisa(self, mock_urlopen):
+        response = self.client.post(
+            reverse("contratistas:radicaciones_lista"),
+            {"trabajador": self.trabajador.pk, "anio": 2026, "mes": "AGOSTO"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        mock_urlopen.assert_not_called()
+
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_enviar_declaracion_avisa_al_correo_revisor(self, mock_urlopen):
+        from .models import ConfiguracionAlertas
+
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        ConfiguracionAlertas.obtener()
+        ConfiguracionAlertas.objects.update(correo_revisor="revisor@empresa.com")
+
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "enviada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_urlopen.assert_called_once()
+
+    @patch("contratistas.views.notificar_declaracion_pendiente")
+    def test_aprobar_no_dispara_aviso_de_pendiente(self, mock_notificar_pendiente):
+        from .models import FirmaMetodo
+
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_notificar_pendiente.assert_not_called()
+
+
 class EmpresaContratistaTests(ApiTestsBase):
     def test_lista(self):
         response = self.client.get(reverse("contratistas:empresas_lista"), **self._auth(self.operador))

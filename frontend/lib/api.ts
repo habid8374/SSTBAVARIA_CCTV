@@ -556,7 +556,11 @@ export function eliminarPermisoTrabajo(token: string, id: number): Promise<void>
   });
 }
 
-export type ConfiguracionAlertas = { dias_alerta_vencimiento: number; actualizada_en: string };
+export type ConfiguracionAlertas = {
+  dias_alerta_vencimiento: number;
+  correo_revisor: string;
+  actualizada_en: string;
+};
 
 export function obtenerConfiguracionAlertas(token: string): Promise<ConfiguracionAlertas> {
   return request<ConfiguracionAlertas>("/api/contratistas/configuracion-alertas/", { headers: authHeaders(token) });
