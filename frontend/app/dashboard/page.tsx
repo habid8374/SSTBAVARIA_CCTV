@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import type { SeccionId } from "@/components/Sidebar";
 import AlertasView from "@/components/views/AlertasView";
+import AyudaView from "@/components/views/AyudaView";
 import CamarasView from "@/components/views/CamarasView";
 import ContratistasView from "@/components/views/ContratistasView";
 import DeclaracionMetodoView from "@/components/views/DeclaracionMetodoView";
@@ -27,6 +28,7 @@ const TITULOS: Record<SeccionId, string> = {
   "declaracion-metodo": "Declaración de Método",
   sistema: "Sistema",
   usuarios: "Gestión de usuarios",
+  ayuda: "Ayuda",
 };
 
 export default function DashboardPage() {
@@ -86,6 +88,7 @@ export default function DashboardPage() {
       {seccion === "usuarios" && usuario.rol === "administrador" && (
         <UsuariosView token={token} usuarioActualId={usuario.id} />
       )}
+      {seccion === "ayuda" && <AyudaView rol={usuario.rol} />}
     </AppShell>
   );
 }

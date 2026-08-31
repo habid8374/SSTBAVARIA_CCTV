@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import { API_URL, type Rol } from "@/lib/api";
 import {
   IconAlerta,
+  IconAyuda,
   IconCamara,
   IconChevronLeft,
   IconContratista,
@@ -25,7 +26,8 @@ export type SeccionId =
   | "contratistas"
   | "declaracion-metodo"
   | "sistema"
-  | "usuarios";
+  | "usuarios"
+  | "ayuda";
 
 type Item = {
   id: SeccionId;
@@ -44,6 +46,7 @@ const ITEMS: Item[] = [
   { id: "declaracion-metodo", label: "Declaración de Método", icon: IconDeclaracionMetodo },
   { id: "sistema", label: "Sistema", icon: IconSistema, adminOnly: true },
   { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true },
+  { id: "ayuda", label: "Ayuda", icon: IconAyuda },
 ];
 
 // Transición compartida por toda etiqueta de texto que aparece/desaparece

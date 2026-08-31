@@ -91,6 +91,19 @@ export function IconNotificacion({ className }: IconProps) {
   );
 }
 
+export function IconAyuda({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path
+        d="M9.5 9.2a2.5 2.5 0 0 1 4.83-.9c.4 1-.2 1.6-.83 2.1-.6.5-1 1-1 1.9M12 17h.01"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function IconSistema({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>

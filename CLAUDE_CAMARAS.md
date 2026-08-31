@@ -13,6 +13,17 @@ centralizarlo ahí), no compartiendo código directamente. Si más adelante
 conviene fusionarlos en un solo backend, es una decisión a tomar con datos
 reales de uso, no un default de arranque.
 
+## ⚠️ Regla permanente: mantener actualizado el manual de Ayuda
+
+`frontend/components/views/AyudaView.tsx` es el manual de usuario dentro de
+la app (sección **Ayuda** del sidebar, visible para todos los roles). El
+cliente pidió explícitamente que se mantenga al día. **Toda tarea que
+agregue o cambie una funcionalidad visible para el usuario (una sección
+nueva, un flujo, un botón, un comportamiento) debe terminar actualizando
+también el tema correspondiente en `AyudaView.tsx`** (o agregando uno nuevo
+si no encaja en ninguno existente) — no es opcional, es parte de "terminar"
+la tarea, igual que correr los tests o actualizar el README.
+
 ## Qué hace este módulo
 
 Conecta 10 cámaras PTZ y detecta automáticamente cuándo hay una persona en una
@@ -163,10 +174,16 @@ También la Fase 4 completa (ver más abajo):
     `.env` del equipo local), activar/desactivar, eliminar, y un badge de
     "Conectado" si `ultima_conexion` fue hace menos de 5 minutos.
 
-Operador ve todas las secciones excepto Sistema y Usuarios. No puede
-crear/editar/eliminar zonas ni reglas (`EsAdministradorOSoloLectura` en el
-backend) ni gestionar usuarios, credenciales de Brevo o equipos locales —
-todo eso es solo Administrador.
+- **Ayuda**: manual de usuario dentro de la app — tabla de contenidos con un
+  tema por sección del dashboard, más un tema dedicado al flujo completo del
+  equipo local (cómo se conectan las cámaras, mDNS, grabaciones) y preguntas
+  frecuentes. Ver la regla permanente arriba: se actualiza con cada cambio
+  visible al usuario.
+
+Operador ve todas las secciones excepto Sistema y Usuarios (tampoco ve esos
+dos temas dentro de Ayuda). No puede crear/editar/eliminar zonas ni reglas
+(`EsAdministradorOSoloLectura` en el backend) ni gestionar usuarios,
+credenciales de Brevo o equipos locales — todo eso es solo Administrador.
 
 ## Fases de entrega (del alcance cotizado al cliente)
 
