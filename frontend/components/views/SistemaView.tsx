@@ -266,6 +266,22 @@ function EquiposLocales({ token }: { token: string }) {
         </div>
       )}
 
+      <div className="mt-4 rounded-lg border border-corp-blue/30 bg-corp-blue-light px-4 py-3 text-sm text-corp-navy">
+        <p className="font-semibold">📹 Cámaras en vivo y grabaciones</p>
+        <p className="mt-1 text-corp-muted">
+          Cada equipo local levanta su propia página para ver las cámaras en tiempo real y revisar/eliminar
+          grabaciones por fecha — se abre desde un navegador <strong>en la misma red de la planta</strong>{" "}
+          (no desde acá, para no subir video a internet), en:
+        </p>
+        <p className="mt-2 rounded-md bg-white px-3 py-2 font-mono text-xs text-corp-navy">
+          http://&lt;ip-del-pc-de-ese-equipo&gt;:8090
+        </p>
+        <p className="mt-1 text-xs text-corp-muted">
+          La IP es la del PC donde corre <code>equipo_local</code> en esa red (ej. <code>192.168.1.50</code>) —
+          se consulta en ese mismo PC con <code>ipconfig</code> (Windows) o <code>ip addr</code> (Linux).
+        </p>
+      </div>
+
       <div className="mt-6 overflow-x-auto rounded-xl border border-corp-border bg-white">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="border-b border-corp-border bg-corp-blue-light text-xs uppercase text-corp-muted">
