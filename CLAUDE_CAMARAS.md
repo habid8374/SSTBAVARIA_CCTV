@@ -191,10 +191,12 @@ todo eso es solo Administrador.
      segundo plano (systemd/Tarea Programada) en el PC del DVR/NVR. También
      graba a disco lo que ve cada cámara (con retención automática y borrado
      manual por fecha) y expone un visor web propio en esa red local
-     (`http://<ip-del-pc>:8090`) para ver las cámaras en vivo y revisar
+     (`http://<ip-del-pc>:8090`, o `http://sstbavaria-camaras.local:8090`
+     por el anuncio mDNS/Bonjour) para ver las cámaras en vivo y revisar
      grabaciones — nunca sube video a internet, solo eventos con una foto
      (igual que el resto del módulo). Ver `equipo_local/README.md` para
-     instalación y la sección "Grabaciones y visor en vivo".
+     instalación y las secciones "Grabaciones y visor en vivo" y "Nombre en
+     la red en vez de IP".
 3. Motor de detección y reglas funcionando end-to-end — **construido**;
    falta la puesta a prueba con cámaras reales en sitio (ver "Pendiente de
    verificar con hardware real" más abajo).

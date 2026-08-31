@@ -82,10 +82,16 @@ def main():
     detector = DetectorPersonas(Config.MODELO_YOLO, Config.CONFIANZA_MINIMA)
     sincronizador = SincronizadorCamaras(cliente_api, detector, Config)
 
+    anuncio_mdns = None
     if Config.VISOR_WEB_ACTIVO:
         from .visor_web import iniciar_en_hilo  # import perezoso: acá sí hace falta Flask
 
         iniciar_en_hilo(sincronizador, Config)
+
+        if Config.VISOR_WEB_MDNS_ACTIVO:
+            from .mdns import anunciar  # import perezoso: acá sí hace falta zeroconf
+
+            anuncio_mdns = anunciar(Config)
 
     limpiador = None
     if Config.GRABAR_VIDEO:
@@ -110,6 +116,10 @@ def main():
         time.sleep(Config.INTERVALO_SYNC_SEGUNDOS)
 
     sincronizador.detener_todo()
+    if anuncio_mdns is not None:
+        from .mdns import dejar_de_anunciar
+
+        dejar_de_anunciar(anuncio_mdns)
     logger.info("Equipo local detenido.")
 
 

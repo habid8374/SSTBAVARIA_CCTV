@@ -274,11 +274,13 @@ function EquiposLocales({ token }: { token: string }) {
           (no desde acá, para no subir video a internet), en:
         </p>
         <p className="mt-2 rounded-md bg-white px-3 py-2 font-mono text-xs text-corp-navy">
-          http://&lt;ip-del-pc-de-ese-equipo&gt;:8090
+          http://sstbavaria-camaras.local:8090
         </p>
         <p className="mt-1 text-xs text-corp-muted">
-          La IP es la del PC donde corre <code>equipo_local</code> en esa red (ej. <code>192.168.1.50</code>) —
-          se consulta en ese mismo PC con <code>ipconfig</code> (Windows) o <code>ip addr</code> (Linux).
+          Nombre fijo en la red (funciona directo en Mac/Linux; en Windows hace falta instalar &quot;Bonjour
+          Print Services&quot; una vez, o usar el nombre del PC en la red en su lugar — ej.{" "}
+          <code>http://NOMBRE-DEL-PC:8090</code>). Si nada de eso funciona, la IP directa siempre sirve — se
+          consulta en el PC del equipo local con <code>ipconfig</code> (Windows) o <code>ip addr</code> (Linux).
         </p>
       </div>
 

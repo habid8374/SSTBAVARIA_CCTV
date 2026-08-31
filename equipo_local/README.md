@@ -199,6 +199,36 @@ botón para eliminar por fecha.
 solo es alcanzable desde la red local (o por VPN/escritorio remoto a ese PC
 si hace falta verlo desde afuera).
 
+### Nombre en la red en vez de IP
+
+Para no tener que buscar/memorizar la IP cada vez, el equipo local anuncia
+un nombre fijo en la red (mDNS/Bonjour, activado por defecto):
+
+```
+http://sstbavaria-camaras.local:8090
+```
+
+(el nombre es `VISOR_WEB_MDNS_NOMBRE`, configurable — necesario si hay más
+de un equipo local en la misma red, cada uno con un nombre distinto).
+
+Soporte según desde dónde se mire, sin instalar nada en el equipo local (la
+diferencia es del lado de quien abre el navegador):
+- **Mac** y la **mayoría de Linux de escritorio**: funciona directo.
+- **Windows**: no resuelve `.local` de fábrica. Dos opciones:
+  1. Instalar una vez ["Bonjour Print
+     Services"](https://support.apple.com/kb/DL999) (gratis, de Apple) en
+     el PC desde el que se va a mirar — después `.local` funciona normal.
+  2. Sin instalar nada: usar el **nombre del PC en la red** en vez del
+     `.local` — `http://NOMBRE-DEL-PC:8090` suele resolver solo entre
+     equipos Windows de la misma red (vía NetBIOS), sin configuración
+     adicional. El nombre del PC se ve en Configuración → Sistema → Acerca
+     de, o con `hostname` en una consola.
+
+Si ninguna de las dos aplica (o hay dudas), la IP directa siempre funciona
+— se consulta en el PC del equipo local con `ipconfig` (Windows) o
+`ip addr` (Linux). Para desactivar el anuncio por mDNS:
+`VISOR_WEB_MDNS_ACTIVO=false`.
+
 **Autenticación**: si se configuran `VISOR_WEB_USUARIO`/`VISOR_WEB_PASSWORD`
 en el `.env`, el visor pide usuario/contraseña (HTTP Basic) antes de dejar
 ver nada. Si se dejan vacíos (default), el visor queda abierto a quien esté
@@ -217,14 +247,17 @@ Cubren la geometría (punto-en-polígono, escalado de coordenadas), el cliente
 HTTP (mockeado), la lógica de cooldown/zona de `CamaraMonitor`, la
 reconciliación de cámaras activas de `SincronizadorCamaras`, la grabación en
 disco y retención (`grabador.py`, con un escritor de video inyectado en los
-tests) y las rutas del visor web (`visor_web.py`, vía el test client de
-Flask) — todo sin necesitar cámara, RTSP ni el modelo de IA reales. Lo que sí
-requiere hardware real para verificar (no se puede probar en este entorno de
-desarrollo): conexión RTSP real, calidad de la detección con la cámara
-instalada, que el offset de escalado de coordenadas quede bien calibrado con
-la resolución real del stream vs. la del snapshot de referencia, y que la
-codificación de video (`mp4v`) sea compatible con el códec disponible en el
-PC de destino.
+tests), las rutas del visor web (`visor_web.py`, vía el test client de
+Flask) y el anuncio mDNS (`mdns.py`, con `Zeroconf`/`ServiceInfo` mockeados)
+— todo sin necesitar cámara, RTSP ni el modelo de IA reales. Lo que sí
+requiere hardware/red real para verificar (no se puede probar en este
+entorno de desarrollo): conexión RTSP real, calidad de la detección con la
+cámara instalada, que el offset de escalado de coordenadas quede bien
+calibrado con la resolución real del stream vs. la del snapshot de
+referencia, que la codificación de video (`mp4v`) sea compatible con el
+códec disponible en el PC de destino, y que `<nombre>.local` resuelva de
+verdad en la red de la planta (depende del sistema operativo de quien
+mira — ver "Nombre en la red en vez de IP" arriba).
 
 ## Notas de diseño
 

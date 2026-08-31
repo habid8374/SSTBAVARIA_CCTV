@@ -105,6 +105,13 @@ class Config:
     VISOR_WEB_USUARIO = os.environ.get("VISOR_WEB_USUARIO", "")
     VISOR_WEB_PASSWORD = os.environ.get("VISOR_WEB_PASSWORD", "")
 
+    # Anuncia <nombre>.local en la red (mDNS/Bonjour) apuntando a este PC,
+    # para no tener que buscar/memorizar la IP — ver README → "Nombre en la
+    # red en vez de IP". Si hay más de un equipo local en la misma red,
+    # cada uno necesita un VISOR_WEB_MDNS_NOMBRE distinto.
+    VISOR_WEB_MDNS_ACTIVO = _booleano("VISOR_WEB_MDNS_ACTIVO", True)
+    VISOR_WEB_MDNS_NOMBRE = os.environ.get("VISOR_WEB_MDNS_NOMBRE", "sstbavaria-camaras")
+
     @classmethod
     def validar(cls):
         if not cls.API_KEY:
