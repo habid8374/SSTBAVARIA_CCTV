@@ -2,7 +2,9 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
+import { useDialog } from "@/components/DialogProvider";
 import {
+  API_URL,
   ApiError,
   actualizarConfiguracionNotificaciones,
   actualizarEquipoLocal,
@@ -179,6 +181,7 @@ function EquiposLocales({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
+  const { confirmar } = useDialog();
 
   function cargar() {
     listarEquiposLocales(token)
@@ -198,7 +201,13 @@ function EquiposLocales({ token }: { token: string }) {
   }
 
   async function eliminar(equipo: EquipoLocal) {
-    if (!window.confirm(`¿Eliminar "${equipo.nombre}"? El equipo local dejará de poder autenticarse.`)) return;
+    const ok = await confirmar({
+      titulo: "Eliminar equipo local",
+      mensaje: `¿Eliminar "${equipo.nombre}"? El equipo local dejará de poder autenticarse.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
     try {
       await eliminarEquipoLocal(token, equipo.id);
       cargar();
@@ -217,12 +226,30 @@ function EquiposLocales({ token }: { token: string }) {
     }
   }
 
+  function descargarEnv(equipo: EquipoLocal) {
+    // Genera el .env ya completo (URL del backend + api_key) para que en el
+    // PC del equipo local solo haya que arrastrar el archivo a la carpeta
+    // "equipo_local" — sin abrir ni editar nada a mano.
+    const contenido = `API_BASE_URL=${API_URL}\nAPI_KEY=${equipo.api_key}\n`;
+    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = ".env";
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
-          Cada PC/DVR en sitio que corre <code>equipo_local</code> necesita un registro acá — copia el{" "}
-          <code>api_key</code> generado a su <code>.env</code> (variable <code>API_KEY</code>).
+          Cada PC/DVR en sitio que corre <code>equipo_local</code> necesita un registro acá. Lo más simple:
+          botón <strong>&quot;Descargar .env&quot;</strong> → arrastrar el archivo descargado a la carpeta{" "}
+          <code>equipo_local</code> del PC (sin editar nada a mano). También se puede copiar el{" "}
+          <code>api_key</code> manualmente si se prefiere.
         </p>
         <button
           type="button"
@@ -265,6 +292,13 @@ function EquiposLocales({ token }: { token: string }) {
                       className="text-xs font-medium text-corp-blue hover:underline"
                     >
                       {copiadoId === equipo.id ? "¡Copiado!" : "Copiar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => descargarEnv(equipo)}
+                      className="text-xs font-medium text-corp-blue hover:underline"
+                    >
+                      Descargar .env
                     </button>
                   </div>
                 </td>

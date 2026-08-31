@@ -63,6 +63,13 @@ if not DEBUG and not ALLOWED_HOSTS:
     # Evita quedar con ALLOWED_HOSTS vacío en producción por falta de config.
     ALLOWED_HOSTS = [".railway.app"]
 
+# URL del dashboard (Next.js en Vercel) — usada para el link "VER SITIO" del
+# admin de Django (ver config/urls.py). Si no se configura, cae al primer
+# origen de CORS_ALLOWED_ORIGINS o a localhost en desarrollo.
+FRONTEND_URL = os.environ.get("FRONTEND_URL") or (
+    CORS_ALLOWED_ORIGINS[0] if CORS_ALLOWED_ORIGINS else "http://localhost:3000"
+)
+
 
 # Application definition
 

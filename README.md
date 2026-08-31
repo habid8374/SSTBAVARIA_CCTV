@@ -49,7 +49,10 @@ Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 - `equipo_local/` — programa Python independiente (no es una app Django) que
   corre en el PC del DVR/NVR en sitio: se conecta por RTSP a cada cámara,
   detecta personas con YOLOv8n y reporta eventos al backend de arriba. Corre
-  como servicio en segundo plano. Ver `equipo_local/README.md`.
+  como servicio en segundo plano. También graba a disco (con retención
+  automática) y expone un visor web local (cámaras en vivo + grabaciones,
+  `http://<ip-del-pc>:8090`, solo accesible en la red de la planta). Ver
+  `equipo_local/README.md`.
 
 ## Backend — correr en local
 

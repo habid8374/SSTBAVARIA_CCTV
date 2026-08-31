@@ -82,6 +82,17 @@ def main():
     detector = DetectorPersonas(Config.MODELO_YOLO, Config.CONFIANZA_MINIMA)
     sincronizador = SincronizadorCamaras(cliente_api, detector, Config)
 
+    if Config.VISOR_WEB_ACTIVO:
+        from .visor_web import iniciar_en_hilo  # import perezoso: acá sí hace falta Flask
+
+        iniciar_en_hilo(sincronizador, Config)
+
+    limpiador = None
+    if Config.GRABAR_VIDEO:
+        from .grabador import LimpiadorPeriodico
+
+        limpiador = LimpiadorPeriodico(Config.GRABACIONES_DIR, Config.GRABACIONES_RETENCION_DIAS)
+
     estado = {"detener": False}
 
     def _manejar_senal(signum, frame):
@@ -94,6 +105,8 @@ def main():
     logger.info("Equipo local iniciado — backend: %s", Config.API_BASE_URL)
     while not estado["detener"]:
         sincronizador.sincronizar()
+        if limpiador is not None:
+            limpiador.tick()
         time.sleep(Config.INTERVALO_SYNC_SEGUNDOS)
 
     sincronizador.detener_todo()

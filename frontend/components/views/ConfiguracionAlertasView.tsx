@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import FormularioRegla, { DIAS } from "@/components/FormularioRegla";
+import { useDialog } from "@/components/DialogProvider";
 import {
   actualizarRegla,
   eliminarRegla,
@@ -16,6 +17,7 @@ type ReglaConContexto = ReglaAlerta & { camaraNombre: string; camaraId: number }
 
 export default function ConfiguracionAlertasView({ token, rol }: { token: string; rol: Rol | null }) {
   const esAdmin = rol === "administrador";
+  const { confirmar } = useDialog();
   const [camaras, setCamaras] = useState<CamaraDashboard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
@@ -51,7 +53,13 @@ export default function ConfiguracionAlertasView({ token, rol }: { token: string
   }
 
   async function eliminar(regla: ReglaConContexto) {
-    if (!window.confirm(`¿Eliminar esta regla de "${regla.zona_nombre}"?`)) return;
+    const ok = await confirmar({
+      titulo: "Eliminar regla",
+      mensaje: `¿Eliminar esta regla de "${regla.zona_nombre}"?`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
     try {
       await eliminarRegla(token, regla.id);
       cargar();

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent, type MouseEvent as ReactM
 
 import FormularioRegla, { DIAS } from "@/components/FormularioRegla";
 import PoligonoOverlay from "@/components/PoligonoOverlay";
+import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
   actualizarRegla,
@@ -284,6 +285,7 @@ function ZonaCard({
   const [expandida, setExpandida] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirmar } = useDialog();
 
   async function alternarActiva() {
     try {
@@ -295,7 +297,13 @@ function ZonaCard({
   }
 
   async function eliminar() {
-    if (!window.confirm(`¿Eliminar la zona "${zona.nombre}"? También se eliminan sus reglas.`)) return;
+    const ok = await confirmar({
+      titulo: "Eliminar zona",
+      mensaje: `¿Eliminar la zona "${zona.nombre}"? También se eliminan sus reglas.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
     try {
       await eliminarZona(token, zona.id);
       onCambio();

@@ -15,12 +15,13 @@ import numpy as np
 import requests
 
 from .geometria import escalar_punto, punto_en_poligono
+from .grabador import GrabadorCamara
 
 logger = logging.getLogger("equipo_local.camara")
 
 
 class CamaraMonitor:
-    def __init__(self, camara_datos, detector, cliente_api, config):
+    def __init__(self, camara_datos, detector, cliente_api, config, fabrica_grabador=GrabadorCamara):
         """`camara_datos` es el dict de una cámara tal como lo devuelve
         obtener_reglas_activas(): id, nombre, rtsp_url, snapshot_referencia, zonas[]."""
         self.id = camara_datos["id"]
@@ -35,6 +36,16 @@ class CamaraMonitor:
         self._ultimo_reporte_por_zona = {}
         self._detener = threading.Event()
         self._hilo = None
+        self._lock_frame = threading.Lock()
+        self._ultimo_frame_jpeg = None
+        self._grabador = None
+        if getattr(config, "GRABAR_VIDEO", False):
+            self._grabador = fabrica_grabador(
+                self.id,
+                config.GRABACIONES_DIR,
+                config.GRABACIONES_FPS,
+                config.GRABACIONES_DURACION_CLIP_MINUTOS * 60,
+            )
 
     def actualizar(self, camara_datos):
         """Refresca zonas/reglas/rtsp sin perder el cooldown acumulado ni
@@ -54,6 +65,14 @@ class CamaraMonitor:
         self._detener.set()
         if self._hilo:
             self._hilo.join(timeout=5)
+        if self._grabador is not None:
+            self._grabador.cerrar()
+
+    def obtener_ultimo_frame_jpeg(self):
+        """Último frame capturado, ya codificado en JPEG — lo consume el
+        visor web en vivo (ver visor_web.py). None si todavía no hay ninguno."""
+        with self._lock_frame:
+            return self._ultimo_frame_jpeg
 
     # --- Lógica de decisión, separada de la captura para poder probarla sin cámara real ---
 
@@ -123,9 +142,19 @@ class CamaraMonitor:
                 if not ok:
                     logger.warning("Se perdió la señal de %s — reconectando…", self.nombre)
                     break
+                self._actualizar_ultimo_frame(frame)
+                if self._grabador is not None:
+                    self._grabador.escribir_frame(frame)
                 self._procesar_frame(frame)
                 time.sleep(self.config.INTERVALO_DETECCION_SEGUNDOS)
             captura.release()
+
+    def _actualizar_ultimo_frame(self, frame):
+        ok, buffer = cv2.imencode(".jpg", frame)
+        if not ok:
+            return
+        with self._lock_frame:
+            self._ultimo_frame_jpeg = buffer.tobytes()
 
     def _procesar_frame(self, frame):
         alto, ancho = frame.shape[:2]

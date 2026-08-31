@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
+import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
   actualizarContratista,
@@ -312,6 +313,7 @@ function PanelRadicaciones({ token, trabajador }: { token: string; trabajador: T
   const [radicaciones, setRadicaciones] = useState<RadicacionSeguridadSocial[] | null>(null);
   const [formulario, setFormulario] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { pedirTexto } = useDialog();
 
   function cargar() {
     listarRadicaciones(token, { trabajador: trabajador.id })
@@ -322,8 +324,14 @@ function PanelRadicaciones({ token, trabajador }: { token: string; trabajador: T
   useEffect(cargar, [token, trabajador.id]);
 
   async function decidir(id: number, accion: "aprobar" | "rechazar") {
-    const observaciones =
-      window.prompt(accion === "aprobar" ? "Observaciones (opcional):" : "Motivo del rechazo:") ?? "";
+    const observaciones = await pedirTexto({
+      titulo: accion === "aprobar" ? "Aprobar radicación" : "Rechazar radicación",
+      mensaje: accion === "aprobar" ? "Observaciones (opcional):" : "Motivo del rechazo:",
+      placeholder: accion === "aprobar" ? "Sin observaciones" : "Explica por qué se rechaza…",
+      textoConfirmar: accion === "aprobar" ? "Aprobar" : "Rechazar",
+      opcional: accion === "aprobar",
+    });
+    if (observaciones === null) return;
     try {
       if (accion === "aprobar") {
         await aprobarRadicacion(token, id, observaciones);

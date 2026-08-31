@@ -149,5 +149,65 @@ class ReportarTests(unittest.TestCase):
         monitor._reportar((5.0, 5.0), frame, {"id": 10, "nombre": "Zona Restringida"}, confianza=0.9)
 
 
+class UltimoFrameYGrabacionTests(unittest.TestCase):
+    def test_sin_frame_todavia_devuelve_none(self):
+        monitor = CamaraMonitor(_camara_datos(), MagicMock(), MagicMock(), _config())
+        self.assertIsNone(monitor.obtener_ultimo_frame_jpeg())
+
+    def test_actualizar_ultimo_frame_lo_deja_disponible_como_jpeg(self):
+        monitor = CamaraMonitor(_camara_datos(), MagicMock(), MagicMock(), _config())
+        frame = np.zeros((10, 10, 3), dtype=np.uint8)
+        monitor._actualizar_ultimo_frame(frame)
+        jpeg = monitor.obtener_ultimo_frame_jpeg()
+        self.assertIsInstance(jpeg, (bytes, bytearray))
+        self.assertTrue(jpeg.startswith(b"\xff\xd8"))  # firma JPEG
+
+    def test_grabar_video_activo_crea_un_grabador_por_camara(self):
+        fabrica_grabador = MagicMock()
+        CamaraMonitor(
+            _camara_datos(),
+            MagicMock(),
+            MagicMock(),
+            _config(GRABAR_VIDEO=True, GRABACIONES_DIR="grabaciones", GRABACIONES_FPS=3, GRABACIONES_DURACION_CLIP_MINUTOS=60),
+            fabrica_grabador=fabrica_grabador,
+        )
+        fabrica_grabador.assert_called_once_with(1, "grabaciones", 3, 3600)
+
+    def test_grabar_video_desactivado_no_crea_grabador(self):
+        fabrica_grabador = MagicMock()
+        monitor = CamaraMonitor(
+            _camara_datos(), MagicMock(), MagicMock(), _config(GRABAR_VIDEO=False), fabrica_grabador=fabrica_grabador
+        )
+        fabrica_grabador.assert_not_called()
+        self.assertIsNone(monitor._grabador)
+
+    def test_detener_cierra_el_grabador_si_existe(self):
+        fabrica_grabador = MagicMock()
+        grabador = fabrica_grabador.return_value
+        monitor = CamaraMonitor(
+            _camara_datos(), MagicMock(), MagicMock(), _config(GRABAR_VIDEO=True), fabrica_grabador=fabrica_grabador
+        )
+        monitor.detener()
+        grabador.cerrar.assert_called_once()
+
+    def test_procesar_frame_completo_escribe_al_grabador(self):
+        """_loop_captura llama _actualizar_ultimo_frame + grabador.escribir_frame
+        antes de _procesar_frame — se prueba acá el mismo orden sin cv2.VideoCapture real."""
+        fabrica_grabador = MagicMock()
+        grabador = fabrica_grabador.return_value
+        monitor = CamaraMonitor(
+            _camara_datos(), MagicMock(detectar=MagicMock(return_value=[])), MagicMock(),
+            _config(GRABAR_VIDEO=True), fabrica_grabador=fabrica_grabador,
+        )
+        frame = np.zeros((10, 10, 3), dtype=np.uint8)
+
+        monitor._actualizar_ultimo_frame(frame)
+        monitor._grabador.escribir_frame(frame)
+        monitor._procesar_frame(frame)
+
+        grabador.escribir_frame.assert_called_once_with(frame)
+        self.assertIsNotNone(monitor.obtener_ultimo_frame_jpeg())
+
+
 if __name__ == "__main__":
     unittest.main()

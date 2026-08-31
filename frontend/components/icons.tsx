@@ -104,6 +104,15 @@ export function IconSistema({ className }: IconProps) {
   );
 }
 
+export function IconPanelAdmin({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="3" y="4" width="18" height="14" rx="2" />
+      <path d="M3 9h18M8 21h8M12 18v3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function IconLogout({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>

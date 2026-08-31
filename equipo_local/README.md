@@ -28,6 +28,9 @@ ventana ni intervención manual, igual que un NVR/DVR real.
      por defecto) desde el último reporte de esa misma zona, reporta el
      evento: `POST /api/camaras-ia/eventos/` con el punto detectado y un
      snapshot JPEG del frame.
+   - Cada frame leído también se guarda a disco (si `GRABAR_VIDEO=true`,
+     por defecto) y se cachea como "último frame" para el visor web en
+     vivo — ver [Grabaciones y visor en vivo](#grabaciones-y-visor-en-vivo).
 3. El backend decide si el punto realmente cae en una zona activa con
    horario vigente y dispara la alerta — acá no se duplica esa lógica, el
    equipo local solo pre-filtra localmente para no gastar ancho de banda
@@ -44,6 +47,8 @@ ventana ni intervención manual, igual que un NVR/DVR real.
   sola si está bien configurado CUDA/PyTorch).
 - Acceso de red a las cámaras (RTSP, puerto 554 típicamente) y al backend
   (HTTPS saliente).
+- Disco libre para las grabaciones — ver [Grabaciones y visor en
+  vivo](#grabaciones-y-visor-en-vivo) para el cálculo de espacio.
 
 ## Instalación
 
@@ -69,20 +74,21 @@ pip install -r requirements.txt
 
 1. Crear el registro de este equipo — dos formas, misma tabla:
    - **Dashboard** (recomendado): sección **Sistema → Equipo local** →
-     "+ Nuevo equipo", solo el nombre (ej. "NVR Planta Tocancipá"). La
-     `api_key` se genera sola y aparece en la tabla con un botón "Copiar".
+     "+ Nuevo equipo", solo el nombre (ej. "NVR Planta Tocancipá").
    - **Admin de Django**: `/admin/camaras_ia/equipolocal/add/`, mismo
      resultado.
-2. Copiar `.env.example` a `.env` en esta misma carpeta y completar:
-
-   | Variable | Valor |
-   |---|---|
-   | `API_BASE_URL` | URL del backend en Railway (sin `/` final) |
-   | `API_KEY` | la que generó el paso 1 |
+2. Conseguir el `.env` — dos formas:
+   - **Más simple (recomendado)**: en la misma tabla, botón **"Descargar
+     .env"** → descarga un archivo `.env` ya completo (con `API_BASE_URL` y
+     `API_KEY` adentro). Solo hay que moverlo/arrastrarlo a esta carpeta
+     (`equipo_local/`) — no hace falta abrirlo ni editar nada a mano.
+   - **Manual**: copiar `.env.example` a `.env` en esta misma carpeta y
+     completar `API_BASE_URL` (URL del backend en Railway, sin `/` final) y
+     `API_KEY` (botón "Copiar" de la misma tabla).
 
    El resto de variables (intervalos, cooldown, confianza mínima, modelo,
-   nivel de log) tienen defaults razonables — ver `config.py` y
-   `.env.example` si hace falta ajustarlas.
+   grabación, visor web, nivel de log) tienen defaults razonables — ver
+   `config.py` y `.env.example` si hace falta ajustarlas.
 3. Configurar cada cámara desde el dashboard (sección **Cámaras**): IP,
    usuario/contraseña ONVIF (se reutilizan como credenciales RTSP), y opcio-
    nalmente una **URL RTSP** explícita si la cámara no es Dahua o no sigue
@@ -141,6 +147,65 @@ Ajustar las rutas y el `User=` del `.service` si se instala en otro lugar.
    SSTBavaria-EquipoLocalCamaras`. Para ver que esté corriendo: Administrador
    de tareas → pestaña Detalles → buscar `pythonw.exe`.
 
+## Grabaciones y visor en vivo
+
+Además de reportar eventos al backend, el equipo local graba lo que ven las
+cámaras en el disco del propio PC (no en la nube — mismo criterio que el
+resto del proyecto: nunca sale video crudo a internet) y expone una páginita
+web local para verlas en vivo y revisar/borrar lo grabado.
+
+### Dónde quedan las grabaciones
+
+```
+equipo_local/grabaciones/<id-de-la-cámara>/<YYYY-MM-DD>/HH-MM-SS.mp4
+```
+
+Cada clip dura `GRABACIONES_DURACION_CLIP_MINUTOS` (1 hora por defecto) — así
+un archivo nunca crece indefinidamente y es fácil ubicar/borrar lo de un día
+puntual. La carpeta base se puede mover a otro disco con `GRABACIONES_DIR`
+(ej. un disco externo con más espacio).
+
+**Retención automática**: una vez al día se borran solas las carpetas de
+fecha más viejas que `GRABACIONES_RETENCION_DIAS` (15 días por defecto) —
+para que el disco no se llene solo. También se puede borrar manualmente por
+fecha (y opcionalmente por cámara) desde el visor web, con el botón
+"Eliminar por fecha".
+
+**Cálculo de espacio** (orientativo, con los defaults): la grabación usa la
+misma frecuencia de captura que la detección (`INTERVALO_DETECCION_SEGUNDOS`,
+~2.5 fps), no los 25-30fps del video original — así que el peso por cámara
+es bajo. Como referencia, a 3fps y calidad media, una cámara ronda **1-2 GB
+por día**; con 10 cámaras y 15 días de retención, calcula unos **150-300 GB**
+de uso simultáneo. Ajustar `GRABACIONES_RETENCION_DIAS` (menos días) o
+`GRABACIONES_FPS` (menos fps) si el disco del PC es más chico, o desactivar
+la grabación por completo con `GRABAR_VIDEO=false` si solo interesan los
+eventos/alertas.
+
+### Ver las cámaras en vivo y navegar las grabaciones
+
+Con el equipo local corriendo, abrir en un navegador (desde el mismo PC o
+cualquier otro en la misma red de la planta):
+
+```
+http://<ip-del-pc-del-equipo-local>:8090
+```
+
+(el puerto es `VISOR_WEB_PUERTO`, 8090 por defecto). La página muestra una
+grilla con la imagen en vivo de cada cámara activa, y más abajo un buscador
+de grabaciones por cámara/fecha con enlace para ver/descargar cada clip y el
+botón para eliminar por fecha.
+
+**No sale a internet**: el equipo local no expone puertos públicos — esto
+solo es alcanzable desde la red local (o por VPN/escritorio remoto a ese PC
+si hace falta verlo desde afuera).
+
+**Autenticación**: si se configuran `VISOR_WEB_USUARIO`/`VISOR_WEB_PASSWORD`
+en el `.env`, el visor pide usuario/contraseña (HTTP Basic) antes de dejar
+ver nada. Si se dejan vacíos (default), el visor queda abierto a quien esté
+en la misma red — solo recomendable si esa red ya es de confianza (la
+consola arranca con una advertencia si quedan vacíos, para no pasarlo por
+alto). Para desactivar el visor por completo: `VISOR_WEB_ACTIVO=false`.
+
 ## Pruebas automatizadas
 
 ```bash
@@ -149,13 +214,17 @@ python -m unittest discover -s equipo_local/tests -t .
 ```
 
 Cubren la geometría (punto-en-polígono, escalado de coordenadas), el cliente
-HTTP (mockeado), la lógica de cooldown/zona de `CamaraMonitor`, y la
-reconciliación de cámaras activas de `SincronizadorCamaras` — todo sin
-necesitar cámara, RTSP ni el modelo de IA reales. Lo que sí requiere hardware
-real para verificar (no se puede probar en este entorno de desarrollo):
-conexión RTSP real, calidad de la detección con la cámara instalada, y que
-el offset de escalado de coordenadas quede bien calibrado con la resolución
-real del stream vs. la del snapshot de referencia.
+HTTP (mockeado), la lógica de cooldown/zona de `CamaraMonitor`, la
+reconciliación de cámaras activas de `SincronizadorCamaras`, la grabación en
+disco y retención (`grabador.py`, con un escritor de video inyectado en los
+tests) y las rutas del visor web (`visor_web.py`, vía el test client de
+Flask) — todo sin necesitar cámara, RTSP ni el modelo de IA reales. Lo que sí
+requiere hardware real para verificar (no se puede probar en este entorno de
+desarrollo): conexión RTSP real, calidad de la detección con la cámara
+instalada, que el offset de escalado de coordenadas quede bien calibrado con
+la resolución real del stream vs. la del snapshot de referencia, y que la
+codificación de video (`mp4v`) sea compatible con el códec disponible en el
+PC de destino.
 
 ## Notas de diseño
 

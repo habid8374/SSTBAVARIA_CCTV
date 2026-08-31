@@ -18,6 +18,13 @@ def _flotante(nombre, default):
     return float(valor) if valor else default
 
 
+def _booleano(nombre, default):
+    valor = os.environ.get(nombre)
+    if valor is None or valor == "":
+        return default
+    return valor.strip().lower() not in ("0", "false", "no")
+
+
 class Config:
     # URL base del backend Django (Railway en producción, 127.0.0.1:8000 en pruebas locales).
     API_BASE_URL = os.environ.get("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
@@ -55,6 +62,48 @@ class Config:
     RECONEXION_SEGUNDOS = _entero("RECONEXION_SEGUNDOS", 10)
 
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+
+    # --- Grabación en disco (para revisar después) ---
+
+    # Si se desactiva, el equipo local solo detecta/reporta — no graba nada
+    # a disco (útil si el PC no tiene espacio de sobra).
+    GRABAR_VIDEO = _booleano("GRABAR_VIDEO", True)
+
+    # Carpeta base donde se guardan los clips: <carpeta>/<camara_id>/<YYYY-MM-DD>/HH-MM-SS.mp4
+    # — con esa estructura, "eliminar por fecha" es simplemente borrar una subcarpeta.
+    GRABACIONES_DIR = os.environ.get("GRABACIONES_DIR", "grabaciones")
+
+    # Cada cuánto se cierra el clip actual y se abre uno nuevo — clips más
+    # cortos son más fáciles de indexar/borrar por fecha, pero generan más
+    # archivos. Una hora es un buen equilibrio para revisión manual.
+    GRABACIONES_DURACION_CLIP_MINUTOS = _entero("GRABACIONES_DURACION_CLIP_MINUTOS", 60)
+
+    # FPS con el que se graba el clip — igual a la frecuencia real de
+    # captura (1 / INTERVALO_DETECCION_SEGUNDOS), no a los 24-30fps del
+    # stream original: no se lee cada frame del RTSP (ver arriba), así que
+    # grabar más "fps" de los que en verdad se capturan solo generaría un
+    # video acelerado. Si cambias INTERVALO_DETECCION_SEGUNDOS, ajusta esto también.
+    GRABACIONES_FPS = _entero("GRABACIONES_FPS", 3)
+
+    # Cuántos días se conservan las grabaciones antes de borrarse solas —
+    # corre una limpieza automática una vez al día.
+    GRABACIONES_RETENCION_DIAS = _entero("GRABACIONES_RETENCION_DIAS", 15)
+
+    # --- Visor web local (cámaras en vivo + grabaciones) ---
+
+    # Si se desactiva, no se levanta el visor web (solo detección/grabación).
+    VISOR_WEB_ACTIVO = _booleano("VISOR_WEB_ACTIVO", True)
+
+    # 0.0.0.0 para que se pueda ver desde otros equipos de la misma red —
+    # nunca sale a internet, el equipo local no expone puertos públicos.
+    VISOR_WEB_HOST = os.environ.get("VISOR_WEB_HOST", "0.0.0.0")
+    VISOR_WEB_PUERTO = _entero("VISOR_WEB_PUERTO", 8090)
+
+    # Usuario/contraseña del visor (HTTP Basic) — si se deja vacío, el visor
+    # queda sin autenticación (solo recomendable si la red local ya es de
+    # confianza). Ver equipo_local/README.md.
+    VISOR_WEB_USUARIO = os.environ.get("VISOR_WEB_USUARIO", "")
+    VISOR_WEB_PASSWORD = os.environ.get("VISOR_WEB_PASSWORD", "")
 
     @classmethod
     def validar(cls):

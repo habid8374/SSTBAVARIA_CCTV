@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
+import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
   actualizarUsuario,
@@ -18,6 +19,7 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioGestionado[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const { confirmar } = useDialog();
 
   function cargar() {
     listarUsuarios(token)
@@ -46,7 +48,13 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
   }
 
   async function eliminar(usuario: UsuarioGestionado) {
-    if (!window.confirm(`¿Eliminar a ${usuario.username}? Esta acción no se puede deshacer.`)) {
+    const ok = await confirmar({
+      titulo: "Eliminar usuario",
+      mensaje: `¿Eliminar a ${usuario.username}? Esta acción no se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) {
       return;
     }
     try {
