@@ -362,3 +362,351 @@ export function eliminarRegla(token: string, id: number): Promise<void> {
     headers: authHeaders(token),
   });
 }
+
+// --- Contratistas: empresas, trabajadores, seguridad social, declaración de método ---
+
+export type Opcion = { clave: string; etiqueta: string };
+
+export type Catalogos = {
+  cursos_safety_academy: Opcion[];
+  permisos_trabajo: string[];
+  roles_firma: Opcion[];
+};
+
+export function obtenerCatalogosContratistas(token: string): Promise<Catalogos> {
+  return request<Catalogos>("/api/contratistas/catalogos/", { headers: authHeaders(token) });
+}
+
+export type EmpresaContratista = {
+  id: number;
+  nombre: string;
+  nit: string;
+  contacto_nombre: string;
+  contacto_telefono: string;
+  contacto_correo: string;
+  responsable_sst_nombre: string;
+  responsable_sst_telefono: string;
+  activa: boolean;
+  creada_en: string;
+  trabajadores_count: number;
+};
+
+export type NuevaEmpresaContratista = Omit<
+  EmpresaContratista,
+  "id" | "creada_en" | "trabajadores_count"
+>;
+
+export function listarContratistas(token: string): Promise<EmpresaContratista[]> {
+  return request<EmpresaContratista[]>("/api/contratistas/empresas/", { headers: authHeaders(token) });
+}
+
+export function crearContratista(
+  token: string,
+  datos: Partial<NuevaEmpresaContratista>
+): Promise<EmpresaContratista> {
+  return request<EmpresaContratista>("/api/contratistas/empresas/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarContratista(
+  token: string,
+  id: number,
+  cambios: Partial<NuevaEmpresaContratista>
+): Promise<EmpresaContratista> {
+  return request<EmpresaContratista>(`/api/contratistas/empresas/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export type TipoVinculacion = "fijo" | "temporal";
+
+export type RadicacionResumen = {
+  id: number;
+  anio: number;
+  mes: string;
+  estado: EstadoRadicacion;
+  fecha_vencimiento: string | null;
+};
+
+export type Trabajador = {
+  id: number;
+  contratista: number;
+  contratista_nombre: string;
+  nombres: string;
+  apellidos: string;
+  documento: string;
+  eps: string;
+  arl: string;
+  afp: string;
+  tipo_vinculacion: TipoVinculacion;
+  fecha_inicio_contrato: string | null;
+  cursos_safety_academy: Record<string, string | null>;
+  activo: boolean;
+  creado_en: string;
+  ultima_radicacion: RadicacionResumen | null;
+};
+
+export type NuevoTrabajador = {
+  contratista: number;
+  nombres: string;
+  apellidos: string;
+  documento: string;
+  eps?: string;
+  arl?: string;
+  afp?: string;
+  tipo_vinculacion?: TipoVinculacion;
+  fecha_inicio_contrato?: string | null;
+  cursos_safety_academy?: Record<string, string | null>;
+  activo?: boolean;
+};
+
+export function listarTrabajadores(token: string, contratistaId?: number): Promise<Trabajador[]> {
+  const query = contratistaId ? `?contratista=${contratistaId}` : "";
+  return request<Trabajador[]>(`/api/contratistas/trabajadores/${query}`, { headers: authHeaders(token) });
+}
+
+export function crearTrabajador(token: string, datos: NuevoTrabajador): Promise<Trabajador> {
+  return request<Trabajador>("/api/contratistas/trabajadores/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarTrabajador(
+  token: string,
+  id: number,
+  cambios: Partial<NuevoTrabajador>
+): Promise<Trabajador> {
+  return request<Trabajador>(`/api/contratistas/trabajadores/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export type EstadoRadicacion = "pendiente" | "aprobada" | "rechazada";
+
+export type RadicacionSeguridadSocial = {
+  id: number;
+  trabajador: number;
+  trabajador_nombre: string;
+  contratista_nombre: string;
+  anio: number;
+  mes: string;
+  numero_planilla: string;
+  fecha_vencimiento: string | null;
+  soporte_pago: string | null;
+  interventor: string;
+  estado: EstadoRadicacion;
+  observaciones: string;
+  radicada_en: string;
+  revisada_en: string | null;
+};
+
+export type NuevaRadicacion = {
+  trabajador: number;
+  anio: number;
+  mes: string;
+  numero_planilla?: string;
+  fecha_vencimiento?: string | null;
+  interventor?: string;
+};
+
+export function listarRadicaciones(
+  token: string,
+  filtros: { trabajador?: number; contratista?: number; estado?: EstadoRadicacion } = {}
+): Promise<RadicacionSeguridadSocial[]> {
+  const params = new URLSearchParams();
+  if (filtros.trabajador !== undefined) params.set("trabajador", String(filtros.trabajador));
+  if (filtros.contratista !== undefined) params.set("contratista", String(filtros.contratista));
+  if (filtros.estado) params.set("estado", filtros.estado);
+  const query = params.toString();
+  return request<RadicacionSeguridadSocial[]>(`/api/contratistas/radicaciones/${query ? `?${query}` : ""}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function crearRadicacion(
+  token: string,
+  datos: NuevaRadicacion,
+  soporte?: File
+): Promise<RadicacionSeguridadSocial> {
+  if (soporte) {
+    const formData = new FormData();
+    Object.entries(datos).forEach(([clave, valor]) => {
+      if (valor !== undefined && valor !== null) formData.append(clave, String(valor));
+    });
+    formData.append("soporte_pago", soporte);
+    return request<RadicacionSeguridadSocial>("/api/contratistas/radicaciones/", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: formData,
+    });
+  }
+  return request<RadicacionSeguridadSocial>("/api/contratistas/radicaciones/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function aprobarRadicacion(
+  token: string,
+  id: number,
+  observaciones = ""
+): Promise<RadicacionSeguridadSocial> {
+  return request<RadicacionSeguridadSocial>(`/api/contratistas/radicaciones/${id}/aprobar/`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ observaciones }),
+  });
+}
+
+export function rechazarRadicacion(
+  token: string,
+  id: number,
+  observaciones = ""
+): Promise<RadicacionSeguridadSocial> {
+  return request<RadicacionSeguridadSocial>(`/api/contratistas/radicaciones/${id}/rechazar/`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ observaciones }),
+  });
+}
+
+export type NivelRiesgo = { clave: string; etiqueta: string };
+
+export type ActividadMetodo = {
+  id: number;
+  orden: number;
+  secuencia: string;
+  tecnicas_herramientas: string;
+  descripcion_riesgo: string;
+  probabilidad_sin: number;
+  frecuencia_sin: number;
+  impacto_sin: number;
+  riesgo_sin: number;
+  nivel_riesgo_sin: NivelRiesgo;
+  medidas_mitigacion: string;
+  probabilidad_con: number;
+  frecuencia_con: number;
+  impacto_con: number;
+  riesgo_con: number;
+  nivel_riesgo_con: NivelRiesgo;
+  permisos_requeridos: string[];
+  tarea_sif: boolean;
+};
+
+export type NuevaActividadMetodo = Omit<
+  ActividadMetodo,
+  "id" | "riesgo_sin" | "nivel_riesgo_sin" | "riesgo_con" | "nivel_riesgo_con"
+>;
+
+export type RolFirma =
+  | "supervisor_contratista"
+  | "delegado_abi"
+  | "seguridad_planta"
+  | "lider_area"
+  | "dueno_territorio";
+
+export type FirmaMetodo = {
+  id: number;
+  rol: RolFirma;
+  rol_display: string;
+  nombre_firmante: string;
+  firmado_en: string;
+};
+
+export type EstadoDeclaracion = "borrador" | "enviada" | "aprobada" | "rechazada";
+
+export type DeclaracionMetodo = {
+  id: number;
+  contratista: number;
+  contratista_nombre: string;
+  planta_area: string;
+  numero_pedido: string;
+  gerente_proyecto: string;
+  contacto_nombre: string;
+  contacto_telefono: string;
+  fecha_elaboracion: string;
+  duracion_dias: number;
+  descripcion_trabajo: string;
+  estado: EstadoDeclaracion;
+  observaciones: string;
+  creada_en: string;
+  actualizada_en: string;
+  actividades: ActividadMetodo[];
+  firmas: FirmaMetodo[];
+};
+
+export type NuevaDeclaracion = {
+  contratista: number;
+  planta_area?: string;
+  numero_pedido?: string;
+  gerente_proyecto?: string;
+  contacto_nombre?: string;
+  contacto_telefono?: string;
+  fecha_elaboracion: string;
+  duracion_dias?: number;
+  descripcion_trabajo: string;
+  estado?: EstadoDeclaracion;
+  observaciones?: string;
+  actividades?: Partial<NuevaActividadMetodo>[];
+};
+
+export function listarDeclaraciones(
+  token: string,
+  filtros: { contratista?: number; estado?: EstadoDeclaracion } = {}
+): Promise<DeclaracionMetodo[]> {
+  const params = new URLSearchParams();
+  if (filtros.contratista !== undefined) params.set("contratista", String(filtros.contratista));
+  if (filtros.estado) params.set("estado", filtros.estado);
+  const query = params.toString();
+  return request<DeclaracionMetodo[]>(`/api/contratistas/declaraciones/${query ? `?${query}` : ""}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function obtenerDeclaracion(token: string, id: number): Promise<DeclaracionMetodo> {
+  return request<DeclaracionMetodo>(`/api/contratistas/declaraciones/${id}/`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function crearDeclaracion(token: string, datos: NuevaDeclaracion): Promise<DeclaracionMetodo> {
+  return request<DeclaracionMetodo>("/api/contratistas/declaraciones/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarDeclaracion(
+  token: string,
+  id: number,
+  cambios: Partial<NuevaDeclaracion>
+): Promise<DeclaracionMetodo> {
+  return request<DeclaracionMetodo>(`/api/contratistas/declaraciones/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function firmarDeclaracion(
+  token: string,
+  id: number,
+  datos: { rol: RolFirma; nombre_firmante: string }
+): Promise<FirmaMetodo> {
+  return request<FirmaMetodo>(`/api/contratistas/declaraciones/${id}/firmar/`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}

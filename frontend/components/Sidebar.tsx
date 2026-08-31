@@ -5,13 +5,22 @@ import {
   IconAlerta,
   IconCamara,
   IconChevronLeft,
+  IconContratista,
+  IconDeclaracionMetodo,
   IconLogout,
   IconResumen,
   IconUsuarios,
   IconZona,
 } from "./icons";
 
-export type SeccionId = "tablero" | "camaras" | "zonas" | "alertas" | "usuarios";
+export type SeccionId =
+  | "tablero"
+  | "camaras"
+  | "zonas"
+  | "alertas"
+  | "contratistas"
+  | "declaracion-metodo"
+  | "usuarios";
 
 type Item = {
   id: SeccionId;
@@ -25,6 +34,8 @@ const ITEMS: Item[] = [
   { id: "camaras", label: "Cámaras", icon: IconCamara },
   { id: "zonas", label: "Zonas y horarios", icon: IconZona },
   { id: "alertas", label: "Alertas", icon: IconAlerta },
+  { id: "contratistas", label: "Contratistas", icon: IconContratista },
+  { id: "declaracion-metodo", label: "Declaración de Método", icon: IconDeclaracionMetodo },
   { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true },
 ];
 

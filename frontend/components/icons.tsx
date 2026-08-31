@@ -52,6 +52,33 @@ export function IconAlerta({ className }: IconProps) {
   );
 }
 
+export function IconContratista({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path
+        d="M3 12c0-3 2-5.5 4-6.5M21 12c0-3-2-5.5-4-6.5M4 12a8 8 0 0 1 16 0M2.5 12h19M6 12v2a6 6 0 0 0 12 0v-2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="17.5" r="2.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconDeclaracionMetodo({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path
+        d="M8 3.5h8a1 1 0 0 1 1 1V4h1a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h1v.5a1 1 0 0 0 1 1h0"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M9 3.5h6a1 1 0 0 1 1 1v1H8v-1a1 1 0 0 1 1-1Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m9 12.5 2 2 4-4.5M8.5 17h7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function IconLogout({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>

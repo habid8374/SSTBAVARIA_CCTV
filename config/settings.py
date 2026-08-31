@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "core",
     "camaras_ia",
+    "contratistas",
 ]
 
 MIDDLEWARE = [

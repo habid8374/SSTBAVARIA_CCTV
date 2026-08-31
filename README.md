@@ -18,6 +18,18 @@ frontend en Vercel — pero viven en el mismo repositorio.
   Tablero de indicadores, Cámaras IA con overlays de zona sobre el último
   snapshot, editor visual de Zonas y horarios (dibujar el polígono haciendo
   clic sobre el encuadre de referencia), y la bandeja de Alertas.
+- **Contratistas y Declaración de Método** (completo): dos módulos de
+  cumplimiento SST para el personal de empresas contratistas, digitalizando
+  el proceso manual (Excel/PDF) que ya usa el cliente:
+  - **Contratistas**: empresas contratistas, su personal (con EPS/ARL/AFP y
+    cursos Safety Academy) y la radicación mensual del soporte de pago de
+    seguridad social (planilla PILA), con aprobación/rechazo por un
+    interventor.
+  - **Declaración de Método**: formulario dinámico de secuencia de
+    actividades con evaluación de riesgo por el método Kinney
+    (R = Probabilidad × Frecuencia × Impacto, antes y después de mitigación),
+    permisos de trabajo requeridos y firmas de aprobación — basado en el
+    formato real `REG.MAZ.SAFE.2.5.2` que ya usa el cliente.
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 
@@ -29,6 +41,9 @@ Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
   `ReglaAlerta`, `EventoDetectado`; lógica de negocio en `services.py`
   (`punto_en_poligono`, `evaluar_zona_horario`, `disparar_alerta`); y los
   endpoints de API descritos abajo.
+- `contratistas/` — modelos `EmpresaContratista`, `Trabajador`,
+  `RadicacionSeguridadSocial`, `DeclaracionMetodo`, `ActividadMetodo`
+  (con el cálculo de riesgo Kinney), `FirmaMetodo`; endpoints descritos abajo.
 - `frontend/` — dashboard Next.js (App Router + TypeScript + Tailwind),
   instalable como PWA. Ver su propia sección más abajo.
 
@@ -129,6 +144,18 @@ eliminar) requiere rol Administrador.
 | `GET/POST /api/camaras-ia/dashboard/zonas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/zonas/<id>/` | CRUD de `ZonaRestringida` — el polígono se dibuja haciendo clic sobre el snapshot de referencia, en las mismas coordenadas de píxel de esa imagen |
 | `GET/POST /api/camaras-ia/dashboard/reglas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/reglas/<id>/` | CRUD de `ReglaAlerta` (horario/días/canal/destinatario) de una zona |
 
+### Endpoints de `contratistas` (autenticados por token de usuario)
+
+| Endpoint | Qué hace |
+|---|---|
+| `GET /api/contratistas/catalogos/` | Listas fijas para los formularios: cursos Safety Academy, permisos de trabajo, roles de firma |
+| `GET/POST /api/contratistas/empresas/`, `GET/PATCH/DELETE /api/contratistas/empresas/<id>/` | CRUD de `EmpresaContratista` |
+| `GET/POST /api/contratistas/trabajadores/`, `GET/PATCH/DELETE /api/contratistas/trabajadores/<id>/` | CRUD de `Trabajador`; filtro `?contratista=` |
+| `GET/POST /api/contratistas/radicaciones/`, `GET/PATCH/DELETE /api/contratistas/radicaciones/<id>/` | CRUD de `RadicacionSeguridadSocial` (multipart para el soporte de pago); filtros `?trabajador=&contratista=&estado=` |
+| `POST /api/contratistas/radicaciones/<id>/aprobar/`, `POST .../rechazar/` | Decisión del interventor sobre una radicación (`observaciones` opcional) |
+| `GET/POST /api/contratistas/declaraciones/`, `GET/PATCH/DELETE /api/contratistas/declaraciones/<id>/` | `DeclaracionMetodo` con sus `actividades` anidadas (se reemplazan todas en cada guardado) |
+| `POST /api/contratistas/declaraciones/<id>/firmar/` | Agrega/reemplaza la firma de un rol (`rol`, `nombre_firmante`) |
+
 ## Frontend — correr en local
 
 Requiere Node.js 20+. El dashboard es una SPA con sidebar (no hay rutas por
@@ -146,9 +173,10 @@ Abre `http://localhost:3000` (redirige a `/login`). Con el backend corriendo
 en local (`DEBUG=True`), el login ya funciona con el superusuario que hayas
 creado ahí.
 
-- **Secciones del sidebar**: Tablero, Cámaras, Zonas y horarios, Alertas —
-  para todos los roles — y Usuarios, solo para Administrador. Ninguna tiene
-  URL propia; son secciones dentro de `/dashboard` manejadas por estado.
+- **Secciones del sidebar**: Tablero, Cámaras, Zonas y horarios, Alertas,
+  Contratistas, Declaración de Método — para todos los roles — y Usuarios,
+  solo para Administrador. Ninguna tiene URL propia; son secciones dentro de
+  `/dashboard` manejadas por estado.
 - **Roles**: el primer usuario (`createsuperuser`) es Administrador y ve la
   sección "Usuarios" en el sidebar; desde ahí crea al resto del equipo con
   su rol (Administrador u Operador) — no hay pantalla de registro público.

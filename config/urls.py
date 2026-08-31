@@ -7,6 +7,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("core.urls")),
     path("api/camaras-ia/", include("camaras_ia.urls")),
+    path("api/contratistas/", include("contratistas.urls")),
 ]
 
 # Sirve media/ (snapshots) también fuera de DEBUG — el disco de Railway no
