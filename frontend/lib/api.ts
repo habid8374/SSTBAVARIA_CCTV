@@ -549,6 +549,8 @@ export type Trabajador = {
   cursos_safety_academy: Record<string, string | null>;
   activo: boolean;
   creado_en: string;
+  autorizacion_datos: boolean;
+  autorizacion_datos_en: string | null;
   ultima_radicacion: RadicacionResumen | null;
 };
 
@@ -564,6 +566,7 @@ export type NuevoTrabajador = {
   fecha_inicio_contrato?: string | null;
   cursos_safety_academy?: Record<string, string | null>;
   activo?: boolean;
+  autorizacion_datos: boolean;
 };
 
 export function listarTrabajadores(token: string, contratistaId?: number): Promise<Trabajador[]> {

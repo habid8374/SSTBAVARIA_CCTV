@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { useDialog } from "@/components/DialogProvider";
@@ -652,6 +653,7 @@ function FormularioTrabajador({
   const [tipoVinculacion, setTipoVinculacion] = useState<TipoVinculacion>(trabajador?.tipo_vinculacion ?? "fijo");
   const [fechaInicio, setFechaInicio] = useState(trabajador?.fecha_inicio_contrato ?? "");
   const [cursos, setCursos] = useState<Record<string, string | null>>(trabajador?.cursos_safety_academy ?? {});
+  const [autorizacionDatos, setAutorizacionDatos] = useState(trabajador?.autorizacion_datos ?? false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -667,6 +669,11 @@ function FormularioTrabajador({
     event.preventDefault();
     setError(null);
     setEnviando(true);
+    if (!trabajador && !autorizacionDatos) {
+      setError("Hace falta la autorización de tratamiento de datos personales para registrar al trabajador.");
+      setEnviando(false);
+      return;
+    }
     const datos: NuevoTrabajador = {
       contratista: contratistaId,
       nombres,
@@ -678,6 +685,7 @@ function FormularioTrabajador({
       tipo_vinculacion: tipoVinculacion,
       fecha_inicio_contrato: fechaInicio || null,
       cursos_safety_academy: cursos,
+      autorizacion_datos: autorizacionDatos,
     };
     try {
       if (trabajador) {
@@ -772,6 +780,26 @@ function FormularioTrabajador({
               })}
             </div>
           </div>
+
+          {!trabajador && (
+            <label className="flex items-start gap-2 rounded-lg border border-corp-border bg-zinc-50 px-3 py-2.5 text-sm text-corp-navy">
+              <input
+                type="checkbox"
+                required
+                checked={autorizacionDatos}
+                onChange={(e) => setAutorizacionDatos(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-corp-border accent-corp-blue"
+              />
+              <span>
+                Declaro que cuento con la autorización del trabajador para el tratamiento de sus datos
+                personales, incluidos los de afiliación a seguridad social, conforme a la{" "}
+                <Link href="/politica-privacidad" target="_blank" className="font-medium text-corp-blue hover:underline">
+                  política de tratamiento de datos personales
+                </Link>{" "}
+                (Ley 1581 de 2012).
+              </span>
+            </label>
+          )}
 
           {error && (
             <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from core.models import Empresa
@@ -93,14 +94,39 @@ class TrabajadorSerializer(serializers.ModelSerializer):
             "cursos_safety_academy",
             "activo",
             "creado_en",
+            "autorizacion_datos",
+            "autorizacion_datos_en",
             "ultima_radicacion",
         ]
+        read_only_fields = ["id", "creado_en", "autorizacion_datos_en"]
 
     def get_ultima_radicacion(self, trabajador):
         radicacion = trabajador.radicaciones.order_by("-radicada_en").first()
         if not radicacion:
             return None
         return RadicacionResumenSerializer(radicacion).data
+
+    def validate(self, datos):
+        if self.instance is None and not datos.get("autorizacion_datos"):
+            raise serializers.ValidationError(
+                {
+                    "autorizacion_datos": (
+                        "Hace falta la autorización de tratamiento de datos personales "
+                        "para registrar al trabajador (Ley 1581 de 2012)."
+                    )
+                }
+            )
+        return datos
+
+    def create(self, validated_data):
+        if validated_data.get("autorizacion_datos"):
+            validated_data["autorizacion_datos_en"] = timezone.now()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if validated_data.get("autorizacion_datos") and not instance.autorizacion_datos:
+            validated_data["autorizacion_datos_en"] = timezone.now()
+        return super().update(instance, validated_data)
 
 
 class RadicacionSeguridadSocialSerializer(serializers.ModelSerializer):

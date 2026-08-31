@@ -53,6 +53,17 @@ class Trabajador(models.Model):
     )
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
+    autorizacion_datos = models.BooleanField(
+        "autorización de tratamiento de datos personales",
+        default=False,
+        help_text=(
+            "Habeas Data (Ley 1581 de 2012) — el trabajador (o quien radica en su nombre) autorizó el "
+            "tratamiento de sus datos personales, incluidos los de afiliación a seguridad social."
+        ),
+    )
+    autorizacion_datos_en = models.DateTimeField(
+        "autorización otorgada el", null=True, blank=True
+    )
 
     CURSOS = {
         "induccion_sst": "Inducción SST",

@@ -215,12 +215,53 @@ class TrabajadorTests(ApiTestsBase):
                 "apellidos": "Estepa Patiño",
                 "documento": "80431911",
                 "cursos_safety_academy": {"induccion_sst": "2026-08-01"},
+                "autorizacion_datos": True,
             },
             content_type="application/json",
             **self._auth(self.operador),
         )
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(Trabajador.objects.count(), 2)
+        trabajador = Trabajador.objects.get(documento="80431911")
+        self.assertTrue(trabajador.autorizacion_datos)
+        self.assertIsNotNone(trabajador.autorizacion_datos_en)
+
+    def test_crear_trabajador_sin_autorizacion_devuelve_400(self):
+        response = self.client.post(
+            reverse("contratistas:trabajadores_lista"),
+            {
+                "contratista": self.contratista.pk,
+                "nombres": "Luis Alfonso",
+                "apellidos": "Estepa Patiño",
+                "documento": "80431911",
+            },
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("autorizacion_datos", response.data)
+        self.assertFalse(Trabajador.objects.filter(documento="80431911").exists())
+
+    def test_editar_no_reexige_autorizacion_y_no_recalcula_fecha(self):
+        fecha_original = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        trabajador = Trabajador.objects.create(
+            contratista=self.contratista,
+            nombres="Ana",
+            apellidos="Ríos",
+            documento="999",
+            autorizacion_datos=True,
+            autorizacion_datos_en=fecha_original,
+        )
+
+        response = self.client.patch(
+            reverse("contratistas:trabajadores_detalle", args=[trabajador.pk]),
+            {"eps": "Sura"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        trabajador.refresh_from_db()
+        self.assertEqual(trabajador.autorizacion_datos_en, fecha_original)
 
     def test_filtro_por_contratista(self):
         otro_contratista = EmpresaContratista.objects.create(empresa=self.empresa, nombre="Otra SAS")

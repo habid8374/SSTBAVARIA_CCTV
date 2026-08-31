@@ -1,42 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 
+import { Mono, Nota, Ol, P, Sub, Ul } from "@/components/DocTexto";
 import type { Rol } from "@/lib/api";
-
-function P({ children }: { children: ReactNode }) {
-  return <p className="text-sm leading-relaxed text-corp-navy">{children}</p>;
-}
-
-function Sub({ children }: { children: ReactNode }) {
-  return <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-corp-muted">{children}</h3>;
-}
-
-function Ul({ children }: { children: ReactNode }) {
-  return <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-corp-navy">{children}</ul>;
-}
-
-function Ol({ children }: { children: ReactNode }) {
-  return <ol className="list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-corp-navy">{children}</ol>;
-}
-
-function Mono({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-corp-navy">{children}</code>;
-}
-
-function Nota({ children, tipo = "info" }: { children: ReactNode; tipo?: "info" | "aviso" }) {
-  return (
-    <div
-      className={`rounded-lg border px-4 py-3 text-sm leading-relaxed ${
-        tipo === "aviso"
-          ? "border-amber-200 bg-amber-50 text-amber-800"
-          : "border-corp-blue/30 bg-corp-blue-light text-corp-navy"
-      }`}
-    >
-      {children}
-    </div>
-  );
-}
 
 type Tema = {
   id: string;
@@ -376,6 +344,40 @@ const TEMAS: Tema[] = [
           nombre, el problema es solo de resolución de nombre en esa red — la IP directa debe seguir
           funcionando.
         </P>
+      </>
+    ),
+  },
+  {
+    id: "politica-privacidad",
+    titulo: "Política de privacidad",
+    contenido: (
+      <>
+        <P>
+          El módulo de Contratistas guarda datos personales de los trabajadores, incluidos datos de
+          afiliación a seguridad social (EPS, ARL, AFP) — datos sensibles bajo la Ley 1581 de 2012
+          (&quot;Habeas Data&quot;) en Colombia.
+        </P>
+        <Ul>
+          <li>
+            Al registrar un trabajador nuevo, el formulario exige marcar que se cuenta con su autorización
+            para tratar esos datos — sin eso, el sistema no deja guardar el registro. Queda la fecha exacta
+            de esa autorización.
+          </li>
+          <li>
+            El texto completo de la política — qué datos se recogen, para qué, cuánto se conservan y cómo
+            ejercer los derechos de acceso/corrección/eliminación — está publicado y es de acceso público
+            (sin necesidad de iniciar sesión) en{" "}
+            <Link href="/politica-privacidad" target="_blank" className="text-corp-blue hover:underline">
+              /politica-privacidad
+            </Link>
+            , y enlazado también desde la pantalla de inicio de sesión.
+          </li>
+        </Ul>
+        <Nota tipo="aviso">
+          El texto de la política es un borrador técnico — todavía tiene datos de la empresa (NIT, razón
+          social, contacto) pendientes por completar y una revisión legal pendiente antes de considerarse
+          definitivo.
+        </Nota>
       </>
     ),
   },

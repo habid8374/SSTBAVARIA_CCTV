@@ -37,6 +37,14 @@ frontend en Vercel — pero viven en el mismo repositorio.
     puede aprobar una declaración sin al menos una firma registrada;
     exportación a Excel de las radicaciones (`openpyxl`) y a PDF de la
     declaración de método completa (`xhtml2pdf`).
+- **Política de privacidad / Habeas Data** (borrador): el registro de un
+  trabajador exige marcar la autorización de tratamiento de sus datos
+  personales (Ley 1581 de 2012), con fecha registrada
+  (`Trabajador.autorizacion_datos`/`autorizacion_datos_en`). El texto de la
+  política es público, sin necesidad de sesión, en `/politica-privacidad`
+  (enlazado desde el formulario de trabajador y desde el login) — es un
+  borrador técnico: le faltan los datos propios de la empresa (NIT, razón
+  social, contacto) y revisión legal antes de considerarse definitivo.
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 

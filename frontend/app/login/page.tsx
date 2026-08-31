@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { ApiError, login } from "@/lib/api";
 import { guardarSesion } from "@/lib/auth";
@@ -133,6 +134,11 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-xs text-corp-muted">
             Acceso exclusivo para personal autorizado.
+          </p>
+          <p className="mt-2 text-center text-xs text-corp-muted">
+            <Link href="/politica-privacidad" target="_blank" className="text-corp-blue hover:underline">
+              Política de tratamiento de datos personales
+            </Link>
           </p>
         </div>
       </div>
