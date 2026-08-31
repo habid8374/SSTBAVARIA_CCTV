@@ -23,6 +23,18 @@ class UsuarioAdmin(DjangoUserAdmin):
     inlines = [PerfilUsuarioInline]
     list_display = DjangoUserAdmin.list_display + ("rol",)
 
+    def get_inline_instances(self, request, obj=None):
+        # En "Agregar usuario" el usuario todavía no existe -> el inline no
+        # tiene a qué PerfilUsuario apuntar. La señal crear_perfil_usuario ya
+        # crea uno automáticamente en cuanto se guarda el User; si además se
+        # muestra el inline acá, Django intenta insertar un segundo
+        # PerfilUsuario para el mismo usuario_id y revienta con
+        # UniqueViolation. Se oculta en "agregar" y se deja para "editar",
+        # donde el perfil ya existe de verdad.
+        if obj is None:
+            return []
+        return super().get_inline_instances(request, obj)
+
     @admin.display(description="rol")
     def rol(self, obj):
         return obj.perfil.get_rol_display() if hasattr(obj, "perfil") else "—"

@@ -251,3 +251,30 @@ class UsuarioContratistaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["usuario"]["contratista_id"], self.contratista.pk)
         self.assertEqual(response.data["usuario"]["contratista_nombre"], "SCEPSA")
+
+
+class UsuarioAdminTests(TestCase):
+    """El admin.py de Django (no el endpoint del dashboard) tiene su propio
+    camino de alta: PerfilUsuarioInline sobre UserAdmin. La señal
+    crear_perfil_usuario ya crea el PerfilUsuario en cuanto se guarda el
+    User — si el inline también intenta crear uno en "Agregar usuario",
+    revienta con UniqueViolation (dos PerfilUsuario para el mismo
+    usuario_id). Ver core/admin.py: UsuarioAdmin.get_inline_instances."""
+
+    def setUp(self):
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.client.force_login(self.admin)
+
+    def test_agregar_usuario_desde_el_admin_no_revienta(self):
+        response = self.client.post(
+            "/admin/auth/user/add/",
+            {
+                "username": "nuevo_desde_admin",
+                "password1": "una-clave-larga-123",
+                "password2": "una-clave-larga-123",
+            },
+        )
+        self.assertNotEqual(response.status_code, 500)
+        nuevo = Usuario.objects.get(username="nuevo_desde_admin")
+        self.assertEqual(PerfilUsuario.objects.filter(usuario=nuevo).count(), 1)
+        self.assertEqual(nuevo.perfil.rol, PerfilUsuario.Rol.OPERADOR)
