@@ -87,7 +87,7 @@ export default function Sidebar({
   return (
     <aside
       className={`flex h-full flex-col bg-corp-navy text-white transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        colapsado ? "w-[76px]" : "w-64"
+        colapsado ? "w-[76px]" : "w-72"
       } ${className}`}
     >
       <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
@@ -115,7 +115,7 @@ export default function Sidebar({
             >
               <Icon className="h-5 w-5 shrink-0" />
               <span
-                className={`text-left ${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}
+                className={`text-left ${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[13rem] opacity-100"}`}
               >
                 {item.label}
               </span>
@@ -131,7 +131,7 @@ export default function Sidebar({
           className="hidden w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/70 hover:bg-white/10 md:flex"
         >
           <IconChevronLeft className={`h-4 w-4 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${colapsado ? "rotate-180" : ""}`} />
-          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}>
+          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[13rem] opacity-100"}`}>
             Colapsar menú
           </span>
         </button>
@@ -140,7 +140,7 @@ export default function Sidebar({
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold">
             {nombre.slice(0, 2).toUpperCase()}
           </div>
-          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}>
+          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[13rem] opacity-100"}`}>
             {nombre}
           </span>
         </div>
@@ -154,7 +154,7 @@ export default function Sidebar({
             className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/70 hover:bg-white/10"
           >
             <IconPanelAdmin className="h-5 w-5 shrink-0" />
-            <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}>
+            <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[13rem] opacity-100"}`}>
               Admin de Django
             </span>
           </a>
@@ -166,7 +166,7 @@ export default function Sidebar({
           className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/70 hover:bg-white/10"
         >
           <IconLogout className="h-5 w-5 shrink-0" />
-          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[9rem] opacity-100"}`}>
+          <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[13rem] opacity-100"}`}>
             Cerrar sesión
           </span>
         </button>
