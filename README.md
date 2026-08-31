@@ -45,6 +45,19 @@ frontend en Vercel — pero viven en el mismo repositorio.
     declaración se edita después de firmada, la firma queda marcada
     `documento_modificado_despues_de_firmar` y bloquea la aprobación hasta
     que se vuelva a firmar sobre la versión actual.
+  - **Funcionarios firmantes** (`contratistas.Funcionario`): padrón de
+    personas de la empresa autorizadas a firmar por rol interno (Delegado,
+    Seguridad de Planta, Líder de Área, Dueño de Territorio — no incluye al
+    supervisor del contratista, que cambia por proyecto). El formulario de
+    firma ofrece un desplegable con estos nombres (con opción "Otro" para
+    texto libre) en vez de un campo abierto.
+  - **Indicadores** (`/api/contratistas/indicadores/dashboard/` +
+    sección "Indicadores" en el sidebar): panel tipo Power BI —
+    contratistas/trabajadores activos, riesgo Kinney promedio (sin vs. con
+    mitigación), tiempo promedio de aprobación, radicaciones/declaraciones
+    por estado, tendencia de los últimos 6 meses, cumplimiento por
+    contratista y el top 5 de actividades de mayor riesgo. Todo calculado
+    al vuelo, sin tablas de resumen que se puedan desincronizar.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada

@@ -251,6 +251,53 @@ const TEMAS: Tema[] = [
     ),
   },
   {
+    id: "funcionarios",
+    titulo: "Funcionarios firmantes",
+    contenido: (
+      <>
+        <P>
+          Padrón de personas de la empresa autorizadas a firmar declaraciones de método en cada rol interno
+          (Delegado, Seguridad de Planta, Líder de Área, Dueño de Territorio) — no incluye al supervisor del
+          contratista, porque ese cambia por proyecto y se sigue escribiendo libre al firmar.
+        </P>
+        <Ul>
+          <li>Nombre, cargo, correo y teléfono — se puede desactivar sin borrar el historial.</li>
+          <li>
+            En el formulario de firma de una declaración, si hay funcionarios activos para el rol elegido,
+            aparece un desplegable con sus nombres (más la opción &quot;Otro (escribir manualmente)&quot;)
+            en vez de un campo de texto libre — así queda un padrón de quién puede firmar cada rol, aunque
+            el sistema siga sin darle una cuenta propia a cada uno.
+          </li>
+        </Ul>
+        <Nota tipo="aviso">
+          Solo Administrador puede eliminar un funcionario; cualquier usuario puede crear/editar. Eliminar
+          uno no borra las firmas que ya haya hecho — esas quedan con el nombre que se guardó al firmar.
+        </Nota>
+      </>
+    ),
+  },
+  {
+    id: "indicadores-contratistas",
+    titulo: "Indicadores",
+    contenido: (
+      <>
+        <P>
+          Panel de indicadores de Contratistas y Declaración de Método — cumplimiento por contratista,
+          riesgo Kinney, tiempos de aprobación y tendencia mensual. Todo se calcula al vuelo contra los
+          datos actuales, no hay resúmenes guardados que se puedan desactualizar.
+        </P>
+        <Ul>
+          <li>Contratistas y trabajadores activos, riesgo Kinney promedio (sin vs. con mitigación) y tiempo
+            promedio de aprobación de declaraciones.</li>
+          <li>Radicaciones y declaraciones por estado, en barras.</li>
+          <li>Tendencia de los últimos 6 meses (declaraciones y radicaciones creadas por mes).</li>
+          <li>Cumplimiento por contratista (trabajadores, radicaciones y declaraciones pendientes) y el
+            top 5 de actividades con mayor riesgo sin mitigar.</li>
+        </Ul>
+      </>
+    ),
+  },
+  {
     id: "sistema",
     titulo: "Sistema",
     soloAdmin: true,

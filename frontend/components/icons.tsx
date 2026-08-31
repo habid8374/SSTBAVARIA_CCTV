@@ -171,3 +171,12 @@ export function IconCandado({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconIndicadores({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path d="M12 3a9 9 0 1 0 9 9h-9V3Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

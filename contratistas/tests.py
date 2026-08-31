@@ -14,6 +14,7 @@ from .models import (
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
+    Funcionario,
     RadicacionSeguridadSocial,
     Trabajador,
     nivel_riesgo,
@@ -173,6 +174,118 @@ class IndicadoresTests(ApiTestsBase):
 
     def test_requiere_autenticacion(self):
         response = self.client.get(reverse("contratistas:indicadores"))
+        self.assertEqual(response.status_code, 401)
+
+
+class IndicadoresDashboardTests(ApiTestsBase):
+    def test_requiere_autenticacion(self):
+        response = self.client.get(reverse("contratistas:indicadores_dashboard"))
+        self.assertEqual(response.status_code, 401)
+
+    def test_estructura_basica_sin_datos(self):
+        response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["contratistas_activos"], 1)
+        self.assertEqual(response.data["trabajadores_activos"], 1)
+        self.assertEqual(response.data["riesgo_promedio_sin"], 0)
+        self.assertIsNone(response.data["tiempo_promedio_aprobacion_dias"])
+        self.assertEqual(len(response.data["tendencia_mensual"]), 6)
+        self.assertEqual(len(response.data["top_riesgos"]), 0)
+
+    def test_riesgo_promedio_y_top_riesgos(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Riesgo alto",
+            probabilidad_sin=10, frecuencia_sin=10, impacto_sin=15,
+        )
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=1, secuencia="Riesgo bajo",
+            probabilidad_sin=1, frecuencia_sin=1, impacto_sin=1,
+        )
+        response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        # (1500 + 1) / 2 = 750.5
+        self.assertEqual(response.data["riesgo_promedio_sin"], 750.5)
+        self.assertEqual(response.data["top_riesgos"][0]["secuencia"], "Riesgo alto")
+        self.assertEqual(response.data["top_riesgos"][0]["riesgo_sin"], 1500)
+
+    def test_por_contratista_cuenta_pendientes(self):
+        RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador, anio=2026, mes="AGOSTO", estado="pendiente"
+        )
+        DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+            estado="enviada",
+        )
+        response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
+        fila = response.data["por_contratista"][0]
+        self.assertEqual(fila["contratista"], "SCEPSA COLOMBIA SAS")
+        self.assertEqual(fila["trabajadores"], 1)
+        self.assertEqual(fila["radicaciones_pendientes"], 1)
+        self.assertEqual(fila["declaraciones_pendientes"], 1)
+
+    def test_tendencia_mensual_cuenta_mes_actual(self):
+        DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=timezone.localdate(),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
+        self.assertEqual(response.data["tendencia_mensual"][-1]["declaraciones"], 1)
+
+
+class FuncionarioTests(ApiTestsBase):
+    def test_crear_funcionario(self):
+        response = self.client.post(
+            reverse("contratistas:funcionarios_lista"),
+            {"nombre": "Jenny Quintero", "cargo": "Coordinadora HSEQ", "rol_firma": "delegado_abi", "correo": "jq@x.com"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Funcionario.objects.count(), 1)
+
+    def test_listar_filtra_por_rol_y_activo(self):
+        Funcionario.objects.create(
+            empresa=self.empresa, nombre="Jenny", rol_firma="delegado_abi", activo=True
+        )
+        Funcionario.objects.create(
+            empresa=self.empresa, nombre="Carlos", rol_firma="lider_area", activo=False
+        )
+        response = self.client.get(
+            reverse("contratistas:funcionarios_lista") + "?rol_firma=delegado_abi",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["nombre"], "Jenny")
+
+        response = self.client.get(
+            reverse("contratistas:funcionarios_lista") + "?activo=true", **self._auth(self.operador)
+        )
+        self.assertEqual(len(response.data), 1)
+
+    def test_operador_no_puede_eliminar(self):
+        funcionario = Funcionario.objects.create(empresa=self.empresa, nombre="Jenny", rol_firma="delegado_abi")
+        response = self.client.delete(
+            reverse("contratistas:funcionarios_detalle", args=[funcionario.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_puede_eliminar(self):
+        funcionario = Funcionario.objects.create(empresa=self.empresa, nombre="Jenny", rol_firma="delegado_abi")
+        response = self.client.delete(
+            reverse("contratistas:funcionarios_detalle", args=[funcionario.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+
+    def test_requiere_autenticacion(self):
+        response = self.client.get(reverse("contratistas:funcionarios_lista"))
         self.assertEqual(response.status_code, 401)
 
 

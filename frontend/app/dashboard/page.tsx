@@ -10,6 +10,8 @@ import AyudaView from "@/components/views/AyudaView";
 import CamarasView from "@/components/views/CamarasView";
 import ContratistasView from "@/components/views/ContratistasView";
 import DeclaracionMetodoView from "@/components/views/DeclaracionMetodoView";
+import FuncionariosView from "@/components/views/FuncionariosView";
+import IndicadoresContratistasView from "@/components/views/IndicadoresContratistasView";
 import NotificacionesView from "@/components/views/NotificacionesView";
 import SistemaView from "@/components/views/SistemaView";
 import TableroView from "@/components/views/TableroView";
@@ -26,6 +28,8 @@ const TITULOS: Record<SeccionId, string> = {
   notificaciones: "Notificaciones",
   contratistas: "Contratistas",
   "declaracion-metodo": "Declaración de Método",
+  funcionarios: "Funcionarios firmantes",
+  "indicadores-contratistas": "Indicadores",
   sistema: "Sistema",
   usuarios: "Gestión de usuarios",
   ayuda: "Ayuda",
@@ -84,6 +88,8 @@ export default function DashboardPage() {
       {seccion === "notificaciones" && <NotificacionesView token={token} rol={usuario.rol} />}
       {seccion === "contratistas" && <ContratistasView token={token} rol={usuario.rol} />}
       {seccion === "declaracion-metodo" && <DeclaracionMetodoView token={token} rol={usuario.rol} />}
+      {seccion === "funcionarios" && <FuncionariosView token={token} rol={usuario.rol} />}
+      {seccion === "indicadores-contratistas" && <IndicadoresContratistasView token={token} />}
       {seccion === "sistema" && usuario.rol === "administrador" && <SistemaView token={token} />}
       {seccion === "usuarios" && usuario.rol === "administrador" && (
         <UsuariosView token={token} usuarioActualId={usuario.id} />

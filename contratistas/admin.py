@@ -5,6 +5,7 @@ from .models import (
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
+    Funcionario,
     RadicacionSeguridadSocial,
     Trabajador,
 )
@@ -73,6 +74,13 @@ class ActividadMetodoAdmin(admin.ModelAdmin):
 
 @admin.register(FirmaMetodo)
 class FirmaMetodoAdmin(admin.ModelAdmin):
-    list_display = ("declaracion", "rol", "nombre_firmante", "firmado_en")
+    list_display = ("declaracion", "rol", "nombre_firmante", "firmante_usuario", "firmado_en")
     list_filter = ("rol",)
-    readonly_fields = ("firmado_en",)
+    readonly_fields = ("firmado_en", "hash_documento")
+
+
+@admin.register(Funcionario)
+class FuncionarioAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "cargo", "rol_firma", "correo", "activo")
+    list_filter = ("rol_firma", "activo")
+    search_fields = ("nombre", "cargo", "correo")

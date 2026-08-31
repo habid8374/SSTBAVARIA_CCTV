@@ -10,12 +10,14 @@ import {
   firmarDeclaracion,
   listarContratistas,
   listarDeclaraciones,
+  listarFuncionarios,
   obtenerCatalogosContratistas,
   type Catalogos,
   type DeclaracionMetodo,
   type EmpresaContratista,
   type EstadoDeclaracion,
   type FirmaMetodo,
+  type Funcionario,
   type NuevaActividadMetodo,
   type NuevaDeclaracion,
   type Rol,
@@ -706,10 +708,36 @@ function PanelFirmas({
 }) {
   const [firmas, setFirmas] = useState<FirmaMetodo[]>(declaracion.firmas);
   const [rol, setRol] = useState<RolFirma>((rolesFirma[0]?.clave as RolFirma) ?? "supervisor_contratista");
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
+  const [funcionarioId, setFuncionarioId] = useState<number | "otro">("otro");
   const [nombreFirmante, setNombreFirmante] = useState("");
   const [consientoFirma, setConsientoFirma] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    listarFuncionarios(token, { activo: true }).then(setFuncionarios).catch(() => setFuncionarios([]));
+  }, [token]);
+
+  const opcionesFuncionario = funcionarios.filter((f) => f.rol_firma === rol);
+
+  function cambiarRol(nuevoRol: RolFirma) {
+    setRol(nuevoRol);
+    setFuncionarioId("otro");
+    setNombreFirmante("");
+  }
+
+  function elegirFuncionario(valor: string) {
+    if (valor === "otro") {
+      setFuncionarioId("otro");
+      setNombreFirmante("");
+      return;
+    }
+    const id = Number(valor);
+    setFuncionarioId(id);
+    const elegido = funcionarios.find((f) => f.id === id);
+    setNombreFirmante(elegido?.nombre ?? "");
+  }
 
   const hayDocumentoModificado = firmas.some((f) => f.documento_modificado_despues_de_firmar);
 
@@ -726,6 +754,7 @@ function PanelFirmas({
       });
       setFirmas((actual) => [...actual.filter((f) => f.rol !== firma.rol), firma]);
       setNombreFirmante("");
+      setFuncionarioId("otro");
       setConsientoFirma(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar la firma.");
@@ -771,7 +800,7 @@ function PanelFirmas({
         <div className="flex flex-wrap items-end gap-3">
           <label className="space-y-1.5">
             <span className="text-sm font-medium text-corp-navy">Rol</span>
-            <select value={rol} onChange={(e) => setRol(e.target.value as RolFirma)} className={INPUT}>
+            <select value={rol} onChange={(e) => cambiarRol(e.target.value as RolFirma)} className={INPUT}>
               {rolesFirma.map((r) => (
                 <option key={r.clave} value={r.clave}>
                   {r.etiqueta}
@@ -779,15 +808,35 @@ function PanelFirmas({
               ))}
             </select>
           </label>
-          <label className="flex-1 space-y-1.5">
-            <span className="text-sm font-medium text-corp-navy">Nombre de quien firma</span>
-            <input
-              value={nombreFirmante}
-              onChange={(e) => setNombreFirmante(e.target.value)}
-              className={INPUT}
-              placeholder="Nombre completo"
-            />
-          </label>
+          {opcionesFuncionario.length > 0 && (
+            <label className="flex-1 space-y-1.5">
+              <span className="text-sm font-medium text-corp-navy">Quién firma</span>
+              <select
+                value={String(funcionarioId)}
+                onChange={(e) => elegirFuncionario(e.target.value)}
+                className={INPUT}
+              >
+                <option value="otro">Otro (escribir manualmente)</option>
+                {opcionesFuncionario.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nombre}
+                    {f.cargo ? ` — ${f.cargo}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {(opcionesFuncionario.length === 0 || funcionarioId === "otro") && (
+            <label className="flex-1 space-y-1.5">
+              <span className="text-sm font-medium text-corp-navy">Nombre de quien firma</span>
+              <input
+                value={nombreFirmante}
+                onChange={(e) => setNombreFirmante(e.target.value)}
+                className={INPUT}
+                placeholder="Nombre completo"
+              />
+            </label>
+          )}
           <button
             type="submit"
             disabled={enviando || !consientoFirma}

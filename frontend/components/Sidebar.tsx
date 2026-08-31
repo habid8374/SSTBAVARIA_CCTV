@@ -8,6 +8,7 @@ import {
   IconChevronLeft,
   IconContratista,
   IconDeclaracionMetodo,
+  IconIndicadores,
   IconLogout,
   IconNotificacion,
   IconPanelAdmin,
@@ -25,6 +26,8 @@ export type SeccionId =
   | "notificaciones"
   | "contratistas"
   | "declaracion-metodo"
+  | "funcionarios"
+  | "indicadores-contratistas"
   | "sistema"
   | "usuarios"
   | "ayuda";
@@ -44,6 +47,8 @@ const ITEMS: Item[] = [
   { id: "notificaciones", label: "Notificaciones", icon: IconNotificacion },
   { id: "contratistas", label: "Contratistas", icon: IconContratista },
   { id: "declaracion-metodo", label: "Declaración de Método", icon: IconDeclaracionMetodo },
+  { id: "funcionarios", label: "Funcionarios firmantes", icon: IconUsuarios },
+  { id: "indicadores-contratistas", label: "Indicadores", icon: IconIndicadores },
   { id: "sistema", label: "Sistema", icon: IconSistema, adminOnly: true },
   { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true },
   { id: "ayuda", label: "Ayuda", icon: IconAyuda },

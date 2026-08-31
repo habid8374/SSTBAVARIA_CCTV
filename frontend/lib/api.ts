@@ -696,6 +696,45 @@ export function obtenerIndicadoresContratistas(token: string): Promise<Indicador
   return request<IndicadoresContratistas>("/api/contratistas/indicadores/", { headers: authHeaders(token) });
 }
 
+export type TopRiesgo = {
+  declaracion_id: number;
+  contratista: string;
+  secuencia: string;
+  riesgo_sin: number;
+  nivel_sin: string;
+  riesgo_con: number;
+};
+
+export type ContratistaResumen = {
+  contratista: string;
+  trabajadores: number;
+  radicaciones_pendientes: number;
+  declaraciones_pendientes: number;
+};
+
+export type MesResumen = {
+  mes: string;
+  declaraciones: number;
+  radicaciones: number;
+};
+
+export type IndicadoresDashboard = {
+  contratistas_activos: number;
+  trabajadores_activos: number;
+  radicaciones_por_estado: Record<EstadoRadicacion, number>;
+  declaraciones_por_estado: Record<EstadoDeclaracion, number>;
+  riesgo_promedio_sin: number;
+  riesgo_promedio_con: number;
+  top_riesgos: TopRiesgo[];
+  tiempo_promedio_aprobacion_dias: number | null;
+  por_contratista: ContratistaResumen[];
+  tendencia_mensual: MesResumen[];
+};
+
+export function obtenerIndicadoresDashboard(token: string): Promise<IndicadoresDashboard> {
+  return request<IndicadoresDashboard>("/api/contratistas/indicadores/dashboard/", { headers: authHeaders(token) });
+}
+
 export function crearRadicacion(
   token: string,
   datos: NuevaRadicacion,
@@ -789,6 +828,69 @@ export type FirmaMetodo = {
   documento_modificado_despues_de_firmar: boolean;
   firmado_en: string;
 };
+
+export type RolFuncionario = Exclude<RolFirma, "supervisor_contratista">;
+
+export type Funcionario = {
+  id: number;
+  nombre: string;
+  cargo: string;
+  rol_firma: RolFuncionario;
+  rol_firma_display: string;
+  correo: string;
+  telefono: string;
+  activo: boolean;
+  creado_en: string;
+};
+
+export type NuevoFuncionario = {
+  nombre: string;
+  cargo?: string;
+  rol_firma: RolFuncionario;
+  correo?: string;
+  telefono?: string;
+  activo?: boolean;
+};
+
+export function listarFuncionarios(
+  token: string,
+  filtros: { rol_firma?: RolFuncionario; activo?: boolean } = {}
+): Promise<Funcionario[]> {
+  const params = new URLSearchParams();
+  if (filtros.rol_firma) params.set("rol_firma", filtros.rol_firma);
+  if (filtros.activo !== undefined) params.set("activo", String(filtros.activo));
+  const query = params.toString();
+  return request<Funcionario[]>(`/api/contratistas/funcionarios/${query ? `?${query}` : ""}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function crearFuncionario(token: string, datos: NuevoFuncionario): Promise<Funcionario> {
+  return request<Funcionario>("/api/contratistas/funcionarios/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarFuncionario(
+  token: string,
+  id: number,
+  cambios: Partial<NuevoFuncionario>
+): Promise<Funcionario> {
+  return request<Funcionario>(`/api/contratistas/funcionarios/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarFuncionario(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/funcionarios/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
 
 export type EstadoDeclaracion = "borrador" | "enviada" | "aprobada" | "rechazada";
 

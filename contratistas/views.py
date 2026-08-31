@@ -12,10 +12,12 @@ from rest_framework.response import Response
 from core.permissions import EsAdministradorParaEliminar
 
 from .models import (
+    ActividadMetodo,
     DIAS_ALERTA_VENCIMIENTO,
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
+    Funcionario,
     RadicacionSeguridadSocial,
     Trabajador,
     calcular_hash_declaracion,
@@ -29,6 +31,7 @@ from .serializers import (
     EmpresaContratistaCrearSerializer,
     EmpresaContratistaSerializer,
     FirmaMetodoSerializer,
+    FuncionarioSerializer,
     RadicacionSeguridadSocialSerializer,
     TrabajadorSerializer,
 )
@@ -59,6 +62,132 @@ def indicadores(request):
             ).count(),
         }
     )
+
+
+MESES_ABREVIADOS = {
+    1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun",
+    7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic",
+}
+
+
+def _ultimos_meses(hoy, cantidad=6):
+    """[(año, mes), ...] de los últimos `cantidad` meses, terminando en el mes actual."""
+    meses = []
+    year, month = hoy.year, hoy.month
+    for _ in range(cantidad):
+        meses.append((year, month))
+        month -= 1
+        if month == 0:
+            month, year = 12, year - 1
+    return list(reversed(meses))
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def indicadores_dashboard(request):
+    """Panel de indicadores tipo Power BI para Contratistas y Declaración de
+    Método: cumplimiento por contratista, estado de declaraciones, riesgo
+    Kinney promedio, tiempos de aprobación y tendencia mensual. Todo se
+    calcula al vuelo — no hay tablas de resumen materializadas que puedan
+    desincronizarse del dato real."""
+    hoy = timezone.localdate()
+
+    radicaciones = RadicacionSeguridadSocial.objects.all()
+    radicaciones_por_estado = {
+        clave: radicaciones.filter(estado=clave).count() for clave, _ in RadicacionSeguridadSocial.Estado.choices
+    }
+
+    declaraciones = DeclaracionMetodo.objects.all()
+    declaraciones_por_estado = {
+        clave: declaraciones.filter(estado=clave).count() for clave, _ in DeclaracionMetodo.Estado.choices
+    }
+
+    actividades = list(ActividadMetodo.objects.select_related("declaracion__contratista"))
+    riesgos_sin = [a.riesgo_sin for a in actividades]
+    riesgos_con = [a.riesgo_con for a in actividades]
+    top_riesgos = sorted(actividades, key=lambda a: a.riesgo_sin, reverse=True)[:5]
+    top_riesgos_datos = [
+        {
+            "declaracion_id": a.declaracion_id,
+            "contratista": a.declaracion.contratista.nombre,
+            "secuencia": a.secuencia[:80],
+            "riesgo_sin": a.riesgo_sin,
+            "nivel_sin": nivel_riesgo(a.riesgo_sin)[1],
+            "riesgo_con": a.riesgo_con,
+        }
+        for a in top_riesgos
+    ]
+
+    aprobadas = declaraciones.filter(estado=DeclaracionMetodo.Estado.APROBADA)
+    tiempos_dias = [(d.actualizada_en - d.creada_en).total_seconds() / 86400 for d in aprobadas]
+
+    contratistas_activos = list(EmpresaContratista.objects.filter(activa=True).prefetch_related("trabajadores"))
+    por_contratista = []
+    for c in contratistas_activos:
+        por_contratista.append(
+            {
+                "contratista": c.nombre,
+                "trabajadores": c.trabajadores.count(),
+                "radicaciones_pendientes": radicaciones.filter(
+                    trabajador__contratista=c, estado=RadicacionSeguridadSocial.Estado.PENDIENTE
+                ).count(),
+                "declaraciones_pendientes": declaraciones.filter(contratista=c)
+                .exclude(estado__in=[DeclaracionMetodo.Estado.APROBADA, DeclaracionMetodo.Estado.RECHAZADA])
+                .count(),
+            }
+        )
+    por_contratista.sort(key=lambda x: x["trabajadores"], reverse=True)
+
+    tendencia_mensual = []
+    for year, month in _ultimos_meses(hoy):
+        tendencia_mensual.append(
+            {
+                "mes": f"{MESES_ABREVIADOS[month]} {year}",
+                "declaraciones": declaraciones.filter(creada_en__year=year, creada_en__month=month).count(),
+                "radicaciones": radicaciones.filter(radicada_en__year=year, radicada_en__month=month).count(),
+            }
+        )
+
+    return Response(
+        {
+            "contratistas_activos": len(contratistas_activos),
+            "trabajadores_activos": Trabajador.objects.filter(activo=True).count(),
+            "radicaciones_por_estado": radicaciones_por_estado,
+            "declaraciones_por_estado": declaraciones_por_estado,
+            "riesgo_promedio_sin": round(sum(riesgos_sin) / len(riesgos_sin), 1) if riesgos_sin else 0,
+            "riesgo_promedio_con": round(sum(riesgos_con) / len(riesgos_con), 1) if riesgos_con else 0,
+            "top_riesgos": top_riesgos_datos,
+            "tiempo_promedio_aprobacion_dias": (
+                round(sum(tiempos_dias) / len(tiempos_dias), 1) if tiempos_dias else None
+            ),
+            "por_contratista": por_contratista[:8],
+            "tendencia_mensual": tendencia_mensual,
+        }
+    )
+
+
+# --- Funcionarios firmantes ---
+
+
+class FuncionarioListaDashboard(generics.ListCreateAPIView):
+    serializer_class = FuncionarioSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = Funcionario.objects.all()
+        rol_firma = self.request.query_params.get("rol_firma")
+        if rol_firma:
+            qs = qs.filter(rol_firma=rol_firma)
+        solo_activos = self.request.query_params.get("activo")
+        if solo_activos is not None:
+            qs = qs.filter(activo=solo_activos.lower() in ("1", "true"))
+        return qs
+
+
+class FuncionarioDetalle(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Funcionario.objects.all()
+    serializer_class = FuncionarioSerializer
+    permission_classes = [EsAdministradorParaEliminar]
 
 
 # --- Empresas contratistas ---

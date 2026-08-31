@@ -350,3 +350,30 @@ class FirmaMetodo(models.Model):
         if not self.hash_documento:
             return False
         return self.hash_documento != calcular_hash_declaracion(self.declaracion)
+
+
+class Funcionario(models.Model):
+    """Persona autorizada para firmar declaraciones de método en uno de los
+    roles internos de la empresa cliente (no el supervisor del contratista,
+    que cambia por proyecto y se sigue escribiendo libre). Es el padrón que
+    el formulario de firma ofrece para elegir en vez de un texto libre."""
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="funcionarios")
+    nombre = models.CharField(max_length=150)
+    cargo = models.CharField(max_length=150, blank=True)
+    rol_firma = models.CharField(
+        max_length=30,
+        choices=[c for c in FirmaMetodo.Rol.choices if c[0] != FirmaMetodo.Rol.SUPERVISOR_CONTRATISTA],
+    )
+    correo = models.EmailField(blank=True)
+    telefono = models.CharField(max_length=30, blank=True)
+    activo = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "funcionario firmante"
+        verbose_name_plural = "funcionarios firmantes"
+        ordering = ["rol_firma", "nombre"]
+
+    def __str__(self):
+        return f"{self.nombre} — {self.get_rol_firma_display()}"

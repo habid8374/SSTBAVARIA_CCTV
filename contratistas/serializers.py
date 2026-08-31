@@ -9,6 +9,7 @@ from .models import (
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
+    Funcionario,
     RadicacionSeguridadSocial,
     Trabajador,
     nivel_riesgo,
@@ -326,3 +327,18 @@ class CatalogosSerializer(serializers.Serializer):
 
     def get_roles_firma(self, obj):
         return [{"clave": clave, "etiqueta": etiqueta} for clave, etiqueta in FirmaMetodo.Rol.choices]
+
+
+class FuncionarioSerializer(serializers.ModelSerializer):
+    rol_firma_display = serializers.CharField(source="get_rol_firma_display", read_only=True)
+
+    class Meta:
+        model = Funcionario
+        fields = ["id", "nombre", "cargo", "rol_firma", "rol_firma_display", "correo", "telefono", "activo", "creado_en"]
+        read_only_fields = ["id", "creado_en"]
+
+    def create(self, validated_data):
+        empresa = Empresa.objects.first()
+        if empresa is None:
+            empresa = Empresa.objects.create(nombre="Empresa")
+        return Funcionario.objects.create(empresa=empresa, **validated_data)
