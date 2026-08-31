@@ -551,6 +551,7 @@ export type Trabajador = {
   creado_en: string;
   autorizacion_datos: boolean;
   autorizacion_datos_en: string | null;
+  soporte_autorizacion_datos: string | null;
   ultima_radicacion: RadicacionResumen | null;
 };
 
@@ -574,23 +575,34 @@ export function listarTrabajadores(token: string, contratistaId?: number): Promi
   return request<Trabajador[]>(`/api/contratistas/trabajadores/${query}`, { headers: authHeaders(token) });
 }
 
-export function crearTrabajador(token: string, datos: NuevoTrabajador): Promise<Trabajador> {
+function datosTrabajadorFormData(datos: NuevoTrabajador | Partial<NuevoTrabajador>, evidencia: File): FormData {
+  const formData = new FormData();
+  Object.entries(datos).forEach(([clave, valor]) => {
+    if (valor === undefined || valor === null) return;
+    formData.append(clave, typeof valor === "object" ? JSON.stringify(valor) : String(valor));
+  });
+  formData.append("soporte_autorizacion_datos", evidencia);
+  return formData;
+}
+
+export function crearTrabajador(token: string, datos: NuevoTrabajador, evidencia?: File): Promise<Trabajador> {
   return request<Trabajador>("/api/contratistas/trabajadores/", {
     method: "POST",
     headers: authHeaders(token),
-    body: JSON.stringify(datos),
+    body: evidencia ? datosTrabajadorFormData(datos, evidencia) : JSON.stringify(datos),
   });
 }
 
 export function actualizarTrabajador(
   token: string,
   id: number,
-  cambios: Partial<NuevoTrabajador>
+  cambios: Partial<NuevoTrabajador>,
+  evidencia?: File
 ): Promise<Trabajador> {
   return request<Trabajador>(`/api/contratistas/trabajadores/${id}/`, {
     method: "PATCH",
     headers: authHeaders(token),
-    body: JSON.stringify(cambios),
+    body: evidencia ? datosTrabajadorFormData(cambios, evidencia) : JSON.stringify(cambios),
   });
 }
 

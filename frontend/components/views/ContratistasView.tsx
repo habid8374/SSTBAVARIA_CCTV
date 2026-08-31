@@ -654,6 +654,7 @@ function FormularioTrabajador({
   const [fechaInicio, setFechaInicio] = useState(trabajador?.fecha_inicio_contrato ?? "");
   const [cursos, setCursos] = useState<Record<string, string | null>>(trabajador?.cursos_safety_academy ?? {});
   const [autorizacionDatos, setAutorizacionDatos] = useState(trabajador?.autorizacion_datos ?? false);
+  const [evidenciaAutorizacion, setEvidenciaAutorizacion] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -689,9 +690,9 @@ function FormularioTrabajador({
     };
     try {
       if (trabajador) {
-        await actualizarTrabajador(token, trabajador.id, datos);
+        await actualizarTrabajador(token, trabajador.id, datos, evidenciaAutorizacion ?? undefined);
       } else {
-        await crearTrabajador(token, datos);
+        await crearTrabajador(token, datos, evidenciaAutorizacion ?? undefined);
       }
       onGuardado();
     } catch (err) {
@@ -800,6 +801,29 @@ function FormularioTrabajador({
               </span>
             </label>
           )}
+
+          <Campo label="Evidencia de la autorización (opcional)">
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => setEvidenciaAutorizacion(e.target.files?.[0] ?? null)}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm text-corp-navy outline-none file:mr-3 file:rounded-md file:border-0 file:bg-corp-blue-light file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-corp-blue"
+            />
+            {trabajador?.soporte_autorizacion_datos && !evidenciaAutorizacion && (
+              <p className="mt-1 text-xs text-corp-muted">
+                Ya hay una evidencia guardada —{" "}
+                <a
+                  href={trabajador.soporte_autorizacion_datos}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-corp-blue hover:underline"
+                >
+                  verla
+                </a>
+                . Sube un archivo nuevo para reemplazarla.
+              </p>
+            )}
+          </Campo>
 
           {error && (
             <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

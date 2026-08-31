@@ -81,7 +81,9 @@ export default function PoliticaPrivacidadContenido() {
         Al registrar un trabajador en el sistema, la persona que radica la información (representante de la
         empresa contratista) declara contar con la autorización previa, expresa e informada del trabajador
         para el tratamiento de sus datos personales, incluidos los datos sensibles de afiliación a seguridad
-        social, conforme a esta política. Esta autorización queda registrada en el sistema con fecha y hora.
+        social, conforme a esta política. Esta autorización queda registrada en el sistema con fecha y hora,
+        y opcionalmente puede respaldarse adjuntando la evidencia (foto o PDF del formato firmado por el
+        trabajador).
       </P>
 
       <Sub>5. Derechos del titular (Habeas Data)</Sub>

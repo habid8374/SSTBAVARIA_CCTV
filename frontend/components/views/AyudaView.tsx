@@ -365,6 +365,12 @@ const TEMAS: Tema[] = [
             de esa autorización.
           </li>
           <li>
+            El formulario también permite adjuntar la evidencia (foto o PDF del formato firmado por el
+            trabajador) — es opcional, pero respalda la casilla con un documento real en vez de depender
+            solo de la palabra de quien registra. Se puede subir al crear el trabajador o después, editando
+            su ficha.
+          </li>
+          <li>
             El texto completo de la política — qué datos se recogen, para qué, cuánto se conservan y cómo
             ejercer los derechos de acceso/corrección/eliminación — está publicado y es de acceso público
             (sin necesidad de iniciar sesión) en{" "}

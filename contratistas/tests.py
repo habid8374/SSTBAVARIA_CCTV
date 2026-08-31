@@ -263,6 +263,45 @@ class TrabajadorTests(ApiTestsBase):
         trabajador.refresh_from_db()
         self.assertEqual(trabajador.autorizacion_datos_en, fecha_original)
 
+    def test_crear_trabajador_con_evidencia_de_autorizacion(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        evidencia = SimpleUploadedFile("autorizacion.pdf", b"%PDF-1.4 contenido falso", content_type="application/pdf")
+        response = self.client.post(
+            reverse("contratistas:trabajadores_lista"),
+            {
+                "contratista": self.contratista.pk,
+                "nombres": "Luis Alfonso",
+                "apellidos": "Estepa Patiño",
+                "documento": "80431911",
+                "autorizacion_datos": True,
+                "soporte_autorizacion_datos": evidencia,
+            },
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        trabajador = Trabajador.objects.get(documento="80431911")
+        self.assertTrue(trabajador.soporte_autorizacion_datos.name)
+
+    def test_evidencia_de_autorizacion_con_extension_invalida_devuelve_400(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("malware.exe", b"MZ contenido falso", content_type="application/octet-stream")
+        response = self.client.post(
+            reverse("contratistas:trabajadores_lista"),
+            {
+                "contratista": self.contratista.pk,
+                "nombres": "Luis Alfonso",
+                "apellidos": "Estepa Patiño",
+                "documento": "80431911",
+                "autorizacion_datos": True,
+                "soporte_autorizacion_datos": archivo,
+            },
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("soporte_autorizacion_datos", response.data)
+
     def test_filtro_por_contratista(self):
         otro_contratista = EmpresaContratista.objects.create(empresa=self.empresa, nombre="Otra SAS")
         Trabajador.objects.create(

@@ -29,6 +29,10 @@ class EmpresaContratista(models.Model):
         return self.nombre
 
 
+def soporte_autorizacion_upload_to(instance, filename):
+    return f"autorizaciones_datos/{instance.contratista_id}/{filename}"
+
+
 class Trabajador(models.Model):
     """Trabajador de una empresa contratista, con sus datos de afiliación."""
 
@@ -63,6 +67,20 @@ class Trabajador(models.Model):
     )
     autorizacion_datos_en = models.DateTimeField(
         "autorización otorgada el", null=True, blank=True
+    )
+    soporte_autorizacion_datos = models.FileField(
+        "evidencia de la autorización",
+        upload_to=soporte_autorizacion_upload_to,
+        null=True,
+        blank=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=["pdf", "jpg", "jpeg", "png"]),
+            validar_tamano_archivo,
+        ],
+        help_text=(
+            "Foto o PDF del formato de autorización firmado por el trabajador — respalda la casilla "
+            "marcada arriba. Opcional pero recomendado como evidencia."
+        ),
     )
 
     CURSOS = {

@@ -96,6 +96,7 @@ class TrabajadorSerializer(serializers.ModelSerializer):
             "creado_en",
             "autorizacion_datos",
             "autorizacion_datos_en",
+            "soporte_autorizacion_datos",
             "ultima_radicacion",
         ]
         read_only_fields = ["id", "creado_en", "autorizacion_datos_en"]
