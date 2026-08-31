@@ -141,9 +141,16 @@ También la Fase 4 completa (ver más abajo):
   (coordenadas en píxeles naturales de esa foto) y configurar sus reglas de
   horario (días, franja, canal, destinatario) sin tocar el admin de Django.
 - **Alertas**: bandeja de `EventoDetectado` con foto, filtros por
-  estado/disparo de alerta, y marcar revisado.
+  estado/disparo de alerta, y marcar revisado — solo triage, sin datos de
+  notificación.
+- **Notificaciones**: sección propia, separada de Alertas. Pestaña "Envíos":
+  historial de eventos con `disparo_alerta=true`, su `canal_notificacion`
+  (correo/whatsapp), estado del envío (Enviada/Error/N-D) y detalle —
+  filtrable por canal. Pestaña "Configuración": la misma
+  `ConfiguracionAlertasView` de siempre (horario/canal/destinatario por
+  zona), movida aquí desde lo que antes era "Alertas → Configuración".
 
-Operador ve las cuatro secciones pero no puede crear/editar/eliminar zonas
+Operador ve todas las secciones pero no puede crear/editar/eliminar zonas
 ni reglas (`EsAdministradorOSoloLectura` en el backend) ni gestionar
 usuarios — solo Administrador.
 

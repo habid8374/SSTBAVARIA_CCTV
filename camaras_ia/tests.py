@@ -162,6 +162,7 @@ class DispararAlertaCorreoTests(TestCase):
         disparar_alerta(self.evento, self.regla_correo)
         self.evento.refresh_from_db()
         self.assertTrue(self.evento.notificacion_enviada)
+        self.assertEqual(self.evento.canal_notificacion, "correo")
         self.assertIn("seguridad@bavaria.com", self.evento.notificacion_detalle)
         mock_urlopen.assert_called_once()
 
@@ -186,6 +187,8 @@ class DispararAlertaCorreoTests(TestCase):
         mock_urlopen.assert_not_called()
         self.evento.refresh_from_db()
         self.assertFalse(self.evento.notificacion_enviada)
+        self.assertEqual(self.evento.canal_notificacion, "whatsapp")
+        self.assertTrue(self.evento.notificacion_detalle)
 
 
 class RecibirEventoCamaraViewTests(TestCase):

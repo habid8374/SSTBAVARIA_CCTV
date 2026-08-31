@@ -95,8 +95,13 @@ def disparar_alerta(evento, regla):
         regla.destinatario,
     )
 
+    evento.canal_notificacion = regla.canal_notificacion
     if regla.canal_notificacion == "correo":  # ReglaAlerta.Canal.CORREO
         _enviar_notificacion_correo(evento, regla)
+    else:
+        evento.notificacion_enviada = False
+        evento.notificacion_detalle = "Canal WhatsApp — integración de envío pendiente."
+        evento.save(update_fields=["canal_notificacion", "notificacion_enviada", "notificacion_detalle"])
 
 
 def _enviar_notificacion_correo(evento, regla):
@@ -128,4 +133,4 @@ def _enviar_notificacion_correo(evento, regla):
     else:
         evento.notificacion_enviada = True
         evento.notificacion_detalle = f"Correo enviado a {regla.destinatario}"[:255]
-    evento.save(update_fields=["notificacion_enviada", "notificacion_detalle"])
+    evento.save(update_fields=["canal_notificacion", "notificacion_enviada", "notificacion_detalle"])

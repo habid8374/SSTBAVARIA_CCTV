@@ -162,8 +162,9 @@ def eventos_por_zona(request):
 
 
 class EventoListaDashboard(generics.ListAPIView):
-    """Bandeja de Alertas: lista de eventos, más recientes primero, con
-    filtros opcionales ?estado=&disparo_alerta=&camara=."""
+    """Bandeja de Alertas / Envíos de Notificaciones: lista de eventos, más
+    recientes primero, con filtros opcionales
+    ?estado=&disparo_alerta=&camara=&canal_notificacion=."""
 
     serializer_class = EventoDashboardSerializer
     permission_classes = [IsAuthenticated]
@@ -179,6 +180,9 @@ class EventoListaDashboard(generics.ListAPIView):
         camara_id = self.request.query_params.get("camara")
         if camara_id:
             qs = qs.filter(camara_id=camara_id)
+        canal_notificacion = self.request.query_params.get("canal_notificacion")
+        if canal_notificacion:
+            qs = qs.filter(canal_notificacion=canal_notificacion)
         return qs[:200]
 
 

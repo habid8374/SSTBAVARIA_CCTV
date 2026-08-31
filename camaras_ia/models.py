@@ -169,6 +169,13 @@ class EventoDetectado(models.Model):
     punto_y = models.FloatField("punto detectado (y)", null=True, blank=True)
     disparo_alerta = models.BooleanField(default=False)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.NUEVO)
+    canal_notificacion = models.CharField(
+        "canal de notificación",
+        max_length=20,
+        choices=ReglaAlerta.Canal.choices,
+        blank=True,
+        help_text="Canal de la regla que disparó la alerta — vacío si no hubo disparo_alerta",
+    )
     notificacion_enviada = models.BooleanField(
         "notificación enviada",
         default=False,

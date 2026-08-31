@@ -8,6 +8,7 @@ import {
   IconContratista,
   IconDeclaracionMetodo,
   IconLogout,
+  IconNotificacion,
   IconResumen,
   IconUsuarios,
   IconZona,
@@ -18,6 +19,7 @@ export type SeccionId =
   | "camaras"
   | "zonas"
   | "alertas"
+  | "notificaciones"
   | "contratistas"
   | "declaracion-metodo"
   | "usuarios";
@@ -34,6 +36,7 @@ const ITEMS: Item[] = [
   { id: "camaras", label: "Cámaras", icon: IconCamara },
   { id: "zonas", label: "Zonas y horarios", icon: IconZona },
   { id: "alertas", label: "Alertas", icon: IconAlerta },
+  { id: "notificaciones", label: "Notificaciones", icon: IconNotificacion },
   { id: "contratistas", label: "Contratistas", icon: IconContratista },
   { id: "declaracion-metodo", label: "Declaración de Método", icon: IconDeclaracionMetodo },
   { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true },

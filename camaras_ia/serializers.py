@@ -135,6 +135,7 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
             "punto_x",
             "punto_y",
             "disparo_alerta",
+            "canal_notificacion",
             "notificacion_enviada",
             "notificacion_detalle",
             "estado",
@@ -150,6 +151,7 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
             "punto_x",
             "punto_y",
             "disparo_alerta",
+            "canal_notificacion",
             "notificacion_enviada",
             "notificacion_detalle",
         ]

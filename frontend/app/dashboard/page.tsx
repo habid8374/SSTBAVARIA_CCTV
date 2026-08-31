@@ -9,6 +9,7 @@ import AlertasView from "@/components/views/AlertasView";
 import CamarasView from "@/components/views/CamarasView";
 import ContratistasView from "@/components/views/ContratistasView";
 import DeclaracionMetodoView from "@/components/views/DeclaracionMetodoView";
+import NotificacionesView from "@/components/views/NotificacionesView";
 import TableroView from "@/components/views/TableroView";
 import UsuariosView from "@/components/views/UsuariosView";
 import ZonasView from "@/components/views/ZonasView";
@@ -20,6 +21,7 @@ const TITULOS: Record<SeccionId, string> = {
   camaras: "Cámaras IA",
   zonas: "Zonas y horarios",
   alertas: "Alertas",
+  notificaciones: "Notificaciones",
   contratistas: "Contratistas",
   "declaracion-metodo": "Declaración de Método",
   usuarios: "Gestión de usuarios",
@@ -74,7 +76,8 @@ export default function DashboardPage() {
       {seccion === "tablero" && <TableroView token={token} />}
       {seccion === "camaras" && <CamarasView token={token} rol={usuario.rol} />}
       {seccion === "zonas" && <ZonasView token={token} rol={usuario.rol} />}
-      {seccion === "alertas" && <AlertasView token={token} rol={usuario.rol} />}
+      {seccion === "alertas" && <AlertasView token={token} />}
+      {seccion === "notificaciones" && <NotificacionesView token={token} rol={usuario.rol} />}
       {seccion === "contratistas" && <ContratistasView token={token} rol={usuario.rol} />}
       {seccion === "declaracion-metodo" && <DeclaracionMetodoView token={token} rol={usuario.rol} />}
       {seccion === "usuarios" && usuario.rol === "administrador" && (

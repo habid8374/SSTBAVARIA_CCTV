@@ -2,93 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import {
-  actualizarEvento,
-  listarEventos,
-  type EstadoEvento,
-  type EventoDashboard,
-  type Rol,
-} from "@/lib/api";
-
-import ConfiguracionAlertasView from "./ConfiguracionAlertasView";
+import { actualizarEvento, listarEventos, type EstadoEvento, type EventoDashboard } from "@/lib/api";
 
 type FiltroDisparo = "todas" | "con_alerta" | "sin_alerta";
-type Pestana = "bandeja" | "configuracion";
 
-export default function AlertasView({ token, rol }: { token: string; rol: Rol | null }) {
-  const [pestana, setPestana] = useState<Pestana>("bandeja");
-
-  return (
-    <div>
-      <div className="mb-6 flex gap-1 border-b border-corp-border">
-        <BotonPestana activa={pestana === "bandeja"} onClick={() => setPestana("bandeja")}>
-          Bandeja
-        </BotonPestana>
-        <BotonPestana activa={pestana === "configuracion"} onClick={() => setPestana("configuracion")}>
-          Configuración
-        </BotonPestana>
-      </div>
-
-      {pestana === "bandeja" ? (
-        <BandejaAlertas token={token} />
-      ) : (
-        <ConfiguracionAlertasView token={token} rol={rol} />
-      )}
-    </div>
-  );
-}
-
-function BotonPestana({
-  activa,
-  onClick,
-  children,
-}: {
-  activa: boolean;
-  onClick: () => void;
-  children: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
-        activa ? "border-corp-blue text-corp-blue" : "border-transparent text-corp-muted hover:text-corp-navy"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function BadgeNotificacion({ evento }: { evento: EventoDashboard }) {
-  if (!evento.disparo_alerta) {
-    return <span className="text-xs text-corp-muted">—</span>;
-  }
-  if (evento.notificacion_enviada) {
-    return (
-      <span
-        title={evento.notificacion_detalle}
-        className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-      >
-        Enviada
-      </span>
-    );
-  }
-  if (evento.notificacion_detalle) {
-    return (
-      <span
-        title={evento.notificacion_detalle}
-        className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
-      >
-        Error
-      </span>
-    );
-  }
-  // Canal WhatsApp: sigue siendo un stub, no hay envío real que reportar.
-  return <span className="text-xs text-corp-muted">N/D</span>;
-}
-
-function BandejaAlertas({ token }: { token: string }) {
+export default function AlertasView({ token }: { token: string }) {
   const [eventos, setEventos] = useState<EventoDashboard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<EstadoEvento | "todos">("todos");
@@ -149,7 +67,7 @@ function BandejaAlertas({ token }: { token: string }) {
       )}
 
       <div className="mt-6 overflow-x-auto rounded-xl border border-corp-border bg-white">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[680px] text-left text-sm">
           <thead className="border-b border-corp-border bg-corp-blue-light text-xs uppercase text-corp-muted">
             <tr>
               <th className="px-4 py-3">Foto</th>
@@ -157,7 +75,6 @@ function BandejaAlertas({ token }: { token: string }) {
               <th className="px-4 py-3">Zona</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Alerta</th>
-              <th className="px-4 py-3">Notificación</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -194,9 +111,6 @@ function BandejaAlertas({ token }: { token: string }) {
                   >
                     {evento.disparo_alerta ? "Alerta" : "Normal"}
                   </span>
-                </td>
-                <td className="px-4 py-3">
-                  <BadgeNotificacion evento={evento} />
                 </td>
                 <td className="px-4 py-3">
                   <span
