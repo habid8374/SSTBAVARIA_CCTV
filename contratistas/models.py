@@ -467,3 +467,34 @@ class ConfiguracionAlertas(models.Model):
     def obtener(cls):
         objeto, _ = cls.objects.get_or_create(pk=1)
         return objeto
+
+
+class RegistroAuditoria(models.Model):
+    """Traza de quién creó/editó/eliminó un registro y qué cambió — para los
+    modelos críticos de cumplimiento (contratistas, trabajadores,
+    radicaciones, declaraciones de método, funcionarios firmantes). Guarda
+    un string del objeto y no solo su id, para que la traza siga siendo
+    legible aunque el registro original ya se haya eliminado."""
+
+    class Accion(models.TextChoices):
+        CREADO = "creado", "Creado"
+        ACTUALIZADO = "actualizado", "Actualizado"
+        ELIMINADO = "eliminado", "Eliminado"
+
+    modelo = models.CharField(max_length=100)
+    objeto_id = models.PositiveIntegerField()
+    objeto_str = models.CharField(max_length=300)
+    accion = models.CharField(max_length=20, choices=Accion.choices)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    cambios = models.JSONField(default=dict, blank=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "registro de auditoría"
+        verbose_name_plural = "registros de auditoría"
+        ordering = ["-fecha"]
+
+    def __str__(self):
+        return f"{self.get_accion_display()} — {self.modelo} #{self.objeto_id}"

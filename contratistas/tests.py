@@ -16,6 +16,7 @@ from .models import (
     FirmaMetodo,
     Funcionario,
     RadicacionSeguridadSocial,
+    RegistroAuditoria,
     Trabajador,
     nivel_riesgo,
 )
@@ -471,6 +472,79 @@ class EmpresaContratistaTests(ApiTestsBase):
         response = self.client.delete(url, **self._auth(self.admin))
         self.assertEqual(response.status_code, 204)
         self.assertFalse(EmpresaContratista.objects.filter(pk=self.contratista.pk).exists())
+
+
+class RegistroAuditoriaTests(ApiTestsBase):
+    def test_crear_empresa_queda_registrado(self):
+        self.client.post(
+            reverse("contratistas:empresas_lista"),
+            {"nombre": "Gestión y Control Integral del Riesgo SAS", "nit": "900123456-1"},
+            **self._auth(self.operador),
+        )
+        registro = RegistroAuditoria.objects.filter(modelo="EmpresaContratista", accion="creado").latest("fecha")
+        self.assertEqual(registro.objeto_str, "Gestión y Control Integral del Riesgo SAS")
+        self.assertEqual(registro.usuario, self.operador)
+
+    def test_editar_trabajador_registra_solo_los_campos_que_cambiaron(self):
+        self.client.patch(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]),
+            {"eps": "Sura"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        registro = RegistroAuditoria.objects.filter(modelo="Trabajador", accion="actualizado").latest("fecha")
+        self.assertEqual(set(registro.cambios.keys()), {"eps"})
+        self.assertEqual(registro.cambios["eps"], {"antes": "Nueva EPS", "despues": "Sura"})
+
+    def test_editar_sin_cambios_reales_no_crea_registro(self):
+        cantidad_antes = RegistroAuditoria.objects.count()
+        self.client.patch(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]),
+            {"eps": self.trabajador.eps},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(RegistroAuditoria.objects.count(), cantidad_antes)
+
+    def test_eliminar_empresa_queda_registrado_aunque_ya_no_exista(self):
+        pk = self.contratista.pk
+        nombre = self.contratista.nombre
+        self.client.delete(reverse("contratistas:empresas_detalle", args=[pk]), **self._auth(self.admin))
+        registro = RegistroAuditoria.objects.filter(modelo="EmpresaContratista", accion="eliminado").latest("fecha")
+        self.assertEqual(registro.objeto_id, pk)
+        self.assertEqual(registro.objeto_str, nombre)
+
+    def test_aprobar_radicacion_registra_cambio_de_estado(self):
+        radicacion = RadicacionSeguridadSocial.objects.create(
+            trabajador=self.trabajador, anio=2026, mes="ENERO", estado=RadicacionSeguridadSocial.Estado.PENDIENTE
+        )
+        self.client.post(
+            reverse("contratistas:radicaciones_aprobar", args=[radicacion.pk]),
+            {},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        registro = RegistroAuditoria.objects.filter(
+            modelo="RadicacionSeguridadSocial", objeto_id=radicacion.pk, accion="actualizado"
+        ).latest("fecha")
+        self.assertEqual(registro.cambios["estado"], {"antes": "pendiente", "despues": "aprobada"})
+
+    def test_operador_no_puede_ver_auditoria(self):
+        response = self.client.get(reverse("contratistas:auditoria_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_puede_ver_y_filtrar_auditoria(self):
+        self.client.post(
+            reverse("contratistas:empresas_lista"),
+            {"nombre": "Otra Contratista SAS"},
+            **self._auth(self.admin),
+        )
+        response = self.client.get(
+            reverse("contratistas:auditoria_lista") + "?modelo=EmpresaContratista",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(all(r["modelo"] == "EmpresaContratista" for r in response.data))
 
 
 class TrabajadorTests(ApiTestsBase):

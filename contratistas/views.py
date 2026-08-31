@@ -9,8 +9,9 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.permissions import EsAdministradorOSoloLectura, EsAdministradorParaEliminar
+from core.permissions import EsAdministrador, EsAdministradorOSoloLectura, EsAdministradorParaEliminar
 
+from .auditoria import capturar_snapshot, registrar_auditoria
 from .models import (
     ActividadMetodo,
     ConfiguracionAlertas,
@@ -21,6 +22,7 @@ from .models import (
     Funcionario,
     PermisoTrabajo,
     RadicacionSeguridadSocial,
+    RegistroAuditoria,
     Trabajador,
     calcular_hash_declaracion,
     nivel_riesgo,
@@ -43,8 +45,29 @@ from .serializers import (
     FuncionarioSerializer,
     PermisoTrabajoSerializer,
     RadicacionSeguridadSocialSerializer,
+    RegistroAuditoriaSerializer,
     TrabajadorSerializer,
 )
+
+
+class AuditoriaMixin:
+    """Registra en RegistroAuditoria cada creación/edición/eliminación hecha
+    a través de esta vista genérica — ver contratistas/auditoria.py. Solo se
+    aplica a los modelos críticos de cumplimiento (contratistas,
+    trabajadores, radicaciones, declaraciones de método, funcionarios)."""
+
+    def perform_create(self, serializer):
+        instancia = serializer.save()
+        registrar_auditoria(self.request.user, instancia, RegistroAuditoria.Accion.CREADO)
+
+    def perform_update(self, serializer):
+        snapshot_anterior = capturar_snapshot(serializer.instance)
+        instancia = serializer.save()
+        registrar_auditoria(self.request.user, instancia, RegistroAuditoria.Accion.ACTUALIZADO, snapshot_anterior)
+
+    def perform_destroy(self, instance):
+        registrar_auditoria(self.request.user, instance, RegistroAuditoria.Accion.ELIMINADO)
+        instance.delete()
 
 
 @api_view(["GET"])
@@ -191,7 +214,7 @@ def indicadores_dashboard(request):
 # --- Funcionarios firmantes ---
 
 
-class FuncionarioListaDashboard(generics.ListCreateAPIView):
+class FuncionarioListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
     serializer_class = FuncionarioSerializer
     permission_classes = [IsAuthenticated]
 
@@ -206,7 +229,7 @@ class FuncionarioListaDashboard(generics.ListCreateAPIView):
         return qs
 
 
-class FuncionarioDetalle(generics.RetrieveUpdateDestroyAPIView):
+class FuncionarioDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Funcionario.objects.all()
     serializer_class = FuncionarioSerializer
     permission_classes = [EsAdministradorParaEliminar]
@@ -264,13 +287,14 @@ class EmpresaContratistaListaDashboard(generics.ListCreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         contratista = serializer.save()
+        registrar_auditoria(request.user, contratista, RegistroAuditoria.Accion.CREADO)
         return Response(
             EmpresaContratistaSerializer(contratista, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,
         )
 
 
-class EmpresaContratistaDetalle(generics.RetrieveUpdateDestroyAPIView):
+class EmpresaContratistaDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = EmpresaContratista.objects.all()
     serializer_class = EmpresaContratistaSerializer
     permission_classes = [EsAdministradorParaEliminar]
@@ -279,7 +303,7 @@ class EmpresaContratistaDetalle(generics.RetrieveUpdateDestroyAPIView):
 # --- Trabajadores ---
 
 
-class TrabajadorListaDashboard(generics.ListCreateAPIView):
+class TrabajadorListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
     serializer_class = TrabajadorSerializer
     permission_classes = [IsAuthenticated]
 
@@ -291,7 +315,7 @@ class TrabajadorListaDashboard(generics.ListCreateAPIView):
         return qs
 
 
-class TrabajadorDetalle(generics.RetrieveUpdateDestroyAPIView):
+class TrabajadorDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Trabajador.objects.select_related("contratista")
     serializer_class = TrabajadorSerializer
     permission_classes = [EsAdministradorParaEliminar]
@@ -332,11 +356,12 @@ class RadicacionListaDashboard(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         radicacion = serializer.save()
+        registrar_auditoria(self.request.user, radicacion, RegistroAuditoria.Accion.CREADO)
         if radicacion.estado == RadicacionSeguridadSocial.Estado.PENDIENTE:
             notificar_radicacion_pendiente(radicacion)
 
 
-class RadicacionDetalle(generics.RetrieveUpdateDestroyAPIView):
+class RadicacionDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista")
     serializer_class = RadicacionSeguridadSocialSerializer
     permission_classes = [EsAdministradorParaEliminar]
@@ -401,6 +426,7 @@ def radicaciones_exportar(request):
 
 def _decidir_radicacion(request, pk, nuevo_estado):
     radicacion = get_object_or_404(RadicacionSeguridadSocial, pk=pk)
+    snapshot_anterior = capturar_snapshot(radicacion)
     entrada = DecisionRadicacionSerializer(data=request.data)
     entrada.is_valid(raise_exception=True)
     observaciones = entrada.validated_data.get("observaciones", "").strip()
@@ -412,6 +438,7 @@ def _decidir_radicacion(request, pk, nuevo_estado):
     radicacion.observaciones = observaciones or radicacion.observaciones
     radicacion.revisada_en = timezone.now()
     radicacion.save(update_fields=["estado", "observaciones", "revisada_en"])
+    registrar_auditoria(request.user, radicacion, RegistroAuditoria.Accion.ACTUALIZADO, snapshot_anterior)
     notificar_decision_radicacion(radicacion)
     return Response(RadicacionSeguridadSocialSerializer(radicacion).data)
 
@@ -431,7 +458,7 @@ def rechazar_radicacion(request, pk):
 # --- Declaraciones de método ---
 
 
-class DeclaracionMetodoListaDashboard(generics.ListCreateAPIView):
+class DeclaracionMetodoListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
     serializer_class = DeclaracionMetodoSerializer
     permission_classes = [IsAuthenticated]
 
@@ -446,14 +473,16 @@ class DeclaracionMetodoListaDashboard(generics.ListCreateAPIView):
         return qs
 
 
-class DeclaracionMetodoDetalle(generics.RetrieveUpdateDestroyAPIView):
+class DeclaracionMetodoDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas")
     serializer_class = DeclaracionMetodoSerializer
     permission_classes = [EsAdministradorParaEliminar]
 
     def perform_update(self, serializer):
         estado_anterior = serializer.instance.estado
+        snapshot_anterior = capturar_snapshot(serializer.instance)
         declaracion = serializer.save()
+        registrar_auditoria(self.request.user, declaracion, RegistroAuditoria.Accion.ACTUALIZADO, snapshot_anterior)
         if declaracion.estado == estado_anterior:
             return
         if declaracion.estado in (DeclaracionMetodo.Estado.APROBADA, DeclaracionMetodo.Estado.RECHAZADA):
@@ -485,6 +514,25 @@ def firmar_declaracion(request, pk):
         },
     )
     return Response(FirmaMetodoSerializer(firma).data, status=status.HTTP_201_CREATED)
+
+
+class RegistroAuditoriaLista(generics.ListAPIView):
+    """Solo lectura — la traza de auditoría nunca se edita ni se borra desde
+    acá. Filtrable por ?modelo= para revisar solo, por ejemplo, los cambios
+    de Trabajador."""
+
+    serializer_class = RegistroAuditoriaSerializer
+    permission_classes = [EsAdministrador]
+
+    def get_queryset(self):
+        qs = RegistroAuditoria.objects.select_related("usuario")
+        modelo = self.request.query_params.get("modelo")
+        if modelo:
+            qs = qs.filter(modelo=modelo)
+        objeto_id = self.request.query_params.get("objeto_id")
+        if objeto_id:
+            qs = qs.filter(objeto_id=objeto_id)
+        return qs[:500]
 
 
 @api_view(["GET"])

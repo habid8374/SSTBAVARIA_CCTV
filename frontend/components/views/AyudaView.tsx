@@ -306,7 +306,7 @@ const TEMAS: Tema[] = [
     soloAdmin: true,
     contenido: (
       <>
-        <P>Solo Administrador. Tres pestañas:</P>
+        <P>Solo Administrador. Cuatro pestañas:</P>
         <Sub>Brevo (correo)</Sub>
         <P>
           Acá se digita la API key de Brevo (el proveedor que envía los correos de alerta) y el remitente —
@@ -339,6 +339,15 @@ const TEMAS: Tema[] = [
           <strong>apenas queda algo pendiente de revisar</strong>: al radicar seguridad social (queda en
           &quot;Pendiente&quot;) y al pasar una declaración de método a &quot;Enviada&quot;. Así quien
           revisa no tiene que estar entrando al sistema a cada rato para enterarse de que hay algo nuevo.
+        </P>
+        <Sub>Auditoría</Sub>
+        <P>
+          Traza de solo lectura de quién creó, editó o eliminó cada registro crítico de cumplimiento: empresas
+          contratistas, trabajadores, radicaciones de seguridad social, declaraciones de método y funcionarios
+          firmantes. Cada fila muestra fecha, tipo de acción, qué registro fue y qué usuario lo hizo; en{" "}
+          <strong>&quot;Ver cambios&quot;</strong> se ve exactamente qué campos cambiaron y sus valores antes/
+          después. Se puede filtrar por tipo de registro. Un registro se guarda aunque el registro original se
+          elimine después (para no perder el rastro), y nada acá se puede editar ni borrar.
         </P>
       </>
     ),

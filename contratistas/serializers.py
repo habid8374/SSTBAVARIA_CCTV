@@ -13,6 +13,7 @@ from .models import (
     Funcionario,
     PermisoTrabajo,
     RadicacionSeguridadSocial,
+    RegistroAuditoria,
     Trabajador,
     nivel_riesgo,
 )
@@ -370,3 +371,22 @@ class ConfiguracionAlertasSerializer(serializers.ModelSerializer):
         model = ConfiguracionAlertas
         fields = ["dias_alerta_vencimiento", "correo_revisor", "actualizada_en"]
         read_only_fields = ["actualizada_en"]
+
+
+class RegistroAuditoriaSerializer(serializers.ModelSerializer):
+    accion_display = serializers.CharField(source="get_accion_display", read_only=True)
+    usuario_nombre = serializers.CharField(source="usuario.username", read_only=True, default="")
+
+    class Meta:
+        model = RegistroAuditoria
+        fields = [
+            "id",
+            "modelo",
+            "objeto_id",
+            "objeto_str",
+            "accion",
+            "accion_display",
+            "usuario_nombre",
+            "cambios",
+            "fecha",
+        ]

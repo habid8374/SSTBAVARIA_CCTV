@@ -15,6 +15,7 @@ urlpatterns = [
     path("permisos-trabajo/", views.PermisoTrabajoListaDashboard.as_view(), name="permisos_lista"),
     path("permisos-trabajo/<int:pk>/", views.PermisoTrabajoDetalle.as_view(), name="permisos_detalle"),
     path("configuracion-alertas/", views.ConfiguracionAlertasDetalle.as_view(), name="configuracion_alertas"),
+    path("auditoria/", views.RegistroAuditoriaLista.as_view(), name="auditoria_lista"),
     path("empresas/", views.EmpresaContratistaListaDashboard.as_view(), name="empresas_lista"),
     path("empresas/<int:pk>/", views.EmpresaContratistaDetalle.as_view(), name="empresas_detalle"),
     path("trabajadores/", views.TrabajadorListaDashboard.as_view(), name="trabajadores_lista"),

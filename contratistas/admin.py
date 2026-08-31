@@ -10,6 +10,7 @@ from .models import (
     Funcionario,
     PermisoTrabajo,
     RadicacionSeguridadSocial,
+    RegistroAuditoria,
     Trabajador,
 )
 
@@ -104,3 +105,17 @@ class PermisoTrabajoAdmin(admin.ModelAdmin):
 @admin.register(ConfiguracionAlertas)
 class ConfiguracionAlertasAdmin(admin.ModelAdmin):
     list_display = ("dias_alerta_vencimiento", "actualizada_en")
+
+
+@admin.register(RegistroAuditoria)
+class RegistroAuditoriaAdmin(admin.ModelAdmin):
+    list_display = ("fecha", "modelo", "objeto_str", "accion", "usuario")
+    list_filter = ("modelo", "accion")
+    search_fields = ("objeto_str",)
+    readonly_fields = ("modelo", "objeto_id", "objeto_str", "accion", "usuario", "cambios", "fecha")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

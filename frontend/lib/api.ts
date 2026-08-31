@@ -577,6 +577,31 @@ export function actualizarConfiguracionAlertas(
   });
 }
 
+export type RegistroAuditoria = {
+  id: number;
+  modelo: string;
+  objeto_id: number;
+  objeto_str: string;
+  accion: "creado" | "actualizado" | "eliminado";
+  accion_display: string;
+  usuario_nombre: string;
+  cambios: Record<string, { antes: unknown; despues: unknown }>;
+  fecha: string;
+};
+
+export function listarAuditoria(
+  token: string,
+  filtros?: { modelo?: string; objeto_id?: number }
+): Promise<RegistroAuditoria[]> {
+  const parametros = new URLSearchParams();
+  if (filtros?.modelo) parametros.set("modelo", filtros.modelo);
+  if (filtros?.objeto_id) parametros.set("objeto_id", String(filtros.objeto_id));
+  const query = parametros.toString();
+  return request<RegistroAuditoria[]>(`/api/contratistas/auditoria/${query ? `?${query}` : ""}`, {
+    headers: authHeaders(token),
+  });
+}
+
 export type EmpresaContratista = {
   id: number;
   nombre: string;

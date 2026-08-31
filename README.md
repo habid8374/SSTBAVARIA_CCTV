@@ -83,6 +83,19 @@ frontend en Vercel — pero viven en el mismo repositorio.
     entre al sistema a notar que hay algo nuevo. Es independiente del
     aviso de aprobado/rechazado, que sigue yendo siempre al contacto de la
     empresa contratista.
+  - **Auditoría/trazabilidad** (pestaña "Auditoría" en Sistema, solo
+    Administrador; `contratistas.RegistroAuditoria`): cada creación, edición
+    o eliminación de los 5 modelos críticos de cumplimiento (empresas
+    contratistas, trabajadores, radicaciones de seguridad social,
+    declaraciones de método y funcionarios firmantes) queda registrada con
+    quién la hizo (`request.user`), cuándo, y — en las ediciones — qué
+    campos cambiaron y sus valores antes/después
+    (`contratistas/auditoria.py: capturar_snapshot`/`registrar_auditoria`).
+    Incluye también la aprobación/rechazo de radicaciones y declaraciones,
+    que no pasan por el `perform_update` genérico de DRF. El registro guarda
+    una foto del objeto (`objeto_str`) para seguir siendo legible aunque el
+    registro original se elimine después. Es de solo lectura — nada se
+    edita ni se borra desde el dashboard ni desde el admin de Django.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada
