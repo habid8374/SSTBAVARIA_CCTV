@@ -20,13 +20,17 @@ const TEMAS: Tema[] = [
     contenido: (
       <>
         <P>
-          SST Bavaria — Cámaras IA tiene dos roles de usuario: <strong>Administrador</strong> (ve y edita todo,
-          incluida la sección Sistema y Usuarios) y <strong>Operador</strong> (ve el día a día — cámaras,
+          SST Bavaria — Cámaras IA tiene tres roles de usuario: <strong>Administrador</strong> (ve y edita
+          todo, incluida la sección Sistema y Usuarios), <strong>Operador</strong> (ve el día a día — cámaras,
           alertas, contratistas — pero no puede crear/editar zonas, reglas, ni gestionar usuarios o el equipo
-          local).
+          local) y <strong>Contratista</strong> (el portal de la empresa contratista — ver el tema
+          &quot;Portal de contratistas&quot; para el detalle de qué puede hacer).
         </P>
         <Sub>El menú de la izquierda</Sub>
-        <P>Cada ítem del menú es una sección independiente — no hay direcciones web sueltas que recordar:</P>
+        <P>Cada ítem del menú es una sección independiente — no hay direcciones web sueltas que recordar. Un
+          usuario con rol Contratista solo ve Contratistas (su propia empresa, de solo lectura), Declaración
+          de Método, Autorización de Ingreso (de solo lectura) y Ayuda — el resto de ítems son para el
+          personal interno de SST/interventoría:</P>
         <Ul>
           <li><strong>Tablero</strong>: resumen general (KPIs y gráfico).</li>
           <li><strong>Cámaras</strong>: alta y estado de cada cámara.</li>
@@ -37,6 +41,10 @@ const TEMAS: Tema[] = [
           <li><strong>Declaración de Método</strong>: formulario de riesgo (método Kinney) por trabajo.</li>
           <li><strong>Autorización de Ingreso</strong>: quién queda autorizado a entrar a planta, cuándo y en
             qué área — con inclusiones y exclusiones de trabajadores.</li>
+          <li><strong>Funcionarios firmantes</strong> (personal interno): padrón de quién puede firmar cada
+            rol de la Declaración de Método.</li>
+          <li><strong>Indicadores</strong> (personal interno): panel comparativo entre todas las empresas
+            contratistas.</li>
           <li><strong>Sistema</strong> (solo Administrador): credenciales de Brevo y equipos locales.</li>
           <li><strong>Usuarios</strong> (solo Administrador): quién tiene acceso y con qué rol.</li>
           <li><strong>Ayuda</strong>: esta sección.</li>
@@ -45,6 +53,46 @@ const TEMAS: Tema[] = [
           El botón de colapsar menú (abajo del todo) deja solo los íconos — útil en pantallas chicas. En
           celular, el menú se abre con el ícono de las tres rayas arriba a la izquierda.
         </Nota>
+      </>
+    ),
+  },
+  {
+    id: "portal-contratistas",
+    titulo: "Portal de contratistas",
+    contenido: (
+      <>
+        <P>
+          Es el mismo dashboard y el mismo login — no hay una app ni una dirección web aparte — pero un
+          usuario con rol <strong>Contratista</strong> ve un menú reducido y casi todo en modo de solo
+          lectura, scopeado siempre a su propia empresa.
+        </P>
+        <Sub>Qué puede ver y hacer</Sub>
+        <Ul>
+          <li><strong>Declaración de Método</strong>: acceso completo — es la única sección donde puede
+            escribir. Puede crear, editar, enviar a revisión y firmar como Supervisor de Seguridad del
+            Contratista.</li>
+          <li><strong>Contratistas</strong>: ve los datos de su propia empresa y sus trabajadores (EPS/ARL/AFP,
+            radicaciones de seguridad social) — de solo lectura, no puede editar ni cargar radicaciones.</li>
+          <li><strong>Autorización de Ingreso</strong>: ve sus autorizaciones de ingreso vigentes y puede
+            descargar el PDF — de solo lectura.</li>
+          <li><strong>Ayuda</strong>: este manual.</li>
+        </Ul>
+        <P>
+          Todo lo demás (Tablero, Cámaras, Zonas, Alertas, Notificaciones, Funcionarios firmantes,
+          Indicadores, Sistema, Usuarios) es exclusivo del personal interno de SST/interventoría y no aparece
+          en su menú.
+        </P>
+        <Sub>Cómo se da de alta</Sub>
+        <P>
+          Un Administrador crea la cuenta desde Usuarios, eligiendo el rol Contratista y la empresa a la que
+          representa (ver el tema &quot;Usuarios&quot;). Es <strong>una cuenta por empresa</strong>, que
+          comparten todos sus contactos — no una cuenta por persona.
+        </P>
+        <Sub>El flujo de la Declaración de Método</Sub>
+        <P>
+          Ver el tema &quot;Declaración de Método&quot; para el detalle completo del ciclo enviar → revisar →
+          aprobar/rechazar → subsanar, que es el corazón del portal.
+        </P>
       </>
     ),
   },
@@ -251,6 +299,31 @@ const TEMAS: Tema[] = [
           del formulario, una vez la declaración está guardada) genera el documento completo — datos
           generales, actividades con su evaluación de riesgo y firmas — listo para archivar o imprimir.
         </P>
+        <Sub>El ciclo enviar → revisar → aprobar/rechazar → subsanar</Sub>
+        <P>
+          Este es el único formulario en el que el rol Contratista puede escribir (el resto de la app es de
+          solo lectura para ese rol). El flujo completo:
+        </P>
+        <Ol>
+          <li>El contratista crea la declaración desde su portal y la deja en estado <strong>Enviada</strong>{" "}
+            (o la guarda primero como <strong>Borrador</strong> mientras la termina).</li>
+          <li>Al quedar Enviada, se le notifica por correo al personal de SST/interventoría que hay una
+            declaración por revisar.</li>
+          <li>El personal interno la revisa y decide: <strong>Aprobada</strong> (exige al menos una firma
+            vigente, como se explica arriba) o <strong>Rechazada</strong> — el sistema exige escribir el
+            motivo del rechazo en &quot;Observaciones&quot;, no se puede rechazar sin explicar por qué.</li>
+          <li>El contratista ve el motivo del rechazo apenas abre la declaración (aviso en rojo arriba del
+            formulario), corrige lo que haga falta y vuelve a poner el estado en Enviada — así las veces que
+            haga falta hasta que quede Aprobada.</li>
+        </Ol>
+        <Nota>
+          Solo el personal de SST/interventoría puede poner una declaración en Aprobada o Rechazada — un
+          usuario del portal de contratistas no tiene esa opción en su selector de Estado. Tampoco puede
+          elegir la empresa contratista al crear o editar: siempre queda fijada a la suya. Al firmar, el
+          portal de contratistas solo puede hacerlo como &quot;Supervisor de Seguridad del Contratista&quot;
+          — las demás firmas (Delegado, Seguridad de Planta, Líder de Área, Dueño de Territorio) son del
+          personal interno de Bavaria.
+        </Nota>
       </>
     ),
   },
@@ -409,6 +482,14 @@ const TEMAS: Tema[] = [
           <li><strong>Desactivar</strong> en vez de eliminar, para revocar el acceso sin perder su historial
             de acciones.</li>
         </Ul>
+        <Sub>Dar de alta un usuario del portal de contratistas</Sub>
+        <P>
+          Al elegir el rol <strong>Contratista</strong> (al crear un usuario nuevo, o al cambiar el rol de uno
+          existente desde el desplegable de la tabla) el sistema pide elegir a qué{" "}
+          <strong>empresa contratista</strong> representa — es lo que define qué datos puede ver y editar ese
+          usuario. Es <strong>un usuario por empresa</strong>, no uno por persona: si varios contactos de la
+          misma empresa necesitan entrar al portal, comparten esa misma cuenta.
+        </P>
         <Nota>No puedes desactivarte ni eliminarte a ti mismo — esos botones aparecen deshabilitados en tu
           propia fila.</Nota>
       </>

@@ -8,7 +8,9 @@ import {
   actualizarUsuario,
   crearUsuario,
   eliminarUsuario,
+  listarContratistas,
   listarUsuarios,
+  type EmpresaContratista,
   type Rol,
   type UsuarioGestionado,
 } from "@/lib/api";
@@ -17,8 +19,10 @@ type Props = { token: string; usuarioActualId: number };
 
 export default function UsuariosView({ token, usuarioActualId }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioGestionado[] | null>(null);
+  const [contratistas, setContratistas] = useState<EmpresaContratista[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [eligiendoEmpresaPara, setEligiendoEmpresaPara] = useState<UsuarioGestionado | null>(null);
   const { confirmar } = useDialog();
 
   function cargar() {
@@ -28,10 +32,31 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
   }
 
   useEffect(cargar, [token]);
+  useEffect(() => {
+    listarContratistas(token)
+      .then(setContratistas)
+      .catch(() => {});
+  }, [token]);
 
   async function cambiarRol(usuario: UsuarioGestionado, rol: Rol) {
+    if (rol === "contratista") {
+      // El rol Contratista exige elegir una empresa — se pide aparte en
+      // vez de guardar de inmediato con el selector rápido de la tabla.
+      setEligiendoEmpresaPara(usuario);
+      return;
+    }
     try {
       await actualizarUsuario(token, usuario.id, { rol });
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar el rol.");
+    }
+  }
+
+  async function asignarComoContratista(usuario: UsuarioGestionado, contratistaId: number) {
+    try {
+      await actualizarUsuario(token, usuario.id, { rol: "contratista", contratista: contratistaId });
+      setEligiendoEmpresaPara(null);
       cargar();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo actualizar el rol.");
@@ -111,7 +136,11 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
                     >
                       <option value="administrador">Administrador</option>
                       <option value="operador">Operador</option>
+                      <option value="contratista">Contratista</option>
                     </select>
+                    {usuario.rol === "contratista" && (
+                      <p className="mt-1 text-xs text-corp-muted">{usuario.contratista_nombre || "Sin empresa"}</p>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -155,6 +184,7 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
       {mostrarFormulario && (
         <FormularioNuevoUsuario
           token={token}
+          contratistas={contratistas}
           onCerrar={() => setMostrarFormulario(false)}
           onCreado={() => {
             setMostrarFormulario(false);
@@ -162,16 +192,83 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
           }}
         />
       )}
+
+      {eligiendoEmpresaPara && (
+        <FormularioElegirEmpresa
+          usuario={eligiendoEmpresaPara}
+          contratistas={contratistas}
+          onCerrar={() => setEligiendoEmpresaPara(null)}
+          onElegir={(contratistaId) => asignarComoContratista(eligiendoEmpresaPara, contratistaId)}
+        />
+      )}
+    </div>
+  );
+}
+
+function FormularioElegirEmpresa({
+  usuario,
+  contratistas,
+  onCerrar,
+  onElegir,
+}: {
+  usuario: UsuarioGestionado;
+  contratistas: EmpresaContratista[];
+  onCerrar: () => void;
+  onElegir: (contratistaId: number) => void;
+}) {
+  const [contratistaId, setContratistaId] = useState(String(contratistas[0]?.id ?? ""));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 className="text-lg font-semibold text-corp-navy">Empresa contratista</h2>
+        <p className="mt-1 text-sm text-corp-muted">
+          ¿A qué empresa contratista representa {usuario.username} en el portal?
+        </p>
+        <div className="mt-4">
+          <select
+            value={contratistaId}
+            onChange={(event) => setContratistaId(event.target.value)}
+            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          >
+            {contratistas.length === 0 && <option value="">No hay empresas contratistas registradas</option>}
+            {contratistas.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-4 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="rounded-lg px-4 py-2 text-sm font-medium text-corp-muted hover:bg-zinc-100"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={!contratistaId}
+            onClick={() => onElegir(Number(contratistaId))}
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 function FormularioNuevoUsuario({
   token,
+  contratistas,
   onCerrar,
   onCreado,
 }: {
   token: string;
+  contratistas: EmpresaContratista[];
   onCerrar: () => void;
   onCreado: () => void;
 }) {
@@ -179,6 +276,7 @@ function FormularioNuevoUsuario({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rol, setRol] = useState<Rol>("operador");
+  const [contratistaId, setContratistaId] = useState(String(contratistas[0]?.id ?? ""));
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -187,7 +285,13 @@ function FormularioNuevoUsuario({
     setError(null);
     setEnviando(true);
     try {
-      await crearUsuario(token, { username, email, password, rol });
+      await crearUsuario(token, {
+        username,
+        email,
+        password,
+        rol,
+        contratista: rol === "contratista" ? Number(contratistaId) : null,
+      });
       onCreado();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo crear el usuario.");
@@ -234,8 +338,29 @@ function FormularioNuevoUsuario({
             >
               <option value="operador">Operador</option>
               <option value="administrador">Administrador</option>
+              <option value="contratista">Contratista</option>
             </select>
           </Campo>
+
+          {rol === "contratista" && (
+            <Campo label="Empresa contratista">
+              <select
+                required
+                value={contratistaId}
+                onChange={(event) => setContratistaId(event.target.value)}
+                className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+              >
+                <option value="" disabled>
+                  Selecciona una empresa
+                </option>
+                {contratistas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          )}
 
           {error && (
             <div

@@ -4,6 +4,9 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
+from contratistas.models import EmpresaContratista
+from core.models import Empresa
+
 from .models import PerfilUsuario
 from .validators import MAX_UPLOAD_MB, validar_tamano_archivo
 
@@ -163,3 +166,88 @@ class UsuarioManagementTests(TestCase):
     def test_sin_autenticar_devuelve_401(self):
         response = self.client.get(self.lista_url)
         self.assertEqual(response.status_code, 401)
+
+
+class UsuarioContratistaTests(TestCase):
+    """El rol Contratista exige elegir una empresa — es lo que scopea todo
+    lo que ese usuario del portal puede ver y editar."""
+
+    def setUp(self):
+        cache.clear()
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.contratista = EmpresaContratista.objects.create(empresa=empresa, nombre="SCEPSA")
+        self.lista_url = reverse("core:usuarios_lista")
+
+    def _token(self, user):
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        )
+        return response.data["token"]
+
+    def test_crear_usuario_contratista_sin_empresa_devuelve_400(self):
+        token = self._token(self.admin)
+        response = self.client.post(
+            self.lista_url,
+            {"username": "portal1", "email": "portal1@x.com", "password": "otraclave123", "rol": "contratista"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("contratista", response.data)
+
+    def test_crear_usuario_contratista_con_empresa(self):
+        token = self._token(self.admin)
+        response = self.client.post(
+            self.lista_url,
+            {
+                "username": "portal1",
+                "email": "portal1@x.com",
+                "password": "otraclave123",
+                "rol": "contratista",
+                "contratista": self.contratista.pk,
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        nuevo = Usuario.objects.get(username="portal1")
+        self.assertEqual(nuevo.perfil.rol, PerfilUsuario.Rol.CONTRATISTA)
+        self.assertEqual(nuevo.perfil.contratista_id, self.contratista.pk)
+        self.assertFalse(nuevo.perfil.es_interno)
+
+    def test_cambiar_rol_a_operador_limpia_la_empresa(self):
+        usuario = Usuario.objects.create_user("portal1", "portal1@x.com", "clave12345")
+        usuario.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        usuario.perfil.contratista = self.contratista
+        usuario.perfil.save(update_fields=["rol", "contratista"])
+
+        token = self._token(self.admin)
+        response = self.client.patch(
+            reverse("core:usuarios_detalle", args=[usuario.pk]),
+            {"rol": "operador"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.perfil.rol, PerfilUsuario.Rol.OPERADOR)
+        self.assertIsNone(usuario.perfil.contratista_id)
+        self.assertTrue(usuario.perfil.es_interno)
+
+    def test_login_de_usuario_contratista_incluye_su_empresa(self):
+        usuario = Usuario.objects.create_user("portal1", "portal1@x.com", "clave12345")
+        usuario.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        usuario.perfil.contratista = self.contratista
+        usuario.perfil.save(update_fields=["rol", "contratista"])
+
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": "portal1", "password": "clave12345"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["usuario"]["contratista_id"], self.contratista.pk)
+        self.assertEqual(response.data["usuario"]["contratista_nombre"], "SCEPSA")

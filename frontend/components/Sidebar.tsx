@@ -39,19 +39,22 @@ type Item = {
   label: string;
   icon: ComponentType<{ className?: string }>;
   adminOnly?: boolean;
+  // Secciones que no le competen al portal de contratistas — cámaras,
+  // notificaciones, indicadores comparativos entre empresas, etc.
+  soloPersonalInterno?: boolean;
 };
 
 const ITEMS: Item[] = [
-  { id: "tablero", label: "Tablero", icon: IconResumen },
-  { id: "camaras", label: "Cámaras", icon: IconCamara },
-  { id: "zonas", label: "Zonas y horarios", icon: IconZona },
-  { id: "alertas", label: "Alertas", icon: IconAlerta },
-  { id: "notificaciones", label: "Notificaciones", icon: IconNotificacion },
+  { id: "tablero", label: "Tablero", icon: IconResumen, soloPersonalInterno: true },
+  { id: "camaras", label: "Cámaras", icon: IconCamara, soloPersonalInterno: true },
+  { id: "zonas", label: "Zonas y horarios", icon: IconZona, soloPersonalInterno: true },
+  { id: "alertas", label: "Alertas", icon: IconAlerta, soloPersonalInterno: true },
+  { id: "notificaciones", label: "Notificaciones", icon: IconNotificacion, soloPersonalInterno: true },
   { id: "contratistas", label: "Contratistas", icon: IconContratista },
   { id: "declaracion-metodo", label: "Declaración de Método", icon: IconDeclaracionMetodo },
   { id: "autorizacion-ingreso", label: "Autorización de Ingreso", icon: IconAutorizacionIngreso },
-  { id: "funcionarios", label: "Funcionarios firmantes", icon: IconUsuarios },
-  { id: "indicadores-contratistas", label: "Indicadores", icon: IconIndicadores },
+  { id: "funcionarios", label: "Funcionarios firmantes", icon: IconUsuarios, soloPersonalInterno: true },
+  { id: "indicadores-contratistas", label: "Indicadores", icon: IconIndicadores, soloPersonalInterno: true },
   { id: "sistema", label: "Sistema", icon: IconSistema, adminOnly: true },
   { id: "usuarios", label: "Usuarios", icon: IconUsuarios, adminOnly: true },
   { id: "ayuda", label: "Ayuda", icon: IconAyuda },
@@ -82,7 +85,10 @@ export default function Sidebar({
   nombre,
   className = "",
 }: Props) {
-  const items = ITEMS.filter((item) => !item.adminOnly || rol === "administrador");
+  const items = ITEMS.filter(
+    (item) =>
+      (!item.adminOnly || rol === "administrador") && (!item.soloPersonalInterno || rol !== "contratista")
+  );
 
   return (
     <aside

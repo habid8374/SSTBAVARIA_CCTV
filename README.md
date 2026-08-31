@@ -115,6 +115,31 @@ frontend en Vercel — pero viven en el mismo repositorio.
     contratista y del interventor) — replicado a partir del formato Excel
     real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA — INCLUSIONES/
     EXCLUSIONES" de Bavaria.
+  - **Portal de contratistas** (tercer rol `PerfilUsuario.Rol.CONTRATISTA`,
+    mismo dashboard y mismo login — no es una app aparte): una cuenta por
+    empresa contratista (`PerfilUsuario.contratista`, FK a
+    `EmpresaContratista`), con el sidebar reducido a Contratistas (de solo
+    lectura, scopeada a su empresa), Declaración de Método (lectura y
+    escritura completas) y Autorización de Ingreso (de solo lectura); todo
+    lo demás (indicadores comparativos, cámaras, sistema, usuarios, etc.)
+    requiere ser personal interno
+    (`core.permissions.EsPersonalInterno`/`EsPersonalInternoOSoloLectura`).
+    Implementa el flujo que pidió el cliente: el contratista sube su
+    Declaración de Método y la deja en estado "Enviada" → se notifica por
+    correo al personal de SST/interventoría (reutiliza
+    `notificar_declaracion_pendiente`) → el interno la revisa y la aprueba o
+    la rechaza con un motivo obligatorio (`DeclaracionMetodoSerializer.
+    validate`, mismo patrón que el rechazo de radicaciones) → el contratista
+    ve el motivo, corrige y vuelve a poner "Enviada" — así las veces que
+    haga falta hasta la aprobación. Un usuario del portal nunca puede
+    aprobarse/rechazarse a sí mismo (bloqueado en `perform_create`/
+    `perform_update` de `DeclaracionMetodoListaDashboard`/`Detalle`), no
+    puede elegir otra empresa contratista (se fuerza server-side a la suya),
+    y al firmar solo puede hacerlo como "Supervisor de Seguridad del
+    Contratista" — las demás firmas quedan reservadas al personal interno de
+    Bavaria (`firmar_declaracion`). **Pendiente, fuera de este alcance**: el
+    cruce automático de la declaración contra las políticas de seguridad de
+    Bavaria — el cliente todavía no ha enviado ese documento/esas reglas.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada
@@ -188,7 +213,9 @@ Estos endpoints los usa el frontend — no el equipo local (que usa su propia
 API key, ver más abajo). El primer usuario (`createsuperuser`) recibe
 automáticamente el rol **Administrador**; todo usuario creado después desde
 el dashboard o el admin recibe **Operador** por defecto y el administrador
-le puede cambiar el rol.
+le puede cambiar el rol — incluido el tercer rol, **Contratista**, que exige
+elegir además la `EmpresaContratista` a la que representa
+(`PerfilUsuario.contratista`) — ver "Portal de contratistas" más arriba.
 
 - **`POST /api/auth/login/`** — `{"username", "password"}` → `{"token", "usuario"}`.
 - **`POST /api/auth/logout/`** — invalida el token actual (header `Authorization: Token <token>`).
@@ -283,13 +310,18 @@ en local (`DEBUG=True`), el login ya funciona con el superusuario que hayas
 creado ahí.
 
 - **Secciones del sidebar**: Tablero, Cámaras, Zonas y horarios, Alertas,
-  Contratistas, Declaración de Método — para todos los roles — y Usuarios,
-  solo para Administrador. Ninguna tiene URL propia; son secciones dentro de
-  `/dashboard` manejadas por estado.
+  Contratistas, Declaración de Método — para Administrador/Operador — y
+  Usuarios, solo para Administrador. Ninguna tiene URL propia; son secciones
+  dentro de `/dashboard` manejadas por estado. Un usuario con rol
+  Contratista ve un sidebar aparte, reducido a Contratistas (solo lectura),
+  Declaración de Método (lectura y escritura) y Autorización de Ingreso
+  (solo lectura) — ver "Portal de contratistas" más arriba.
 - **Roles**: el primer usuario (`createsuperuser`) es Administrador y ve la
   sección "Usuarios" en el sidebar; desde ahí crea al resto del equipo con
-  su rol (Administrador u Operador) — no hay pantalla de registro público.
-  Operador puede ver todo pero no editar zonas/reglas ni gestionar usuarios.
+  su rol (Administrador, Operador o Contratista) — no hay pantalla de
+  registro público. Operador puede ver todo pero no editar zonas/reglas ni
+  gestionar usuarios; Contratista solo ve y opera dentro de su propia
+  empresa.
 - **Editor de zonas**: en "Zonas y horarios", selecciona una cámara, sube su
   snapshot de referencia si no tiene, y haz clic sobre la imagen para ir
   agregando los vértices del polígono (mínimo 3). Las coordenadas se

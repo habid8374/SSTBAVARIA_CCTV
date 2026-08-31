@@ -59,6 +59,7 @@ function VigenciaBadge({ autorizacion }: { autorizacion: AutorizacionIngreso }) 
 }
 
 export default function AutorizacionIngresoView({ token, rol }: { token: string; rol: Rol | null }) {
+  const esInterno = rol !== "contratista";
   const [autorizaciones, setAutorizaciones] = useState<AutorizacionIngreso[] | null>(null);
   const [contratistas, setContratistas] = useState<EmpresaContratista[] | null>(null);
   const [seleccionada, setSeleccionada] = useState<AutorizacionIngreso | "nueva" | null>(null);
@@ -101,6 +102,7 @@ export default function AutorizacionIngresoView({ token, rol }: { token: string;
         token={token}
         autorizacionInicial={seleccionada === "nueva" ? null : seleccionada}
         contratistas={contratistas ?? []}
+        esInterno={esInterno}
         onVolver={() => {
           setSeleccionada(null);
           cargarAutorizaciones();
@@ -116,15 +118,17 @@ export default function AutorizacionIngresoView({ token, rol }: { token: string;
           Autorización de ingreso de personal contratista a la planta — vigencia, horario, área de trabajo,
           responsable SISO del grupo y la lista de trabajadores incluidos o excluidos del ingreso.
         </p>
-        <button
-          type="button"
-          onClick={() => setSeleccionada("nueva")}
-          disabled={!contratistas?.length}
-          title={!contratistas?.length ? "Registra primero una empresa contratista en “Contratistas”" : undefined}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          + Nueva autorización de ingreso
-        </button>
+        {esInterno && (
+          <button
+            type="button"
+            onClick={() => setSeleccionada("nueva")}
+            disabled={!contratistas?.length}
+            title={!contratistas?.length ? "Registra primero una empresa contratista en “Contratistas”" : undefined}
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            + Nueva autorización de ingreso
+          </button>
+        )}
       </div>
 
       {error && (
@@ -207,11 +211,13 @@ function FormularioAutorizacion({
   token,
   autorizacionInicial,
   contratistas,
+  esInterno,
   onVolver,
 }: {
   token: string;
   autorizacionInicial: AutorizacionIngreso | null;
   contratistas: EmpresaContratista[];
+  esInterno: boolean;
   onVolver: () => void;
 }) {
   const [autorizacion, setAutorizacion] = useState<AutorizacionIngreso | null>(autorizacionInicial);
@@ -334,7 +340,8 @@ function FormularioAutorizacion({
         )}
       </div>
 
-      <form onSubmit={guardar} className="mt-4 space-y-6">
+      <form onSubmit={guardar} className="mt-4">
+        <fieldset disabled={!esInterno} className="space-y-6">
         <div className="rounded-2xl border border-corp-border bg-white p-5">
           <h3 className="text-base font-semibold text-corp-navy">Datos generales</h3>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -492,15 +499,18 @@ function FormularioAutorizacion({
           </div>
         )}
 
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={enviando}
-            className="rounded-lg bg-corp-blue px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
-          >
-            {enviando ? "Guardando…" : "Guardar autorización"}
-          </button>
-        </div>
+        {esInterno && (
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={enviando}
+              className="rounded-lg bg-corp-blue px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+            >
+              {enviando ? "Guardando…" : "Guardar autorización"}
+            </button>
+          </div>
+        )}
+        </fieldset>
       </form>
     </div>
   );

@@ -91,7 +91,7 @@ function EstadoBadge({ estado }: { estado: EstadoDeclaracion }) {
   );
 }
 
-export default function DeclaracionMetodoView({ token }: { token: string; rol: Rol | null }) {
+export default function DeclaracionMetodoView({ token, rol }: { token: string; rol: Rol | null }) {
   const [declaraciones, setDeclaraciones] = useState<DeclaracionMetodo[] | null>(null);
   const [contratistas, setContratistas] = useState<EmpresaContratista[] | null>(null);
   const [catalogos, setCatalogos] = useState<Catalogos | null>(null);
@@ -120,6 +120,7 @@ export default function DeclaracionMetodoView({ token }: { token: string; rol: R
     return (
       <FormularioDeclaracion
         token={token}
+        rolUsuario={rol}
         declaracionInicial={seleccionada === "nueva" ? null : seleccionada}
         contratistas={contratistas ?? []}
         catalogos={catalogos}
@@ -239,17 +240,23 @@ function actividadVacia(orden: number): ActividadForm {
 
 function FormularioDeclaracion({
   token,
+  rolUsuario,
   declaracionInicial,
   contratistas,
   catalogos,
   onVolver,
 }: {
   token: string;
+  rolUsuario: Rol | null;
   declaracionInicial: DeclaracionMetodo | null;
   contratistas: EmpresaContratista[];
   catalogos: Catalogos;
   onVolver: () => void;
 }) {
+  const esContratista = rolUsuario === "contratista";
+  const estadosDisponibles = esContratista
+    ? ESTADOS.filter((e) => e.valor === "borrador" || e.valor === "enviada")
+    : ESTADOS;
   const [declaracion, setDeclaracion] = useState<DeclaracionMetodo | null>(declaracionInicial);
   const [contratistaId, setContratistaId] = useState(
     String(declaracionInicial?.contratista ?? contratistas[0]?.id ?? "")
@@ -264,7 +271,14 @@ function FormularioDeclaracion({
   );
   const [duracionDias, setDuracionDias] = useState(String(declaracionInicial?.duracion_dias ?? 1));
   const [descripcionTrabajo, setDescripcionTrabajo] = useState(declaracionInicial?.descripcion_trabajo ?? "");
-  const [estado, setEstado] = useState<EstadoDeclaracion>(declaracionInicial?.estado ?? "borrador");
+  // Un contratista que abre una declaración rechazada la está subsanando —
+  // el destino natural es "enviada", no dejar el selector en un valor
+  // ("rechazada") que ya no aparece entre sus opciones disponibles.
+  const estadoInicial =
+    esContratista && declaracionInicial && (declaracionInicial.estado === "aprobada" || declaracionInicial.estado === "rechazada")
+      ? "enviada"
+      : (declaracionInicial?.estado ?? "borrador");
+  const [estado, setEstado] = useState<EstadoDeclaracion>(estadoInicial);
   const [observaciones, setObservaciones] = useState(declaracionInicial?.observaciones ?? "");
   const [actividades, setActividades] = useState<ActividadForm[]>(
     declaracionInicial?.actividades.length
@@ -377,6 +391,20 @@ function FormularioDeclaracion({
         )}
       </div>
 
+      {declaracion?.estado === "rechazada" && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p className="font-semibold">Esta declaración fue rechazada.</p>
+          {declaracion.observaciones ? (
+            <p className="mt-1">Motivo: {declaracion.observaciones}</p>
+          ) : (
+            <p className="mt-1">No se registró un motivo.</p>
+          )}
+          {esContratista && (
+            <p className="mt-1">Corrige lo que haga falta y cambia el estado a “Enviada” para volver a mandarla a revisión.</p>
+          )}
+        </div>
+      )}
+
       <form onSubmit={guardar} className="mt-4 space-y-6">
         <div className="rounded-2xl border border-corp-border bg-white p-5">
           <h3 className="text-base font-semibold text-corp-navy">Datos generales</h3>
@@ -384,9 +412,10 @@ function FormularioDeclaracion({
             <Campo label="Empresa contratista">
               <select
                 required
+                disabled={esContratista}
                 value={contratistaId}
                 onChange={(e) => setContratistaId(e.target.value)}
-                className={INPUT}
+                className={`${INPUT} disabled:bg-zinc-100 disabled:text-corp-muted`}
               >
                 <option value="" disabled>
                   Selecciona una empresa
@@ -441,12 +470,17 @@ function FormularioDeclaracion({
             </Campo>
             <Campo label="Estado">
               <select value={estado} onChange={(e) => setEstado(e.target.value as EstadoDeclaracion)} className={INPUT}>
-                {ESTADOS.map((e) => (
+                {estadosDisponibles.map((e) => (
                   <option key={e.valor} value={e.valor}>
                     {e.etiqueta}
                   </option>
                 ))}
               </select>
+              {esContratista && (
+                <span className="block text-xs text-corp-muted">
+                  Solo el personal de SST/interventoría puede aprobar o rechazar.
+                </span>
+              )}
             </Campo>
           </div>
           <div className="mt-4">
@@ -662,7 +696,16 @@ function FormularioDeclaracion({
       </form>
 
       {declaracion && (
-        <PanelFirmas key={declaracion.id} token={token} declaracion={declaracion} rolesFirma={catalogos.roles_firma} />
+        <PanelFirmas
+          key={declaracion.id}
+          token={token}
+          declaracion={declaracion}
+          rolesFirma={
+            esContratista
+              ? catalogos.roles_firma.filter((r) => r.clave === "supervisor_contratista")
+              : catalogos.roles_firma
+          }
+        />
       )}
     </div>
   );

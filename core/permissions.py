@@ -49,3 +49,38 @@ class EsAdministradorParaEliminar(BasePermission):
         if request.method != "DELETE":
             return True
         return EsAdministrador().has_permission(request, view)
+
+
+class EsPersonalInterno(BasePermission):
+    """Solo Administrador u Operador — nunca Contratista. Para secciones que
+    no le competen al portal de contratistas: cámaras, sistema, usuarios,
+    padrón de funcionarios firmantes, indicadores comparativos entre
+    empresas y auditoría."""
+
+    message = "Esta sección es solo para el personal de SST/interventoría."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        perfil = getattr(user, "perfil", None)
+        return bool(perfil and perfil.es_interno)
+
+
+class EsPersonalInternoOSoloLectura(BasePermission):
+    """Cualquier usuario autenticado puede leer (GET); crear/editar requiere
+    ser personal interno (Administrador u Operador) — para datos que un
+    usuario del portal de contratistas puede consultar sobre su propia
+    empresa (queryset ya filtrado en la vista) pero no modificar."""
+
+    message = "Esta acción es solo para el personal de SST/interventoría."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return EsPersonalInterno().has_permission(request, view)

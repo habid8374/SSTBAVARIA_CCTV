@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Empresa
+from core.models import Empresa, PerfilUsuario
 
 from .models import (
     ActividadMetodo,
@@ -1279,3 +1279,181 @@ class AutorizacionIngresoTests(ApiTestsBase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta["Content-Type"], "application/pdf")
         self.assertGreater(len(respuesta.content), 500)
+
+
+class PortalContratistaTests(ApiTestsBase):
+    """El rol Contratista ve y opera solo dentro de su propia empresa: lee
+    su contratista/trabajadores/radicaciones/autorizaciones, pero solo
+    Declaración de Método le permite escribir — y únicamente para enviar o
+    subsanar, nunca para aprobarse o rechazarse a sí mismo."""
+
+    def setUp(self):
+        super().setUp()
+        self.otro_contratista = EmpresaContratista.objects.create(empresa=self.empresa, nombre="OTRA SAS")
+        self.otro_trabajador = Trabajador.objects.create(
+            contratista=self.otro_contratista, nombres="Pedro", apellidos="Ruiz", documento="1122334455"
+        )
+        self.portal_user = Usuario.objects.create_user("portal_scepsa", "portal@scepsa.com", "clave12345")
+        self.portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        self.portal_user.perfil.contratista = self.contratista
+        self.portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+    def test_lista_empresas_solo_muestra_la_propia(self):
+        response = self.client.get(
+            reverse("contratistas:empresas_lista"), **self._auth(self.portal_user)
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [fila["id"] for fila in response.data]
+        self.assertEqual(ids, [self.contratista.pk])
+
+    def test_no_puede_ver_trabajador_de_otra_empresa(self):
+        url = reverse("contratistas:trabajadores_detalle", args=[self.otro_trabajador.pk])
+        response = self.client.get(url, **self._auth(self.portal_user))
+        self.assertEqual(response.status_code, 404)
+
+    def test_lista_trabajadores_ignora_filtro_contratista_ajeno(self):
+        response = self.client.get(
+            reverse("contratistas:trabajadores_lista"),
+            {"contratista": self.otro_contratista.pk},
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [fila["id"] for fila in response.data]
+        self.assertEqual(ids, [self.trabajador.pk])
+
+    def test_no_puede_crear_trabajador(self):
+        response = self.client.post(
+            reverse("contratistas:trabajadores_lista"),
+            {"contratista": self.contratista.pk, "nombres": "X", "apellidos": "Y", "documento": "1"},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_no_puede_aprobar_radicacion(self):
+        radicacion = RadicacionSeguridadSocial.objects.create(trabajador=self.trabajador, anio=2026, mes="ENERO")
+        response = self.client.post(
+            reverse("contratistas:radicaciones_aprobar", args=[radicacion.pk]),
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_no_puede_ver_indicadores_dashboard(self):
+        response = self.client.get(
+            reverse("contratistas:indicadores_dashboard"), **self._auth(self.portal_user)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_no_puede_gestionar_funcionarios(self):
+        response = self.client.get(reverse("contratistas:funcionarios_lista"), **self._auth(self.portal_user))
+        self.assertEqual(response.status_code, 403)
+
+    def test_puede_crear_declaracion_enviada_para_su_empresa(self):
+        payload = {
+            "contratista": self.otro_contratista.pk,  # intenta suplantar otra empresa
+            "planta_area": "Tapas",
+            "fecha_elaboracion": "2026-07-11",
+            "duracion_dias": 10,
+            "descripcion_trabajo": "Mantenimiento",
+            "estado": "enviada",
+        }
+        response = self.client.post(
+            reverse("contratistas:declaraciones_lista"),
+            payload,
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["contratista"], self.contratista.pk)
+        self.assertEqual(response.data["estado"], "enviada")
+
+    def test_no_puede_crear_declaracion_ya_rechazada(self):
+        """"aprobada" nunca es alcanzable al crear (exige firmas, que no
+        existen aún) — la transición que sí hay que bloquear explícitamente
+        es "rechazada", que solo exige un motivo."""
+        payload = {
+            "contratista": self.contratista.pk,
+            "planta_area": "Tapas",
+            "fecha_elaboracion": "2026-07-11",
+            "duracion_dias": 10,
+            "descripcion_trabajo": "Mantenimiento",
+            "estado": "rechazada",
+            "observaciones": "No cumple.",
+        }
+        response = self.client.post(
+            reverse("contratistas:declaraciones_lista"),
+            payload,
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_no_puede_aprobarse_a_si_mismo_al_editar(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+        declaracion.refresh_from_db()
+        self.assertEqual(declaracion.estado, "borrador")
+
+    def test_puede_subsanar_y_reenviar_declaracion_rechazada(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+            estado=DeclaracionMetodo.Estado.RECHAZADA,
+            observaciones="Falta el permiso de trabajo en altura.",
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"descripcion_trabajo": "Instalación de pórtico con permiso adjunto", "estado": "enviada"},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["estado"], "enviada")
+
+    def test_no_ve_declaracion_de_otra_empresa(self):
+        declaracion_ajena = DeclaracionMetodo.objects.create(
+            contratista=self.otro_contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Otra obra",
+        )
+        response = self.client.get(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion_ajena.pk]),
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_solo_puede_firmar_como_supervisor_contratista(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.post(
+            reverse("contratistas:declaraciones_firmar", args=[declaracion.pk]),
+            {"rol": "delegado_abi", "nombre_firmante": "Alguien", "consiento_firma": True},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.post(
+            reverse("contratistas:declaraciones_firmar", args=[declaracion.pk]),
+            {"rol": "supervisor_contratista", "nombre_firmante": "Ana", "consiento_firma": True},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 201, response.data)

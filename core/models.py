@@ -31,11 +31,21 @@ class PerfilUsuario(models.Model):
     class Rol(models.TextChoices):
         ADMINISTRADOR = "administrador", "Administrador"
         OPERADOR = "operador", "Operador"
+        CONTRATISTA = "contratista", "Contratista"
 
     usuario = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="perfil"
     )
     rol = models.CharField(max_length=20, choices=Rol.choices, default=Rol.OPERADOR)
+    contratista = models.ForeignKey(
+        "contratistas.EmpresaContratista",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usuarios_portal",
+        help_text="Solo aplica para el rol Contratista: la empresa a la que representa este usuario "
+        "en el portal — define qué datos puede ver y editar.",
+    )
 
     class Meta:
         verbose_name = "perfil de usuario"
@@ -43,6 +53,11 @@ class PerfilUsuario(models.Model):
 
     def __str__(self):
         return f"{self.usuario.username} ({self.get_rol_display()})"
+
+    @property
+    def es_interno(self):
+        """Personal de SST/interventoría — Administrador u Operador, nunca Contratista."""
+        return self.rol in (self.Rol.ADMINISTRADOR, self.Rol.OPERADOR)
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)

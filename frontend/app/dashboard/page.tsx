@@ -55,6 +55,9 @@ export default function DashboardPage() {
         guardarSesion({ token: sesion.token, nombre: data.nombre, rol: data.rol });
         setToken(sesion.token);
         setUsuario(data);
+        if (data.rol === "contratista") {
+          setSeccion("declaracion-metodo");
+        }
       })
       .catch(() => {
         borrarSesion();

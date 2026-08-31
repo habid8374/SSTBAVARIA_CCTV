@@ -293,6 +293,13 @@ class DeclaracionMetodoSerializer(serializers.ModelSerializer):
                         )
                     }
                 )
+        if datos.get("estado") == DeclaracionMetodo.Estado.RECHAZADA:
+            observaciones = (
+                datos.get("observaciones")
+                or (self.instance.observaciones if self.instance is not None else "")
+            ).strip()
+            if not observaciones:
+                raise serializers.ValidationError({"observaciones": "Hay que indicar el motivo del rechazo."})
         return datos
 
     def create(self, validated_data):

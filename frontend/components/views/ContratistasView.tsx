@@ -41,6 +41,7 @@ const MESES = [
 
 export default function ContratistasView({ token, rol }: { token: string; rol: Rol | null }) {
   const esAdmin = rol === "administrador";
+  const esInterno = rol !== "contratista";
   const [contratistas, setContratistas] = useState<EmpresaContratista[] | null>(null);
   const [seleccionada, setSeleccionada] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,13 +93,15 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
           >
             {exportando ? "Exportando…" : "Exportar radicaciones (Excel)"}
           </button>
-          <button
-            type="button"
-            onClick={() => setFormulario("nueva")}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
-          >
-            + Nueva empresa contratista
-          </button>
+          {esInterno && (
+            <button
+              type="button"
+              onClick={() => setFormulario("nueva")}
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+            >
+              + Nueva empresa contratista
+            </button>
+          )}
         </div>
       </div>
 
@@ -168,6 +171,7 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
                 token={token}
                 contratista={contratista}
                 esAdmin={esAdmin}
+                esInterno={esInterno}
                 onEditarContratista={() => setFormulario(contratista)}
                 onCambioTrabajadores={cargar}
               />
@@ -231,12 +235,14 @@ function PanelContratista({
   token,
   contratista,
   esAdmin,
+  esInterno,
   onEditarContratista,
   onCambioTrabajadores,
 }: {
   token: string;
   contratista: EmpresaContratista;
   esAdmin: boolean;
+  esInterno: boolean;
   onEditarContratista: () => void;
   onCambioTrabajadores: () => void;
 }) {
@@ -291,13 +297,15 @@ function PanelContratista({
       <div>
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-semibold text-corp-navy">Trabajadores</h4>
-          <button
-            type="button"
-            onClick={() => setFormulario("nuevo")}
-            className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
-          >
-            + Nuevo trabajador
-          </button>
+          {esInterno && (
+            <button
+              type="button"
+              onClick={() => setFormulario("nuevo")}
+              className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
+            >
+              + Nuevo trabajador
+            </button>
+          )}
         </div>
 
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
@@ -349,13 +357,15 @@ function PanelContratista({
                       >
                         {seleccionado === t.id ? "Ocultar" : "Ver radicaciones"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormulario(t)}
-                        className="text-xs font-semibold text-corp-blue hover:underline"
-                      >
-                        Editar
-                      </button>
+                      {esInterno && (
+                        <button
+                          type="button"
+                          onClick={() => setFormulario(t)}
+                          className="text-xs font-semibold text-corp-blue hover:underline"
+                        >
+                          Editar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -365,7 +375,7 @@ function PanelContratista({
         )}
       </div>
 
-      {trabajador && <PanelRadicaciones token={token} trabajador={trabajador} />}
+      {trabajador && <PanelRadicaciones token={token} trabajador={trabajador} esInterno={esInterno} />}
 
       {formulario && catalogos && (
         <FormularioTrabajador
@@ -385,7 +395,15 @@ function PanelContratista({
   );
 }
 
-function PanelRadicaciones({ token, trabajador }: { token: string; trabajador: Trabajador }) {
+function PanelRadicaciones({
+  token,
+  trabajador,
+  esInterno,
+}: {
+  token: string;
+  trabajador: Trabajador;
+  esInterno: boolean;
+}) {
   const [radicaciones, setRadicaciones] = useState<RadicacionSeguridadSocial[] | null>(null);
   const [formulario, setFormulario] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -426,13 +444,15 @@ function PanelRadicaciones({ token, trabajador }: { token: string; trabajador: T
         <h4 className="text-sm font-semibold text-corp-navy">
           Seguridad social — {trabajador.apellidos} {trabajador.nombres}
         </h4>
-        <button
-          type="button"
-          onClick={() => setFormulario(true)}
-          className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
-        >
-          + Radicar
-        </button>
+        {esInterno && (
+          <button
+            type="button"
+            onClick={() => setFormulario(true)}
+            className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
+          >
+            + Radicar
+          </button>
+        )}
       </div>
 
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
@@ -466,7 +486,7 @@ function PanelRadicaciones({ token, trabajador }: { token: string; trabajador: T
             <div className="flex shrink-0 items-center gap-3">
               <VencimientoBadge radicacion={r} />
               <EstadoBadge estado={r.estado} />
-              {r.estado === "pendiente" && (
+              {esInterno && r.estado === "pendiente" && (
                 <>
                   <button
                     type="button"

@@ -25,6 +25,8 @@ def _serializar_usuario(user):
         "email": user.email,
         "is_staff": user.is_staff,
         "rol": perfil.rol if perfil else None,
+        "contratista_id": perfil.contratista_id if perfil else None,
+        "contratista_nombre": perfil.contratista.nombre if perfil and perfil.contratista else None,
     }
 
 

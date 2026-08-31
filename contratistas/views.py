@@ -5,11 +5,18 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.permissions import EsAdministrador, EsAdministradorOSoloLectura, EsAdministradorParaEliminar
+from core.models import PerfilUsuario
+from core.permissions import (
+    EsAdministrador,
+    EsAdministradorOSoloLectura,
+    EsAdministradorParaEliminar,
+    EsPersonalInterno,
+    EsPersonalInternoOSoloLectura,
+)
 
 from .auditoria import capturar_snapshot, registrar_auditoria
 from .models import (
@@ -72,6 +79,16 @@ class AuditoriaMixin:
         instance.delete()
 
 
+def _contratista_de(request):
+    """El id de la EmpresaContratista del usuario autenticado, si su rol es
+    Contratista (portal externo) — o None para personal interno, que ve y
+    filtra sin restricción."""
+    perfil = getattr(request.user, "perfil", None)
+    if perfil and perfil.rol == PerfilUsuario.Rol.CONTRATISTA:
+        return perfil.contratista_id
+    return None
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def catalogos(request):
@@ -90,6 +107,9 @@ def indicadores(request):
     dias_alerta = ConfiguracionAlertas.obtener().dias_alerta_vencimiento
     limite_por_vencer = hoy + timedelta(days=dias_alerta)
     radicaciones = RadicacionSeguridadSocial.objects.exclude(estado=RadicacionSeguridadSocial.Estado.RECHAZADA)
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        radicaciones = radicaciones.filter(trabajador__contratista_id=contratista_id)
     return Response(
         {
             "radicaciones_vencidas": radicaciones.filter(fecha_vencimiento__lt=hoy).count(),
@@ -119,7 +139,7 @@ def _ultimos_meses(hoy, cantidad=6):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([EsPersonalInterno])
 def indicadores_dashboard(request):
     """Panel de indicadores tipo Power BI para Contratistas y Declaración de
     Método: cumplimiento por contratista, estado de declaraciones, riesgo
@@ -218,7 +238,7 @@ def indicadores_dashboard(request):
 
 class FuncionarioListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
     serializer_class = FuncionarioSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInterno]
 
     def get_queryset(self):
         qs = Funcionario.objects.all()
@@ -234,7 +254,7 @@ class FuncionarioListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
 class FuncionarioDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Funcionario.objects.all()
     serializer_class = FuncionarioSerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInterno, EsAdministradorParaEliminar]
 
 
 # --- Motor de reglas (cursos, permisos de trabajo, días de alerta) ---
@@ -243,25 +263,25 @@ class FuncionarioDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
 class CursoSafetyAcademyListaDashboard(generics.ListCreateAPIView):
     queryset = CursoSafetyAcademy.objects.all()
     serializer_class = CursoSafetyAcademySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInterno]
 
 
 class CursoSafetyAcademyDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = CursoSafetyAcademy.objects.all()
     serializer_class = CursoSafetyAcademySerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInterno, EsAdministradorParaEliminar]
 
 
 class PermisoTrabajoListaDashboard(generics.ListCreateAPIView):
     queryset = PermisoTrabajo.objects.all()
     serializer_class = PermisoTrabajoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInterno]
 
 
 class PermisoTrabajoDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = PermisoTrabajo.objects.all()
     serializer_class = PermisoTrabajoSerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInterno, EsAdministradorParaEliminar]
 
 
 class ConfiguracionAlertasDetalle(generics.RetrieveUpdateAPIView):
@@ -269,7 +289,7 @@ class ConfiguracionAlertasDetalle(generics.RetrieveUpdateAPIView):
     planilla, editable por un Administrador en vez de fijo en el código."""
 
     serializer_class = ConfiguracionAlertasSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInterno, EsAdministradorOSoloLectura]
 
     def get_object(self):
         return ConfiguracionAlertas.obtener()
@@ -280,7 +300,14 @@ class ConfiguracionAlertasDetalle(generics.RetrieveUpdateAPIView):
 
 class EmpresaContratistaListaDashboard(generics.ListCreateAPIView):
     queryset = EmpresaContratista.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInternoOSoloLectura]
+
+    def get_queryset(self):
+        qs = EmpresaContratista.objects.all()
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(pk=contratista_id)
+        return qs
 
     def get_serializer_class(self):
         return EmpresaContratistaCrearSerializer if self.request.method == "POST" else EmpresaContratistaSerializer
@@ -297,9 +324,15 @@ class EmpresaContratistaListaDashboard(generics.ListCreateAPIView):
 
 
 class EmpresaContratistaDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
-    queryset = EmpresaContratista.objects.all()
     serializer_class = EmpresaContratistaSerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInternoOSoloLectura, EsAdministradorParaEliminar]
+
+    def get_queryset(self):
+        qs = EmpresaContratista.objects.all()
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(pk=contratista_id)
+        return qs
 
 
 # --- Trabajadores ---
@@ -307,20 +340,30 @@ class EmpresaContratistaDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAP
 
 class TrabajadorListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
     serializer_class = TrabajadorSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInternoOSoloLectura]
 
     def get_queryset(self):
         qs = Trabajador.objects.select_related("contratista").prefetch_related("radicaciones")
-        contratista_id = self.request.query_params.get("contratista")
-        if contratista_id:
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
             qs = qs.filter(contratista_id=contratista_id)
+        else:
+            filtro = self.request.query_params.get("contratista")
+            if filtro:
+                qs = qs.filter(contratista_id=filtro)
         return qs
 
 
 class TrabajadorDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
-    queryset = Trabajador.objects.select_related("contratista")
     serializer_class = TrabajadorSerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInternoOSoloLectura, EsAdministradorParaEliminar]
+
+    def get_queryset(self):
+        qs = Trabajador.objects.select_related("contratista")
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(contratista_id=contratista_id)
+        return qs
 
 
 # --- Radicaciones de seguridad social ---
@@ -350,10 +393,13 @@ def _filtrar_radicaciones(qs, params):
 
 class RadicacionListaDashboard(generics.ListCreateAPIView):
     serializer_class = RadicacionSeguridadSocialSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInternoOSoloLectura]
 
     def get_queryset(self):
         qs = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista").order_by("-radicada_en")
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(trabajador__contratista_id=contratista_id)
         return _filtrar_radicaciones(qs, self.request.query_params)
 
     def perform_create(self, serializer):
@@ -364,9 +410,15 @@ class RadicacionListaDashboard(generics.ListCreateAPIView):
 
 
 class RadicacionDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
-    queryset = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista")
     serializer_class = RadicacionSeguridadSocialSerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInternoOSoloLectura, EsAdministradorParaEliminar]
+
+    def get_queryset(self):
+        qs = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista")
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(trabajador__contratista_id=contratista_id)
+        return qs
 
 
 @api_view(["GET"])
@@ -379,6 +431,9 @@ def radicaciones_exportar(request):
     from openpyxl import Workbook
 
     qs = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista").order_by("-radicada_en")
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(trabajador__contratista_id=contratista_id)
     qs = _filtrar_radicaciones(qs, request.query_params)
 
     libro = Workbook()
@@ -446,13 +501,13 @@ def _decidir_radicacion(request, pk, nuevo_estado):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([EsPersonalInterno])
 def aprobar_radicacion(request, pk):
     return _decidir_radicacion(request, pk, RadicacionSeguridadSocial.Estado.APROBADA)
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([EsPersonalInterno])
 def rechazar_radicacion(request, pk):
     return _decidir_radicacion(request, pk, RadicacionSeguridadSocial.Estado.RECHAZADA)
 
@@ -466,22 +521,53 @@ class DeclaracionMetodoListaDashboard(AuditoriaMixin, generics.ListCreateAPIView
 
     def get_queryset(self):
         qs = DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas")
-        contratista_id = self.request.query_params.get("contratista")
-        if contratista_id:
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
             qs = qs.filter(contratista_id=contratista_id)
+        else:
+            filtro = self.request.query_params.get("contratista")
+            if filtro:
+                qs = qs.filter(contratista_id=filtro)
         estado = self.request.query_params.get("estado")
         if estado:
             qs = qs.filter(estado=estado)
         return qs
 
+    def perform_create(self, serializer):
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            estado = serializer.validated_data.get("estado")
+            if estado in (DeclaracionMetodo.Estado.APROBADA, DeclaracionMetodo.Estado.RECHAZADA):
+                raise PermissionDenied("Solo el personal de SST/interventoría puede aprobar o rechazar.")
+            serializer.validated_data["contratista_id"] = contratista_id
+            serializer.validated_data.pop("contratista", None)
+        instancia = serializer.save()
+        registrar_auditoria(self.request.user, instancia, RegistroAuditoria.Accion.CREADO)
+        if instancia.estado == DeclaracionMetodo.Estado.ENVIADA:
+            notificar_declaracion_pendiente(instancia)
+
 
 class DeclaracionMetodoDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
-    queryset = DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas")
     serializer_class = DeclaracionMetodoSerializer
     permission_classes = [EsAdministradorParaEliminar]
 
+    def get_queryset(self):
+        qs = DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas")
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(contratista_id=contratista_id)
+        return qs
+
     def perform_update(self, serializer):
         estado_anterior = serializer.instance.estado
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            nuevo_estado = serializer.validated_data.get("estado", estado_anterior)
+            if nuevo_estado != estado_anterior and nuevo_estado in (
+                DeclaracionMetodo.Estado.APROBADA,
+                DeclaracionMetodo.Estado.RECHAZADA,
+            ):
+                raise PermissionDenied("Solo el personal de SST/interventoría puede aprobar o rechazar.")
         snapshot_anterior = capturar_snapshot(serializer.instance)
         declaracion = serializer.save()
         registrar_auditoria(self.request.user, declaracion, RegistroAuditoria.Accion.ACTUALIZADO, snapshot_anterior)
@@ -498,13 +584,17 @@ class DeclaracionMetodoDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPI
 
 class AutorizacionIngresoListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
     serializer_class = AutorizacionIngresoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInternoOSoloLectura]
 
     def get_queryset(self):
         qs = AutorizacionIngreso.objects.select_related("contratista").prefetch_related("trabajadores__trabajador")
-        contratista_id = self.request.query_params.get("contratista")
-        if contratista_id:
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
             qs = qs.filter(contratista_id=contratista_id)
+        else:
+            filtro = self.request.query_params.get("contratista")
+            if filtro:
+                qs = qs.filter(contratista_id=filtro)
         estado = self.request.query_params.get("estado")
         if estado:
             qs = qs.filter(estado=estado)
@@ -512,9 +602,15 @@ class AutorizacionIngresoListaDashboard(AuditoriaMixin, generics.ListCreateAPIVi
 
 
 class AutorizacionIngresoDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
-    queryset = AutorizacionIngreso.objects.select_related("contratista").prefetch_related("trabajadores__trabajador")
     serializer_class = AutorizacionIngresoSerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInternoOSoloLectura, EsAdministradorParaEliminar]
+
+    def get_queryset(self):
+        qs = AutorizacionIngreso.objects.select_related("contratista").prefetch_related("trabajadores__trabajador")
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(contratista_id=contratista_id)
+        return qs
 
 
 @api_view(["POST"])
@@ -525,11 +621,15 @@ def firmar_declaracion(request, pk):
     cliente nunca puede suplantar a otra persona — y queda registrada la
     huella del documento en ese momento, para poder detectar cambios
     posteriores (ver FirmaMetodo.documento_modificado_despues_de_firmar)."""
-    declaracion = get_object_or_404(
-        DeclaracionMetodo.objects.prefetch_related("actividades"), pk=pk
-    )
+    qs = DeclaracionMetodo.objects.prefetch_related("actividades")
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    declaracion = get_object_or_404(qs, pk=pk)
     entrada = FirmaMetodoSerializer(data=request.data)
     entrada.is_valid(raise_exception=True)
+    if contratista_id is not None and entrada.validated_data["rol"] != FirmaMetodo.Rol.SUPERVISOR_CONTRATISTA:
+        raise PermissionDenied("El portal del contratista solo puede firmar como Supervisor de Seguridad del Contratista.")
     firma, _ = FirmaMetodo.objects.update_or_create(
         declaracion=declaracion,
         rol=entrada.validated_data["rol"],
@@ -571,9 +671,11 @@ def declaracion_pdf(request, pk):
     from django.template.loader import render_to_string
     from xhtml2pdf import pisa
 
-    declaracion = get_object_or_404(
-        DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas"), pk=pk
-    )
+    qs = DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas")
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    declaracion = get_object_or_404(qs, pk=pk)
 
     actividades = []
     for actividad in declaracion.actividades.all():
@@ -623,12 +725,13 @@ def autorizacion_ingreso_pdf(request, pk):
     from django.template.loader import render_to_string
     from xhtml2pdf import pisa
 
-    autorizacion = get_object_or_404(
-        AutorizacionIngreso.objects.select_related("contratista", "declaracion").prefetch_related(
-            "trabajadores__trabajador"
-        ),
-        pk=pk,
+    qs = AutorizacionIngreso.objects.select_related("contratista", "declaracion").prefetch_related(
+        "trabajadores__trabajador"
     )
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    autorizacion = get_object_or_404(qs, pk=pk)
     lineas = list(autorizacion.trabajadores.all())
     incluidos = [linea for linea in lineas if linea.incluido]
     excluidos = [linea for linea in lineas if not linea.incluido]

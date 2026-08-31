@@ -51,7 +51,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export type Rol = "administrador" | "operador";
+export type Rol = "administrador" | "operador" | "contratista";
 
 export type Usuario = {
   id: number;
@@ -60,6 +60,8 @@ export type Usuario = {
   email: string;
   is_staff: boolean;
   rol: Rol | null;
+  contratista_id: number | null;
+  contratista_nombre: string | null;
 };
 
 export type LoginResponse = {
@@ -75,6 +77,8 @@ export type UsuarioGestionado = {
   email: string;
   is_active: boolean;
   rol: Rol;
+  contratista: number | null;
+  contratista_nombre: string | null;
   date_joined: string;
 };
 
@@ -85,6 +89,7 @@ export type NuevoUsuario = {
   first_name?: string;
   last_name?: string;
   rol: Rol;
+  contratista?: number | null;
 };
 
 export type Resumen = {
@@ -136,7 +141,9 @@ export function crearUsuario(token: string, datos: NuevoUsuario): Promise<Usuari
 export function actualizarUsuario(
   token: string,
   id: number,
-  cambios: Partial<Pick<UsuarioGestionado, "rol" | "is_active" | "first_name" | "last_name" | "email">>
+  cambios: Partial<
+    Pick<UsuarioGestionado, "rol" | "is_active" | "first_name" | "last_name" | "email" | "contratista">
+  >
 ): Promise<UsuarioGestionado> {
   return request<UsuarioGestionado>(`/api/auth/usuarios/${id}/`, {
     method: "PATCH",
