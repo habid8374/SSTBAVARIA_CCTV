@@ -56,11 +56,28 @@ class ZonaActivaSerializer(serializers.ModelSerializer):
 
 
 class CamaraActivaSerializer(serializers.ModelSerializer):
+    """Lo que consume el equipo local (obtener_reglas_activas): además de las
+    credenciales, incluye la URL RTSP ya resuelta y el snapshot de referencia
+    — con esto y las zonas (en coordenadas de píxel de ese snapshot) el
+    equipo local tiene todo lo necesario para conectarse, escalar las
+    coordenadas de sus detecciones y reportar eventos."""
+
     zonas = serializers.SerializerMethodField()
+    rtsp_url = serializers.CharField(source="rtsp_url_efectiva", read_only=True)
 
     class Meta:
         model = Camara
-        fields = ["id", "nombre", "ip", "puerto_onvif", "usuario_onvif", "password_onvif", "zonas"]
+        fields = [
+            "id",
+            "nombre",
+            "ip",
+            "puerto_onvif",
+            "usuario_onvif",
+            "password_onvif",
+            "rtsp_url",
+            "snapshot_referencia",
+            "zonas",
+        ]
 
     def get_zonas(self, camara):
         zonas_activas = camara.zonas.filter(activa=True).prefetch_related("reglas")
@@ -159,6 +176,7 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
             "puerto_onvif",
             "usuario_onvif",
             "password_onvif",
+            "rtsp_url",
             "ubicacion",
             "activa",
             "snapshot_referencia",
@@ -187,6 +205,7 @@ class CamaraCrearSerializer(serializers.ModelSerializer):
             "puerto_onvif",
             "usuario_onvif",
             "password_onvif",
+            "rtsp_url",
             "ubicacion",
             "activa",
         ]

@@ -19,6 +19,16 @@ class Camara(models.Model):
     puerto_onvif = models.PositiveIntegerField("puerto ONVIF", default=80)
     usuario_onvif = models.CharField("usuario ONVIF", max_length=100, blank=True)
     password_onvif = models.CharField("contraseña ONVIF", max_length=100, blank=True)
+    rtsp_url = models.CharField(
+        "URL RTSP",
+        max_length=500,
+        blank=True,
+        help_text=(
+            "URL completa del stream RTSP (con usuario/contraseña si aplica). "
+            "Si se deja vacío, el equipo local usa el patrón estándar de Dahua "
+            "con la IP y las credenciales ONVIF de arriba — ver Camara.rtsp_url_efectiva."
+        ),
+    )
     ubicacion = models.CharField(max_length=255, blank=True, help_text="Descripción del punto donde está instalada")
     snapshot_referencia = models.ImageField(
         "snapshot de referencia",
@@ -38,6 +48,18 @@ class Camara(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.ip})"
+
+    @property
+    def rtsp_url_efectiva(self):
+        """URL RTSP a usar por el equipo local: la explícita si se configuró,
+        o si no el patrón estándar de Dahua (confirmado por investigación de
+        hardware — ver CLAUDE_CAMARAS.md) con la IP y credenciales ONVIF.
+        subtype=1 (substream) por defecto: menor resolución/bitrate, más
+        liviano para detección en tiempo real que el canal principal."""
+        if self.rtsp_url:
+            return self.rtsp_url
+        credenciales = f"{self.usuario_onvif}:{self.password_onvif}@" if self.usuario_onvif else ""
+        return f"rtsp://{credenciales}{self.ip}:554/cam/realmonitor?channel=1&subtype=1"
 
 
 class EquipoLocal(models.Model):

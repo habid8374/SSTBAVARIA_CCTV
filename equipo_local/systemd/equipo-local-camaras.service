@@ -1,0 +1,17 @@
+[Unit]
+Description=SST Bavaria - Equipo local de camaras IA
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Ajusta el usuario y las rutas a como quede instalado en el PC del NVR/DVR.
+User=camaras
+WorkingDirectory=/opt/sstbavaria-camaras
+EnvironmentFile=/opt/sstbavaria-camaras/.env
+ExecStart=/opt/sstbavaria-camaras/venv/bin/python -m equipo_local.main
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

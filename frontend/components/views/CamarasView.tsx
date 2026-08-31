@@ -227,6 +227,7 @@ function FormularioCamara({
   const [puertoOnvif, setPuertoOnvif] = useState(String(camara?.puerto_onvif ?? 80));
   const [usuarioOnvif, setUsuarioOnvif] = useState(camara?.usuario_onvif ?? "");
   const [passwordOnvif, setPasswordOnvif] = useState(camara?.password_onvif ?? "");
+  const [rtspUrl, setRtspUrl] = useState(camara?.rtsp_url ?? "");
   const [ubicacion, setUbicacion] = useState(camara?.ubicacion ?? "");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -241,6 +242,7 @@ function FormularioCamara({
       puerto_onvif: Number(puertoOnvif) || 80,
       usuario_onvif: usuarioOnvif,
       password_onvif: passwordOnvif,
+      rtsp_url: rtspUrl,
       ubicacion,
     };
     try {
@@ -312,6 +314,14 @@ function FormularioCamara({
               type="password"
               value={passwordOnvif}
               onChange={(e) => setPasswordOnvif(e.target.value)}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+          <Campo label="URL RTSP (opcional)">
+            <input
+              value={rtspUrl}
+              onChange={(e) => setRtspUrl(e.target.value)}
+              placeholder="Vacío = usa el patrón estándar de Dahua con la IP y credenciales de arriba"
               className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
             />
           </Campo>

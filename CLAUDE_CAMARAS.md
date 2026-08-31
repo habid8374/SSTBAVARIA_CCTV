@@ -46,14 +46,24 @@ oficial verificada en sitio, confirmar con hardware real):
   la submarca Imou sí lo traen. Se configura principalmente por la app
   móvil DMSS (QR + nube P2P), no por un panel web tipo ONVIF/NVR
   empresarial.
-- **Impacto en Fase 2 (equipo local, fuera de este repo)**: si de verdad no
-  hay ONVIF, el equipo local no puede usar descubrimiento/eventos ONVIF
-  como se asumía originalmente (heredado de la referencia Hikvision
-  evaluada antes de confirmar el modelo real) — tendría que tomar el
-  stream RTSP directo y correr la detección con un modelo propio en el
-  mini-PC del sitio, en vez de recibir eventos nativos de la cámara.
-  **Confirmar con el hardware físico** (ONVIF Device Manager u
-  `onvif-cli` contra la IP real) antes de comprometerse a un enfoque.
+- **Impacto en Fase 2 (equipo local, `equipo_local/` en este repo)**: se
+  construyó asumiendo que no hay ONVIF — toma el stream RTSP directo y
+  corre la detección con un modelo propio (YOLOv8n) en el mini-PC del
+  sitio, en vez de recibir eventos nativos de la cámara.
+
+### Pendiente de verificar con hardware real (no se puede probar en este entorno)
+
+- Que la URL RTSP por defecto (`Camara.rtsp_url_efectiva`) realmente
+  conecte con la Picoo A2 tal cual — o si hace falta ajustar el patrón
+  (puerto, canal, subtype) o usar el campo `rtsp_url` explícito.
+- Confirmar de una vez por todas si hay ONVIF (`ONVIF Device Manager` u
+  `onvif-cli` contra la IP real) — si sí lo hay, se podría simplificar el
+  equipo local más adelante (eventos nativos en vez de detección propia).
+- Calidad real de la detección YOLOv8n con la cámara instalada: iluminación
+  del sitio, ángulo, distancia, y si `subtype=1` (substream) da suficiente
+  resolución o hace falta el canal principal.
+- Calibración del escalado de coordenadas (frame RTSP → snapshot de
+  referencia) con la resolución real del stream.
 
 Se mantiene el mismo supuesto de diseño de siempre: la detección de
 movimiento la hace la cámara/equipo local, pero **la lógica de "¿cayó
@@ -142,20 +152,26 @@ usuarios — solo Administrador.
 1. **Análisis de zonas y reglas** — visita/levantamiento de qué cámara ve qué
    zona y en qué horario aplica cada alerta. Modelo de datos + panel de
    administración para registrar lo levantado en la visita. **Completa.**
-2. **Integración con las cámaras (ONVIF/RTSP reales)** — dividida en dos
-   partes que no se mezclan (ver "Qué hace este módulo" arriba):
+2. **Integración con las cámaras (RTSP real)** — dividida en dos partes que
+   no se mezclan (ver "Qué hace este módulo" arriba):
    - **Backend en la nube — completa**: `evaluar_zona_horario` (cruce punto
      detectado + polígono + horario, con ray casting y manejo de horarios
-     que cruzan medianoche), `disparar_alerta` (stub con logging, sin
-     proveedor de WhatsApp/correo real todavía), `recibir_evento_camara`
-     (recibe cámara + punto + snapshot, valida ownership por empresa, crea
-     `EventoDetectado`) y `obtener_reglas_activas` (el equipo local
-     sincroniza cámaras/zonas/reglas activas de su empresa por API key).
-   - **Equipo local en sitio (ONVIF/RTSP/PTZ real contra la Dahua PTZ Pico
-     A2)** — pendiente, es un desarrollo aparte (posiblemente otro repo),
-     no parte de este backend Django.
-3. Motor de detección y reglas funcionando end-to-end (requiere el equipo
-   local de sitio integrado con el backend de arriba)
+     que cruzan medianoche), `disparar_alerta` (canal correo: envío real vía
+     Brevo; WhatsApp sigue siendo stub con logging, sin proveedor real
+     todavía), `recibir_evento_camara` (recibe cámara + punto + snapshot,
+     valida ownership por empresa, crea `EventoDetectado`) y
+     `obtener_reglas_activas` (el equipo local sincroniza cámaras/zonas/
+     reglas activas de su empresa por API key, con `rtsp_url` ya resuelta y
+     el snapshot de referencia para escalar coordenadas).
+   - **Equipo local en sitio — completo**, en `equipo_local/` (mismo repo,
+     programa Python independiente, no es una app Django): se conecta por
+     RTSP a cada cámara (no ONVIF — ver más abajo por qué), detecta personas
+     con YOLOv8n y reporta al backend de arriba. Corre como servicio en
+     segundo plano (systemd/Tarea Programada) en el PC del DVR/NVR. Ver
+     `equipo_local/README.md` para instalación.
+3. Motor de detección y reglas funcionando end-to-end — **construido**;
+   falta la puesta a prueba con cámaras reales en sitio (ver "Pendiente de
+   verificar con hardware real" más abajo).
 4. **Panel en el dashboard (zonas dibujadas, tablero de indicadores) —
    completo** del lado del dashboard (Tablero, Cámaras IA, Zonas y
    horarios, Alertas). Sigue pendiente que datos *reales* del equipo local

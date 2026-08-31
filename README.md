@@ -46,6 +46,10 @@ Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
   (con el cálculo de riesgo Kinney), `FirmaMetodo`; endpoints descritos abajo.
 - `frontend/` — dashboard Next.js (App Router + TypeScript + Tailwind),
   instalable como PWA. Ver su propia sección más abajo.
+- `equipo_local/` — programa Python independiente (no es una app Django) que
+  corre en el PC del DVR/NVR en sitio: se conecta por RTSP a cada cámara,
+  detecta personas con YOLOv8n y reporta eventos al backend de arriba. Corre
+  como servicio en segundo plano. Ver `equipo_local/README.md`.
 
 ## Backend — correr en local
 
@@ -72,6 +76,15 @@ python manage.py runserver
 Admin en `http://127.0.0.1:8000/admin/`. En `DEBUG=True` el backend ya
 acepta llamadas CORS desde `http://localhost:3000` (el frontend) sin
 configurar nada más.
+
+**Tests**: siempre con las apps explícitas —
+`python manage.py test camaras_ia contratistas core` — nunca
+`python manage.py test` a secas. Sin argumentos, Django descubre tests en
+todo el árbol del proyecto (no solo en `INSTALLED_APPS`), lo que incluye
+`equipo_local/tests/`, un programa Python aparte con sus propias
+dependencias (`requests`, `opencv`, etc.) que no están en el venv de Django
+— y el intento de importarlas revienta la corrida. `equipo_local/` tiene su
+propia suite, independiente (ver `equipo_local/README.md`).
 
 ### Login del dashboard, perfil y gestión de usuarios
 

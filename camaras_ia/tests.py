@@ -18,6 +18,32 @@ Usuario = get_user_model()
 CUADRADO = [[0, 0], [10, 0], [10, 10], [0, 10]]
 
 
+class RtspUrlEfectivaTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+
+    def test_usa_rtsp_url_explicita_si_esta_configurada(self):
+        camara = Camara.objects.create(
+            empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1", rtsp_url="rtsp://otra-marca.example/stream"
+        )
+        self.assertEqual(camara.rtsp_url_efectiva, "rtsp://otra-marca.example/stream")
+
+    def test_construye_patron_dahua_con_credenciales(self):
+        camara = Camara.objects.create(
+            empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1", usuario_onvif="admin", password_onvif="clave123"
+        )
+        self.assertEqual(
+            camara.rtsp_url_efectiva,
+            "rtsp://admin:clave123@10.0.0.1:554/cam/realmonitor?channel=1&subtype=1",
+        )
+
+    def test_construye_patron_dahua_sin_credenciales(self):
+        camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.assertEqual(
+            camara.rtsp_url_efectiva, "rtsp://10.0.0.1:554/cam/realmonitor?channel=1&subtype=1"
+        )
+
+
 class PuntoEnPoligonoTests(TestCase):
     def test_punto_dentro(self):
         self.assertTrue(punto_en_poligono((5, 5), CUADRADO))
@@ -242,6 +268,19 @@ class ObtenerReglasActivasViewTests(TestCase):
         self.assertEqual(len(camaras[0]["zonas"]), 1)
         self.assertEqual(len(camaras[0]["zonas"][0]["reglas"]), 1)
         self.assertEqual(camaras[0]["zonas"][0]["reglas"][0]["id"], self.regla.pk)
+
+    def test_incluye_rtsp_url_efectiva(self):
+        response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
+        self.assertEqual(response.data["camaras"][0]["rtsp_url"], self.camara.rtsp_url_efectiva)
+
+    def test_snapshot_referencia_es_url_absoluta(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.camara.snapshot_referencia = SimpleUploadedFile("ref.jpg", b"contenido-jpeg-falso")
+        self.camara.save()
+        response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
+        url_snapshot = response.data["camaras"][0]["snapshot_referencia"]
+        self.assertTrue(url_snapshot.startswith("http://testserver/"), url_snapshot)
 
     def test_zona_inactiva_no_aparece(self):
         self.zona.activa = False

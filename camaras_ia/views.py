@@ -109,7 +109,10 @@ def obtener_reglas_activas(request):
     return Response(
         {
             "equipo": equipo.nombre,
-            "camaras": CamaraActivaSerializer(camaras_activas, many=True).data,
+            # context con el request: sin esto, snapshot_referencia vendría
+            # como ruta relativa (/media/...) — el equipo local corre en otra
+            # máquina y necesita la URL absoluta para poder descargarla.
+            "camaras": CamaraActivaSerializer(camaras_activas, many=True, context={"request": request}).data,
         }
     )
 
