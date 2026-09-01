@@ -140,6 +140,13 @@ export default function LoginPage() {
               Política de tratamiento de datos personales
             </Link>
           </p>
+
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-corp-muted">
+            <span>Powered by</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-axentia.png" alt="Axentia Technologies" className="h-4 w-auto" />
+            <span className="font-medium text-corp-navy">Axentia Technologies</span>
+          </div>
         </div>
       </div>
     </div>
