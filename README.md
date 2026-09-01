@@ -256,7 +256,11 @@ frontend en Vercel — pero viven en el mismo repositorio.
     Contratistas, sin que nadie tenga que anotarlo a mano. El reporte
     (`GET /api/contratistas/capacitacion/registros/`) lista todos los
     intentos con su resultado; personal interno ve todas las empresas, el
-    portal de contratistas solo los suyos.
+    portal de contratistas solo los suyos. Cada registro aprobado tiene un
+    **certificado en PDF** descargable en cualquier momento
+    (`GET .../<id>/certificado/`), y hay un botón para **exportar a Excel**
+    a todos los que aprobaron de una vez (`GET .../exportar/`, filtro
+    `?contratista=` para personal interno).
   - **Portal de contratistas** (tercer rol `PerfilUsuario.Rol.CONTRATISTA`,
     mismo dashboard y mismo login — no es una app aparte): una cuenta por
     empresa contratista (`PerfilUsuario.contratista`, FK a
@@ -439,6 +443,8 @@ eliminar) requiere rol Administrador.
 | `GET /api/contratistas/capacitacion/registros/` | Reporte de capacitaciones hechas; filtro `?contratista=` |
 | `POST /api/contratistas/capacitacion/iniciar/` | Arranca un intento — 403 si la empresa no tiene la capacitación habilitada |
 | `POST /api/contratistas/capacitacion/<id>/calificar/` | Califica en el servidor (`respuestas`); marca `induccion_sst` en el trabajador si aprueba y hay coincidencia por documento |
+| `GET /api/contratistas/capacitacion/<id>/certificado/` | PDF del certificado de un registro aprobado (400 si no está aprobado) |
+| `GET /api/contratistas/capacitacion/exportar/` | Excel con todos los aprobados; filtro `?contratista=` |
 
 ## Frontend — correr en local
 

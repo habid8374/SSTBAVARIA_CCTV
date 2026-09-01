@@ -81,6 +81,12 @@ urlpatterns = [
     ),
     path("capacitacion/preguntas/", views.preguntas_capacitacion, name="capacitacion_preguntas"),
     path("capacitacion/registros/", views.RegistroCapacitacionLista.as_view(), name="capacitacion_registros"),
+    path("capacitacion/exportar/", views.capacitacion_exportar_aprobados, name="capacitacion_exportar"),
     path("capacitacion/iniciar/", views.iniciar_capacitacion, name="capacitacion_iniciar"),
     path("capacitacion/<int:pk>/calificar/", views.calificar_capacitacion, name="capacitacion_calificar"),
+    path(
+        "capacitacion/<int:pk>/certificado/",
+        views.capacitacion_certificado_pdf,
+        name="capacitacion_certificado",
+    ),
 ]

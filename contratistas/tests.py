@@ -2468,3 +2468,86 @@ class CapacitacionTests(ApiTestsBase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 401)
+
+    def _aprobar_registro(self, nombres="Juan Pérez", documento=""):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": nombres, "documento": documento},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        registro_id = inicio.data["id"]
+        self.client.post(
+            reverse("contratistas:capacitacion_calificar", args=[registro_id]),
+            {"respuestas": self._respuestas_correctas()},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        return registro_id
+
+    def test_certificado_requiere_aprobado(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": "Juan Pérez"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        response = self.client.get(
+            reverse("contratistas:capacitacion_certificado", args=[inicio.data["id"]]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_certificado_descarga_pdf_de_aprobado(self):
+        registro_id = self._aprobar_registro()
+        response = self.client.get(
+            reverse("contratistas:capacitacion_certificado", args=[registro_id]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+
+    def test_exportar_aprobados_incluye_solo_aprobados(self):
+        from io import BytesIO
+
+        import openpyxl
+
+        self._aprobar_registro(nombres="Aprobado Uno")
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        RegistroCapacitacion.objects.create(
+            contratista=self.contratista, nombres="No Aprobado", estado=RegistroCapacitacion.Estado.NO_APROBADO
+        )
+
+        response = self.client.get(reverse("contratistas:capacitacion_exportar"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        filas = list(libro.active.iter_rows(values_only=True))
+        self.assertEqual(filas[0][0], "Empresa")
+        nombres_exportados = [fila[1] for fila in filas[1:]]
+        self.assertIn("Aprobado Uno", nombres_exportados)
+        self.assertNotIn("No Aprobado", nombres_exportados)
+
+    def test_portal_contratista_exporta_solo_su_empresa(self):
+        registro_id = self._aprobar_registro(nombres="De Scepsa")
+        otro = EmpresaContratista.objects.create(empresa=self.empresa, nombre="OTRA SAS")
+        RegistroCapacitacion.objects.create(
+            contratista=otro, nombres="De Otra", estado=RegistroCapacitacion.Estado.APROBADO, calificacion=100
+        )
+
+        response = self.client.get(
+            reverse("contratistas:capacitacion_exportar"), **self._auth(self.portal_user)
+        )
+        self.assertEqual(response.status_code, 200)
+
+        from io import BytesIO
+
+        import openpyxl
+
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        filas = list(libro.active.iter_rows(values_only=True))
+        nombres_exportados = [fila[1] for fila in filas[1:]]
+        self.assertEqual(nombres_exportados, ["De Scepsa"])
+        self.assertTrue(registro_id)

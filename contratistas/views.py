@@ -1082,3 +1082,83 @@ def calificar_capacitacion(request, pk):
     datos["correctas"] = correctas
     datos["total"] = total
     return Response(datos)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def capacitacion_certificado_pdf(request, pk):
+    """Certificado imprimible de un registro de capacitación aprobado —
+    mismo documento que ya se ve en pantalla al aprobar, disponible para
+    volver a descargar después desde el reporte."""
+    from django.http import HttpResponse
+    from django.template.loader import render_to_string
+    from xhtml2pdf import pisa
+
+    qs = RegistroCapacitacion.objects.select_related("contratista")
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    registro = get_object_or_404(qs, pk=pk)
+
+    if registro.estado != RegistroCapacitacion.Estado.APROBADO:
+        return Response(
+            {"detail": "Solo se puede descargar el certificado de una capacitación aprobada."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    titulo_curso = ConfiguracionCapacitacion.obtener().titulo_curso
+    html = render_to_string(
+        "contratistas/capacitacion_certificado_pdf.html", {"registro": registro, "titulo_curso": titulo_curso}
+    )
+    respuesta = HttpResponse(content_type="application/pdf")
+    respuesta["Content-Disposition"] = f'inline; filename="certificado-capacitacion-{registro.pk}.pdf"'
+    resultado = pisa.CreatePDF(html, dest=respuesta)
+    if resultado.err:
+        return Response({"detail": "No se pudo generar el certificado."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return respuesta
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def capacitacion_exportar_aprobados(request):
+    """Descarga en Excel a todos los que aprobaron la inducción — filtro
+    opcional ?contratista= para personal interno (el portal de contratistas
+    siempre queda scopeado a la suya)."""
+    from django.http import HttpResponse
+    from openpyxl import Workbook
+
+    qs = RegistroCapacitacion.objects.select_related("contratista", "trabajador").filter(
+        estado=RegistroCapacitacion.Estado.APROBADO
+    )
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    else:
+        filtro = request.query_params.get("contratista")
+        if filtro:
+            qs = qs.filter(contratista_id=filtro)
+    qs = qs.order_by("-finalizado_en")
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Aprobados"
+    hoja.append(
+        ["Empresa", "Nombre", "Correo", "Documento", "Trabajador vinculado", "Calificación", "Fecha de aprobación"]
+    )
+    for registro in qs:
+        hoja.append(
+            [
+                registro.contratista.nombre,
+                registro.nombres,
+                registro.correo,
+                registro.documento,
+                str(registro.trabajador) if registro.trabajador else "",
+                registro.calificacion,
+                timezone.localtime(registro.finalizado_en).strftime("%Y-%m-%d %H:%M") if registro.finalizado_en else "",
+            ]
+        )
+
+    respuesta = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    respuesta["Content-Disposition"] = 'attachment; filename="capacitacion_aprobados.xlsx"'
+    libro.save(respuesta)
+    return respuesta

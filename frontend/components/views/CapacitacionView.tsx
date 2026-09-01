@@ -5,6 +5,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   ApiError,
   calificarCapacitacion,
+  descargarCertificadoCapacitacion,
+  exportarCapacitacionesAprobadasExcel,
   iniciarCapacitacion,
   listarContratistas,
   listarPreguntasCapacitacion,
@@ -47,6 +49,8 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
   const [registroActivo, setRegistroActivo] = useState<RegistroCapacitacion | null>(null);
   const [resultado, setResultado] = useState<ResultadoCapacitacion | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exportando, setExportando] = useState(false);
+  const [descargandoCertificado, setDescargandoCertificado] = useState<number | null>(null);
 
   function cargarRegistros() {
     listarRegistrosCapacitacion(token)
@@ -68,6 +72,28 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
     setRegistroActivo(null);
     setResultado(null);
     cargarRegistros();
+  }
+
+  async function exportarAprobados() {
+    setExportando(true);
+    try {
+      await exportarCapacitacionesAprobadasExcel(token);
+    } catch {
+      setError("No se pudo exportar el Excel de aprobados.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  async function descargarCertificado(id: number) {
+    setDescargandoCertificado(id);
+    try {
+      await descargarCertificadoCapacitacion(token, id);
+    } catch {
+      setError("No se pudo descargar el certificado.");
+    } finally {
+      setDescargandoCertificado(null);
+    }
   }
 
   if (paso === "registro") {
@@ -120,13 +146,23 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
           empresa contratista cuando tiene una Declaración de Método aprobada, o cuando un Administrador la
           habilita manualmente desde la ficha de la empresa en Contratistas.
         </p>
-        <button
-          type="button"
-          onClick={() => setPaso("registro")}
-          className="shrink-0 rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
-        >
-          + Nueva capacitación
-        </button>
+        <div className="flex shrink-0 gap-3">
+          <button
+            type="button"
+            onClick={exportarAprobados}
+            disabled={exportando}
+            className="rounded-lg border border-corp-border px-4 py-2 text-sm font-medium text-corp-navy transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {exportando ? "Exportando…" : "Exportar aprobados (Excel)"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaso("registro")}
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          >
+            + Nueva capacitación
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -149,6 +185,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
                 <th className="px-4 py-2.5">Calificación</th>
                 <th className="px-4 py-2.5">Estado</th>
                 <th className="px-4 py-2.5">Fecha</th>
+                <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-corp-border">
@@ -163,6 +200,18 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
                     <EstadoBadge registro={r} />
                   </td>
                   <td className="px-4 py-2.5">{new Date(r.iniciado_en).toLocaleDateString("es-CO")}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    {r.estado === "aprobado" && (
+                      <button
+                        type="button"
+                        onClick={() => descargarCertificado(r.id)}
+                        disabled={descargandoCertificado === r.id}
+                        className="text-xs font-medium text-corp-blue hover:underline disabled:opacity-60"
+                      >
+                        {descargandoCertificado === r.id ? "Descargando…" : "Certificado"}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

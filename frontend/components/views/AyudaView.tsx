@@ -518,6 +518,15 @@ const TEMAS: Tema[] = [
           (si aplica), calificación, estado y fecha. El personal interno ve todas las empresas; el portal de
           contratistas ve solo los suyos.
         </P>
+        <Sub>Descargar certificado y exportar aprobados</Sub>
+        <Ul>
+          <li>Cada fila <strong>Aprobado</strong> tiene un enlace &quot;Certificado&quot; para volver a
+            descargar ese certificado en PDF en cualquier momento — el mismo documento que se ve al aprobar.</li>
+          <li>Botón <strong>&quot;Exportar aprobados (Excel)&quot;</strong> (arriba, junto a &quot;+ Nueva
+            capacitación&quot;) descarga en un solo Excel a todos los que aprobaron — empresa, nombre, correo,
+            documento, trabajador vinculado, calificación y fecha de aprobación. El personal interno exporta
+            todas las empresas; el portal de contratistas, solo la suya.</li>
+        </Ul>
         <Nota tipo="aviso">
           El video y las 10 preguntas de la evaluación se pueden editar desde el admin de Django (Sistema →
           Configuración de capacitación / Preguntas de capacitación) sin tocar código.

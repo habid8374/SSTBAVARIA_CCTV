@@ -1507,3 +1507,16 @@ export function calificarCapacitacion(
     body: JSON.stringify({ respuestas }),
   });
 }
+
+export function descargarCertificadoCapacitacion(token: string, id: number): Promise<void> {
+  return descargarArchivo(token, `/api/contratistas/capacitacion/${id}/certificado/`, `certificado-capacitacion-${id}.pdf`);
+}
+
+export function exportarCapacitacionesAprobadasExcel(token: string, contratistaId?: number): Promise<void> {
+  const query = contratistaId ? `?contratista=${contratistaId}` : "";
+  return descargarArchivo(
+    token,
+    `/api/contratistas/capacitacion/exportar/${query}`,
+    "capacitacion_aprobados.xlsx"
+  );
+}
