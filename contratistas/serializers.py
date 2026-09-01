@@ -13,6 +13,7 @@ from .models import (
     EquipoProteccionPersonal,
     FirmaMetodo,
     Funcionario,
+    NotaAlerta,
     NotificacionInterna,
     PermisoTrabajo,
     RadicacionSeguridadSocial,
@@ -217,6 +218,18 @@ class FirmaMetodoSerializer(serializers.ModelSerializer):
         return valor
 
 
+class NotaAlertaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NotaAlerta
+        fields = ["id", "codigo_alerta", "actividad_orden", "autor_nombre", "texto", "creada_en"]
+        read_only_fields = ["id", "autor_nombre", "creada_en"]
+
+    def validate_texto(self, valor):
+        if not valor.strip():
+            raise serializers.ValidationError("La nota no puede quedar vacía.")
+        return valor
+
+
 class ActividadMetodoSerializer(serializers.ModelSerializer):
     riesgo_sin = serializers.FloatField(read_only=True)
     riesgo_con = serializers.FloatField(read_only=True)
@@ -285,12 +298,13 @@ class DeclaracionMetodoSerializer(serializers.ModelSerializer):
             "descripcion_trabajo",
             "estado",
             "observaciones",
+            "archivo_origen_excel",
             "creada_en",
             "actualizada_en",
             "actividades",
             "firmas",
         ]
-        read_only_fields = ["id", "creada_en", "actualizada_en"]
+        read_only_fields = ["id", "archivo_origen_excel", "creada_en", "actualizada_en"]
 
     def validate(self, datos):
         if datos.get("estado") == DeclaracionMetodo.Estado.APROBADA:

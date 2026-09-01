@@ -10,6 +10,7 @@ from .models import (
     EquipoProteccionPersonal,
     FirmaMetodo,
     Funcionario,
+    NotaAlerta,
     NotificacionInterna,
     PermisoTrabajo,
     RadicacionSeguridadSocial,
@@ -85,6 +86,13 @@ class FirmaMetodoAdmin(admin.ModelAdmin):
     list_display = ("declaracion", "rol", "nombre_firmante", "firmante_usuario", "firmado_en")
     list_filter = ("rol",)
     readonly_fields = ("firmado_en", "hash_documento")
+
+
+@admin.register(NotaAlerta)
+class NotaAlertaAdmin(admin.ModelAdmin):
+    list_display = ("declaracion", "codigo_alerta", "actividad_orden", "autor_nombre", "creada_en")
+    list_filter = ("codigo_alerta",)
+    readonly_fields = ("creada_en",)
 
 
 @admin.register(Funcionario)

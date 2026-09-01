@@ -1140,6 +1140,7 @@ export type DeclaracionMetodo = {
   descripcion_trabajo: string;
   estado: EstadoDeclaracion;
   observaciones: string;
+  archivo_origen_excel: string | null;
   creada_en: string;
   actualizada_en: string;
   actividades: ActividadMetodo[];
@@ -1177,6 +1178,20 @@ export function importarDeclaracionExcel(token: string, archivo: File): Promise<
   const formData = new FormData();
   formData.append("archivo", archivo);
   return request<DeclaracionImportadaExcel>("/api/contratistas/declaraciones/importar-excel/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: formData,
+  });
+}
+
+export function subirArchivoOrigenDeclaracion(
+  token: string,
+  id: number,
+  archivo: File
+): Promise<DeclaracionMetodo> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  return request<DeclaracionMetodo>(`/api/contratistas/declaraciones/${id}/archivo-origen/`, {
     method: "POST",
     headers: authHeaders(token),
     body: formData,
@@ -1255,6 +1270,33 @@ export type AlertaAutomatica = {
 export function listarAlertasDeclaracion(token: string, id: number): Promise<AlertaAutomatica[]> {
   return request<AlertaAutomatica[]>(`/api/contratistas/declaraciones/${id}/alertas/`, {
     headers: authHeaders(token),
+  });
+}
+
+export type NotaAlerta = {
+  id: number;
+  codigo_alerta: string;
+  actividad_orden: number;
+  autor_nombre: string;
+  texto: string;
+  creada_en: string;
+};
+
+export function listarNotasAlertas(token: string, id: number): Promise<NotaAlerta[]> {
+  return request<NotaAlerta[]>(`/api/contratistas/declaraciones/${id}/notas-alertas/`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function crearNotaAlerta(
+  token: string,
+  id: number,
+  datos: { codigo_alerta: string; actividad_orden: number; texto: string }
+): Promise<NotaAlerta> {
+  return request<NotaAlerta>(`/api/contratistas/declaraciones/${id}/notas-alertas/`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
   });
 }
 

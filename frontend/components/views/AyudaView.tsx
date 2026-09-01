@@ -303,6 +303,12 @@ const TEMAS: Tema[] = [
           cuenta autenticada. Si el sistema no reconoce algún permiso o EPP marcado en el Excel (por ejemplo,
           porque el catálogo cambió), lo indica con un aviso ⚠ para agregarlo a mano.
         </P>
+        <P>
+          El archivo que se sube queda guardado junto con la declaración — una vez creada aparece el botón{" "}
+          <strong>&quot;Ver Excel original&quot;</strong> al lado de &quot;Descargar PDF&quot;/&quot;Descargar
+          Excel&quot;, para que quien revisa pueda abrir el documento tal como llegó y compararlo contra lo
+          que quedó cargado en el formulario.
+        </P>
         <Sub>Firmas electrónicas — no son solo un nombre escrito</Sub>
         <P>
           Al firmar, además del nombre de la persona hay que marcar una casilla de consentimiento explícito
@@ -355,6 +361,13 @@ const TEMAS: Tema[] = [
           más de 1.2 m de excavación (exige salida de emergencia), más de 1.3 m (exige retén exterior) y más
           de 5 m (exige andamiaje). Si esos campos quedan vacíos, esas alertas puntuales simplemente no
           aplican — no se asume nada en su ausencia.
+        </P>
+        <P>
+          Cada alerta trae, debajo del botón de motivo de rechazo, un pequeño cuadro para{" "}
+          <strong>dejar una nota</strong> sobre esa alerta en particular — por ejemplo, por qué se descartó o
+          qué se validó en sitio con el contratista antes de decidir. Las notas quedan con el nombre de quien
+          las escribió y la fecha, y se ven ahí mismo cada vez que alguien vuelva a abrir la declaración; no
+          reemplazan el campo Observaciones general ni cambian el estado de la declaración por sí solas.
         </P>
         <Sub>El ciclo enviar → revisar → aprobar/rechazar → subsanar</Sub>
         <P>

@@ -50,6 +50,16 @@ urlpatterns = [
     path("declaraciones/<int:pk>/excel/", views.declaracion_excel, name="declaraciones_excel"),
     path("declaraciones/<int:pk>/alertas/", views.declaracion_alertas, name="declaraciones_alertas"),
     path(
+        "declaraciones/<int:pk>/archivo-origen/",
+        views.declaracion_subir_archivo_origen,
+        name="declaraciones_archivo_origen",
+    ),
+    path(
+        "declaraciones/<int:pk>/notas-alertas/",
+        views.notas_alertas_declaracion,
+        name="declaraciones_notas_alertas",
+    ),
+    path(
         "autorizaciones-ingreso/",
         views.AutorizacionIngresoListaDashboard.as_view(),
         name="autorizaciones_ingreso_lista",

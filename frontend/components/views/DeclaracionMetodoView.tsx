@@ -8,13 +8,16 @@ import {
   crearDeclaracion,
   descargarDeclaracionExcel,
   descargarDeclaracionPdf,
+  crearNotaAlerta,
   firmarDeclaracion,
   importarDeclaracionExcel,
   listarAlertasDeclaracion,
   listarContratistas,
   listarDeclaraciones,
   listarFuncionarios,
+  listarNotasAlertas,
   obtenerCatalogosContratistas,
+  subirArchivoOrigenDeclaracion,
   type AlertaAutomatica,
   type Catalogos,
   type DeclaracionMetodo,
@@ -22,6 +25,7 @@ import {
   type EstadoDeclaracion,
   type FirmaMetodo,
   type Funcionario,
+  type NotaAlerta,
   type NuevaActividadMetodo,
   type NuevaDeclaracion,
   type Rol,
@@ -299,7 +303,9 @@ function FormularioDeclaracion({
   const [descargandoExcel, setDescargandoExcel] = useState(false);
   const [importandoExcel, setImportandoExcel] = useState(false);
   const [avisosImportacion, setAvisosImportacion] = useState<string[]>([]);
+  const [archivoOrigenExcel, setArchivoOrigenExcel] = useState<File | null>(null);
   const [alertas, setAlertas] = useState<AlertaAutomatica[]>([]);
+  const [notasAlertas, setNotasAlertas] = useState<NotaAlerta[]>([]);
 
   useEffect(() => {
     const id = declaracion?.id;
@@ -319,6 +325,35 @@ function FormularioDeclaracion({
       cancelado = true;
     };
   }, [token, esContratista, declaracion?.id, declaracion?.actualizada_en]);
+
+  useEffect(() => {
+    const id = declaracion?.id;
+    let cancelado = false;
+    const cargar = async () => {
+      if (esContratista || !id) return [];
+      try {
+        return await listarNotasAlertas(token, id);
+      } catch {
+        return [];
+      }
+    };
+    cargar().then((datos) => {
+      if (!cancelado) setNotasAlertas(datos);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [token, esContratista, declaracion?.id, declaracion?.actualizada_en]);
+
+  async function agregarNotaAlerta(alerta: AlertaAutomatica, texto: string) {
+    if (!declaracion || !texto.trim()) return;
+    const nota = await crearNotaAlerta(token, declaracion.id, {
+      codigo_alerta: alerta.codigo,
+      actividad_orden: alerta.actividad_orden,
+      texto: texto.trim(),
+    });
+    setNotasAlertas((actual) => [...actual, nota]);
+  }
 
   function usarComoMotivoRechazo(alerta: AlertaAutomatica) {
     setObservaciones((actual) => (actual.trim() ? `${actual.trim()}\n${alerta.motivo_sugerido}` : alerta.motivo_sugerido));
@@ -373,6 +408,7 @@ function FormularioDeclaracion({
           : [actividadVacia(0)]
       );
       setAvisosImportacion(datos.avisos);
+      setArchivoOrigenExcel(archivo);
       setMensaje(
         "Se importaron los datos del Excel — revísalos y ajusta lo que haga falta antes de guardar. Todavía no se ha guardado nada ni se firmó nada automáticamente."
       );
@@ -454,9 +490,18 @@ function FormularioDeclaracion({
       })),
     };
     try {
-      const guardada = declaracion
+      let guardada = declaracion
         ? await actualizarDeclaracion(token, declaracion.id, payload)
         : await crearDeclaracion(token, payload);
+      if (!declaracion && archivoOrigenExcel) {
+        try {
+          guardada = await subirArchivoOrigenDeclaracion(token, guardada.id, archivoOrigenExcel);
+        } catch {
+          // El Excel original es solo un respaldo para quien revisa — si falla al
+          // adjuntarlo no debe impedir que la declaración recién creada quede guardada.
+        }
+        setArchivoOrigenExcel(null);
+      }
       setDeclaracion(guardada);
       setActividades(guardada.actividades.map((a) => ({ ...a, clave: clave() })));
       setMensaje("Declaración guardada.");
@@ -491,6 +536,16 @@ function FormularioDeclaracion({
             >
               {descargandoExcel ? "Generando…" : "Descargar Excel"}
             </button>
+            {declaracion.archivo_origen_excel && (
+              <a
+                href={declaracion.archivo_origen_excel}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg border border-corp-border px-3 py-1.5 text-xs font-semibold text-corp-navy transition hover:border-corp-blue"
+              >
+                Ver Excel original
+              </a>
+            )}
           </div>
         )}
       </div>
@@ -527,6 +582,12 @@ function FormularioDeclaracion({
                 >
                   Usar como motivo de rechazo
                 </button>
+                <NotasDeAlerta
+                  notas={notasAlertas.filter(
+                    (n) => n.codigo_alerta === alerta.codigo && n.actividad_orden === alerta.actividad_orden
+                  )}
+                  onAgregar={(texto) => agregarNotaAlerta(alerta, texto)}
+                />
               </li>
             ))}
           </ul>
@@ -921,6 +982,61 @@ function FormularioDeclaracion({
           }
         />
       )}
+    </div>
+  );
+}
+
+function NotasDeAlerta({
+  notas,
+  onAgregar,
+}: {
+  notas: NotaAlerta[];
+  onAgregar: (texto: string) => Promise<void>;
+}) {
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  async function enviar() {
+    if (!texto.trim()) return;
+    setEnviando(true);
+    try {
+      await onAgregar(texto);
+      setTexto("");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 border-t border-amber-200 pt-2">
+      {notas.length > 0 && (
+        <ul className="space-y-1.5">
+          {notas.map((nota) => (
+            <li key={nota.id} className="text-xs text-amber-900">
+              <span className="font-semibold">{nota.autor_nombre || "—"}</span>
+              {" · "}
+              {new Date(nota.creada_en).toLocaleString("es-CO")}
+              <p className="text-amber-800">{nota.texto}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-2 flex flex-col gap-1.5 sm:flex-row">
+        <input
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Agregar una nota sobre esta alerta…"
+          className="flex-1 rounded-lg border border-amber-300 px-2 py-1 text-xs outline-none focus:border-amber-500"
+        />
+        <button
+          type="button"
+          onClick={enviar}
+          disabled={enviando || !texto.trim()}
+          className="rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {enviando ? "Guardando…" : "Agregar nota"}
+        </button>
+      </div>
     </div>
   );
 }

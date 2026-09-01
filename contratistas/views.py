@@ -55,6 +55,7 @@ from .serializers import (
     EquipoProteccionPersonalSerializer,
     FirmaMetodoSerializer,
     FuncionarioSerializer,
+    NotaAlertaSerializer,
     NotificacionInternaSerializer,
     PermisoTrabajoSerializer,
     RadicacionSeguridadSocialSerializer,
@@ -847,6 +848,62 @@ def declaracion_alertas(request, pk):
     declaracion = get_object_or_404(qs, pk=pk)
 
     return Response(generar_alertas(declaracion))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def declaracion_subir_archivo_origen(request, pk):
+    """Guarda el Excel original que se subió para importar esta declaración
+    (o cualquier otro Excel de referencia), para que quien la revisa pueda
+    abrirlo y compararlo contra lo que quedó cargado en el formulario."""
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    from core.validators import validar_tamano_archivo
+
+    qs = DeclaracionMetodo.objects.all()
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    declaracion = get_object_or_404(qs, pk=pk)
+
+    archivo = request.FILES.get("archivo")
+    if not archivo:
+        return Response({"detail": "Hace falta adjuntar un archivo."}, status=status.HTTP_400_BAD_REQUEST)
+    if not archivo.name.lower().endswith(".xlsx"):
+        return Response({"detail": "El archivo debe ser un .xlsx."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        validar_tamano_archivo(archivo)
+    except DjangoValidationError as exc:
+        return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+    declaracion.archivo_origen_excel = archivo
+    declaracion.save(update_fields=["archivo_origen_excel"])
+    return Response(DeclaracionMetodoSerializer(declaracion, context={"request": request}).data)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([EsPersonalInterno])
+def notas_alertas_declaracion(request, pk):
+    """Notas que deja el personal de SST/interventoría sobre una alerta
+    automática puntual — identificada por su código más el orden de la
+    actividad que la disparó (ver contratistas.models.NotaAlerta) — para
+    dejar registrado por qué se actuó o no sobre ella. No reemplaza el
+    campo Observaciones general ni cambia el estado de la declaración; solo
+    para quien revisa, igual que el panel de alertas."""
+    declaracion = get_object_or_404(DeclaracionMetodo, pk=pk)
+
+    if request.method == "GET":
+        notas = declaracion.notas_alertas.order_by("creada_en")
+        return Response(NotaAlertaSerializer(notas, many=True).data)
+
+    entrada = NotaAlertaSerializer(data=request.data)
+    entrada.is_valid(raise_exception=True)
+    nota = entrada.save(
+        declaracion=declaracion,
+        autor=request.user,
+        autor_nombre=request.user.get_full_name() or request.user.username,
+    )
+    return Response(NotaAlertaSerializer(nota).data, status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET"])

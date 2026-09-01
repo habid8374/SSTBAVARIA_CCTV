@@ -223,6 +223,10 @@ class RadicacionSeguridadSocial(models.Model):
 DIAS_ALERTA_VENCIMIENTO = 15  # a cuántos días de vencer se considera "por vencer" en los indicadores
 
 
+def declaracion_origen_excel_upload_to(instance, filename):
+    return f"declaraciones_origen/{instance.contratista_id}/{filename}"
+
+
 class DeclaracionMetodo(models.Model):
     """Declaración de método y evaluación de riesgo (formato GEINCOR/Kinney) para un trabajo puntual."""
 
@@ -245,6 +249,15 @@ class DeclaracionMetodo(models.Model):
     descripcion_trabajo = models.TextField()
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.BORRADOR)
     observaciones = models.TextField(blank=True)
+    archivo_origen_excel = models.FileField(
+        "Excel original",
+        upload_to=declaracion_origen_excel_upload_to,
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(allowed_extensions=["xlsx"]), validar_tamano_archivo],
+        help_text="Libro de Excel que se subió para importar esta declaración — se conserva "
+        "para que quien revisa pueda abrirlo y compararlo contra lo que quedó cargado.",
+    )
     creada_en = models.DateTimeField(auto_now_add=True)
     actualizada_en = models.DateTimeField(auto_now=True)
 
@@ -255,6 +268,33 @@ class DeclaracionMetodo(models.Model):
 
     def __str__(self):
         return f"{self.descripcion_trabajo[:50]} — {self.contratista.nombre}"
+
+
+class NotaAlerta(models.Model):
+    """Nota que deja el personal de SST/interventoría sobre una alerta
+    automática puntual, para dejar registrado por qué actuó (o no) sobre
+    ella. Las actividades de una declaración se reemplazan por completo en
+    cada guardado (ver DeclaracionMetodoSerializer), así que no hay un id
+    de actividad estable al que enlazar — se identifica la alerta igual que
+    el motor de alertas ya la identifica: por su código más el orden de la
+    actividad que la disparó. No reemplaza el campo Observaciones general
+    ni cambia el estado de la declaración."""
+
+    declaracion = models.ForeignKey(DeclaracionMetodo, on_delete=models.CASCADE, related_name="notas_alertas")
+    codigo_alerta = models.CharField(max_length=60)
+    actividad_orden = models.PositiveIntegerField()
+    autor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    autor_nombre = models.CharField(max_length=150, blank=True)
+    texto = models.TextField()
+    creada_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "nota de alerta"
+        verbose_name_plural = "notas de alertas"
+        ordering = ["creada_en"]
+
+    def __str__(self):
+        return f"{self.codigo_alerta} — {self.declaracion}"
 
 
 PERMISOS_TRABAJO = [

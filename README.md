@@ -73,6 +73,17 @@ frontend en Vercel — pero viven en el mismo repositorio.
     firmando de verdad, ligada a la cuenta autenticada). Lo que no se pueda
     reconocer automáticamente se reporta en `avisos` para revisión manual
     antes de guardar.
+  - **Archivo Excel original adjunto a la declaración** (campo
+    `DeclaracionMetodo.archivo_origen_excel`,
+    `POST /api/contratistas/declaraciones/<id>/archivo-origen/`,
+    `IsAuthenticated`, scopeado por contratista igual que el resto): al
+    crear una declaración importando un Excel, el frontend sube ese mismo
+    archivo a este endpoint justo después de guardarla por primera vez, y
+    queda disponible con un botón "Ver Excel original" (junto a
+    "Descargar PDF"/"Descargar Excel") para que quien revisa pueda abrir
+    el documento tal como llegó y compararlo contra lo que quedó cargado
+    en el formulario — pedido explícito del cliente para poder contrastar
+    la evaluación del sistema contra el archivo fuente.
   - **Alertas automáticas** (`contratistas/alertas_automaticas.py`,
     `GET /api/contratistas/declaraciones/<id>/alertas/`, solo
     `EsPersonalInterno`): al revisar una declaración, un motor de reglas
@@ -94,6 +105,17 @@ frontend en Vercel — pero viven en el mismo repositorio.
     de la declaración, no bloquea aprobar/rechazar, y el texto sugerido se
     puede editar o descartar libremente; la aprobación o el rechazo siguen
     siendo 100% una decisión humana.
+  - **Notas por alerta** (`contratistas.NotaAlerta`,
+    `GET/POST /api/contratistas/declaraciones/<id>/notas-alertas/`, solo
+    `EsPersonalInterno` — otro pedido del cliente): además del botón de
+    motivo de rechazo, cada alerta tiene su propio cuadro para dejar notas
+    de texto libre (por ejemplo, por qué se descartó o qué se validó en
+    sitio) con autor y fecha. Como las actividades se reemplazan por
+    completo en cada guardado (no tienen un id estable entre ediciones),
+    la alerta se identifica igual que ya la identifica el motor de
+    alertas: por su código más el orden de la actividad que la disparó.
+    No reemplaza el campo Observaciones general ni cambia el estado de la
+    declaración.
   - **Firma electrónica de la Declaración de Método**: cada firma queda
     ligada a la cuenta autenticada que la ejecutó (`FirmaMetodo.firmante_usuario`,
     tomado de `request.user` — nunca del cliente) más un consentimiento

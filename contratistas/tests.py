@@ -1740,6 +1740,137 @@ class ImportarExcelDeclaracionTests(ApiTestsBase):
         self.assertEqual(response.status_code, 400)
 
 
+class ArchivoOrigenDeclaracionTests(ApiTestsBase):
+    """Adjuntar el Excel original a una declaración ya creada — para que
+    quien revisa pueda abrirlo y compararlo contra lo que quedó cargado."""
+
+    def _declaracion(self, contratista=None):
+        return DeclaracionMetodo.objects.create(
+            contratista=contratista or self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+
+    def _archivo(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(
+            "original.xlsx",
+            _construir_excel_declaracion_prueba(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def test_requiere_autenticacion(self):
+        declaracion = self._declaracion()
+        url = reverse("contratistas:declaraciones_archivo_origen", args=[declaracion.pk])
+        response = self.client.post(url, {"archivo": self._archivo()})
+        self.assertEqual(response.status_code, 401)
+
+    def test_sube_y_queda_disponible_en_el_detalle(self):
+        declaracion = self._declaracion()
+        url = reverse("contratistas:declaraciones_archivo_origen", args=[declaracion.pk])
+        response = self.client.post(url, {"archivo": self._archivo()}, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["archivo_origen_excel"])
+
+        detalle = self.client.get(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]), **self._auth(self.operador)
+        )
+        self.assertTrue(detalle.data["archivo_origen_excel"])
+
+    def test_portal_contratista_puede_subir_a_su_propia_declaracion(self):
+        declaracion = self._declaracion()
+        portal_user = Usuario.objects.create_user("portal_origen_test", "portal_origen@x.com", "clave12345")
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = self.contratista
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+        url = reverse("contratistas:declaraciones_archivo_origen", args=[declaracion.pk])
+        response = self.client.post(url, {"archivo": self._archivo()}, **self._auth(portal_user))
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_portal_contratista_no_puede_subir_a_declaracion_de_otra_empresa(self):
+        otra_empresa = EmpresaContratista.objects.create(empresa=self.empresa, nombre="Otra SAS", nit="900000000-1")
+        declaracion_ajena = self._declaracion(contratista=otra_empresa)
+        portal_user = Usuario.objects.create_user("portal_origen_test2", "portal_origen2@x.com", "clave12345")
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = self.contratista
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+        url = reverse("contratistas:declaraciones_archivo_origen", args=[declaracion_ajena.pk])
+        response = self.client.post(url, {"archivo": self._archivo()}, **self._auth(portal_user))
+        self.assertEqual(response.status_code, 404)
+
+    def test_extension_invalida_devuelve_400(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        declaracion = self._declaracion()
+        archivo = SimpleUploadedFile("original.txt", b"no es un excel", content_type="text/plain")
+        url = reverse("contratistas:declaraciones_archivo_origen", args=[declaracion.pk])
+        response = self.client.post(url, {"archivo": archivo}, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 400)
+
+
+class NotasAlertasTests(ApiTestsBase):
+    """Notas del personal de SST/interventoría sobre una alerta puntual —
+    identificada por código + orden de la actividad que la disparó."""
+
+    def _declaracion(self):
+        return DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+
+    def test_requiere_personal_interno(self):
+        declaracion = self._declaracion()
+        url = reverse("contratistas:declaraciones_notas_alertas", args=[declaracion.pk])
+
+        portal_user = Usuario.objects.create_user("portal_notas_test", "portal_notas@x.com", "clave12345")
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = self.contratista
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+        response = self.client.get(url, **self._auth(portal_user))
+        self.assertEqual(response.status_code, 403)
+
+    def test_lista_vacia_al_principio(self):
+        declaracion = self._declaracion()
+        url = reverse("contratistas:declaraciones_notas_alertas", args=[declaracion.pk])
+        response = self.client.get(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [])
+
+    def test_crear_nota_y_listarla(self):
+        declaracion = self._declaracion()
+        url = reverse("contratistas:declaraciones_notas_alertas", args=[declaracion.pk])
+        response = self.client.post(
+            url,
+            {
+                "codigo_alerta": "altura_sin_epp_caida",
+                "actividad_orden": 0,
+                "texto": "Se validó en sitio con el supervisor, queda pendiente actualizar el EPP.",
+            },
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["autor_nombre"], "operador1")
+
+        listado = self.client.get(url, **self._auth(self.operador))
+        self.assertEqual(len(listado.data), 1)
+        self.assertEqual(listado.data[0]["codigo_alerta"], "altura_sin_epp_caida")
+
+    def test_texto_vacio_devuelve_400(self):
+        declaracion = self._declaracion()
+        url = reverse("contratistas:declaraciones_notas_alertas", args=[declaracion.pk])
+        response = self.client.post(
+            url,
+            {"codigo_alerta": "altura_sin_epp_caida", "actividad_orden": 0, "texto": "   "},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+
+
 class AutorizacionIngresoTests(ApiTestsBase):
     def setUp(self):
         super().setUp()
