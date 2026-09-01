@@ -306,6 +306,8 @@ function FormularioDeclaracion({
   const [archivoOrigenExcel, setArchivoOrigenExcel] = useState<File | null>(null);
   const [alertas, setAlertas] = useState<AlertaAutomatica[]>([]);
   const [notasAlertas, setNotasAlertas] = useState<NotaAlerta[]>([]);
+  const [alertasSeleccionadas, setAlertasSeleccionadas] = useState<Set<string>>(new Set());
+  const [alertasAplicadas, setAlertasAplicadas] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const id = declaracion?.id;
@@ -355,8 +357,38 @@ function FormularioDeclaracion({
     setNotasAlertas((actual) => [...actual, nota]);
   }
 
+  function claveAlerta(alerta: AlertaAutomatica) {
+    return `${alerta.codigo}-${alerta.actividad_orden}`;
+  }
+
+  function agregarMotivos(alertasAAgregar: AlertaAutomatica[]) {
+    if (alertasAAgregar.length === 0) return;
+    const textoNuevo = alertasAAgregar.map((a) => a.motivo_sugerido).join("\n");
+    setObservaciones((actual) => (actual.trim() ? `${actual.trim()}\n${textoNuevo}` : textoNuevo));
+    setAlertasAplicadas((actual) => {
+      const siguiente = new Set(actual);
+      alertasAAgregar.forEach((a) => siguiente.add(claveAlerta(a)));
+      return siguiente;
+    });
+  }
+
   function usarComoMotivoRechazo(alerta: AlertaAutomatica) {
-    setObservaciones((actual) => (actual.trim() ? `${actual.trim()}\n${alerta.motivo_sugerido}` : alerta.motivo_sugerido));
+    agregarMotivos([alerta]);
+  }
+
+  function alternarSeleccionAlerta(alerta: AlertaAutomatica, marcada: boolean) {
+    setAlertasSeleccionadas((actual) => {
+      const siguiente = new Set(actual);
+      const clave = claveAlerta(alerta);
+      if (marcada) siguiente.add(clave);
+      else siguiente.delete(clave);
+      return siguiente;
+    });
+  }
+
+  function agregarSeleccionadasComoMotivo() {
+    agregarMotivos(alertas.filter((a) => alertasSeleccionadas.has(claveAlerta(a))));
+    setAlertasSeleccionadas(new Set());
   }
 
   async function descargarPdf() {
@@ -569,19 +601,59 @@ function FormularioDeclaracion({
           <p className="font-semibold">
             Alertas automáticas ({alertas.length}) — revísalas antes de decidir, no reemplazan tu criterio.
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3 border-b border-amber-200 pb-2">
+            <label className="flex items-center gap-1.5 text-xs font-medium">
+              <input
+                type="checkbox"
+                checked={alertas.length > 0 && alertas.every((a) => alertasSeleccionadas.has(claveAlerta(a)))}
+                onChange={(e) =>
+                  setAlertasSeleccionadas(e.target.checked ? new Set(alertas.map(claveAlerta)) : new Set())
+                }
+                className="h-4 w-4 rounded border-amber-400 accent-amber-700"
+              />
+              Seleccionar todas
+            </label>
+            <button
+              type="button"
+              onClick={agregarSeleccionadasComoMotivo}
+              disabled={alertasSeleccionadas.size === 0}
+              className="rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Agregar seleccionadas al motivo de rechazo ({alertasSeleccionadas.size})
+            </button>
+          </div>
           <ul className="mt-2 space-y-3">
-            {alertas.map((alerta, indice) => (
-              <li key={`${alerta.codigo}-${indice}`} className="rounded-md border border-amber-200 bg-white/60 p-3">
-                <p className="font-medium">{alerta.titulo}</p>
-                <p className="mt-1 text-amber-800">{alerta.mensaje}</p>
-                <p className="mt-1 text-xs text-amber-700">Fuente: {alerta.fuente}</p>
-                <button
-                  type="button"
-                  onClick={() => usarComoMotivoRechazo(alerta)}
-                  className="mt-2 rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
-                >
-                  Usar como motivo de rechazo
-                </button>
+            {alertas.map((alerta, indice) => {
+              const clave = claveAlerta(alerta);
+              const yaAplicada = alertasAplicadas.has(clave);
+              return (
+              <li key={`${clave}-${indice}`} className="rounded-md border border-amber-200 bg-white/60 p-3">
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={alertasSeleccionadas.has(clave)}
+                    onChange={(e) => alternarSeleccionAlerta(alerta, e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-amber-400 accent-amber-700"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium">{alerta.titulo}</p>
+                    <p className="mt-1 text-amber-800">{alerta.mensaje}</p>
+                    <p className="mt-1 text-xs text-amber-700">Fuente: {alerta.fuente}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => usarComoMotivoRechazo(alerta)}
+                        disabled={yaAplicada}
+                        className="rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Usar como motivo de rechazo
+                      </button>
+                      {yaAplicada && (
+                        <span className="text-xs font-semibold text-emerald-700">✓ Agregada al motivo de rechazo</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <NotasDeAlerta
                   notas={notasAlertas.filter(
                     (n) => n.codigo_alerta === alerta.codigo && n.actividad_orden === alerta.actividad_orden
@@ -589,7 +661,8 @@ function FormularioDeclaracion({
                   onAgregar={(texto) => agregarNotaAlerta(alerta, texto)}
                 />
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}
