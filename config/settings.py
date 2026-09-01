@@ -193,11 +193,48 @@ STORAGES = {
     },
 }
 
-# Media (snapshots de EventoDetectado). Almacenamiento local por ahora — el
-# disco de Railway no es persistente entre despliegues; migrar a un storage
-# externo (S3 u otro) es una decisión de alcance aparte, no default de Fase 1.
+# Media (Excel original de declaraciones, PDFs de autorización de datos,
+# fotos de referencia de cámaras). MEDIA_ROOT/local por defecto — sin
+# almacenamiento externo configurado, cualquier archivo subido desaparece
+# en el próximo despliegue (el disco de Railway no es persistente entre
+# despliegues). Ver USANDO_R2 más abajo para el storage que sí sobrevive.
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Cloudflare R2 (API compatible con S3) como storage de archivos subidos,
+# para que sobrevivan a los despliegues de Railway. Sin las 4 variables de
+# entorno obligatorias configuradas, cae al disco local de arriba — así el
+# desarrollo local no necesita una cuenta de Cloudflare. R2_PUBLIC_BASE_URL
+# es opcional: sin ella, cada URL de archivo se firma con una expiración
+# (1 hora) en vez de exigir que el bucket sea público.
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "")
+R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL", "")
+R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "")
+
+USANDO_R2 = bool(R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME and R2_ENDPOINT_URL)
+if USANDO_R2:
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "access_key": R2_ACCESS_KEY_ID,
+            "secret_key": R2_SECRET_ACCESS_KEY,
+            "bucket_name": R2_BUCKET_NAME,
+            "endpoint_url": R2_ENDPOINT_URL,
+            "region_name": "auto",
+            "signature_version": "s3v4",
+            "file_overwrite": False,
+            "default_acl": None,
+            "querystring_auth": not R2_PUBLIC_BASE_URL,
+            "querystring_expire": 3600,
+            **(
+                {"custom_domain": R2_PUBLIC_BASE_URL.removeprefix("https://").removeprefix("http://")}
+                if R2_PUBLIC_BASE_URL
+                else {}
+            ),
+        },
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

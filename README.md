@@ -461,6 +461,7 @@ creado ahí.
    | `BREVO_API_KEY` | API key de [Brevo](https://app.brevo.com) (Settings → SMTP & API → API Keys) — opcional: también se puede digitar desde el dashboard (Sistema → Brevo), que tiene prioridad sobre esta variable; sin ninguna de las dos, las alertas por correo quedan registradas como error pero no rompen nada |
    | `BREVO_REMITENTE_EMAIL` | correo remitente verificado en Brevo (Settings → Senders) — también configurable desde el dashboard |
    | `BREVO_REMITENTE_NOMBRE` | nombre que aparece como remitente, ej. `SST Bavaria — Cámaras IA` — también configurable desde el dashboard |
+   | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL` | Cloudflare R2 para que los archivos subidos (`media/`) sobrevivan a los despliegues — ver la sección "Almacenamiento de archivos (`media/`) en Cloudflare R2" más abajo. Sin estas 4 variables, cae a disco local (se pierde en cada deploy) |
 
 4. Railway detecta `railway.json` (build con Nixpacks) y corre
    automáticamente `migrate`, `collectstatic` y levanta `gunicorn` según el
@@ -528,12 +529,70 @@ que el dominio queda en "Valid Configuration" en Vercel, hay que sumarlo a
 arriba) — sin ese paso el login funciona por IP/vercel.app pero falla en
 el dominio propio.
 
-### Nota sobre `media/` (fotos de eventos)
+### Almacenamiento de archivos (`media/`) en Cloudflare R2
 
-El disco de Railway no es persistente entre despliegues. Ahora que el
-endpoint de eventos ya guarda snapshots de verdad, antes de recibir eventos
-reales en producción hay que decidir un storage externo (S3 u otro) — es
-una decisión de alcance/costo aparte, no un default de esta fase.
+El disco de Railway no es persistente entre despliegues — cualquier
+archivo subido a `media/` (Excel original de declaraciones, PDFs de
+autorización de datos, fotos de referencia de cámaras) desaparece en el
+próximo deploy si no se configura un storage externo. El backend usa
+[Cloudflare R2](https://developers.cloudflare.com/r2/) (compatible con la
+API de S3, sin costo de salida de datos) en cuanto estas 4 variables están
+puestas en Railway — sin ellas, cae automáticamente a disco local (sirve
+para desarrollo, no para producción):
+
+| Variable | Valor |
+|---|---|
+| `R2_ACCESS_KEY_ID` | Access Key ID del token de API de R2 |
+| `R2_SECRET_ACCESS_KEY` | Secret Access Key del mismo token |
+| `R2_BUCKET_NAME` | nombre del bucket, ej. `sstbavaria-cctv-media` |
+| `R2_ENDPOINT_URL` | `https://<Account ID>.r2.cloudflarestorage.com` — el Account ID está en R2 Object Storage → Overview, en "Account Details" |
+| `R2_PUBLIC_BASE_URL` | opcional — dominio público del bucket (el subdominio `.r2.dev` que da Cloudflare al activar "Public access" en el bucket, o un dominio propio conectado a él). Sin esta variable, cada link a un archivo se firma con una URL temporal (expira en 1 hora) en vez de exigir que el bucket sea público — más seguro y no requiere configurar nada adicional |
+
+Pasos en el dashboard de Cloudflare (**R2 Object Storage**):
+1. **Create bucket** — nombre a elección (ej. `sstbavaria-cctv-media`),
+   dejarlo privado (no hace falta "Public access" si no vas a usar
+   `R2_PUBLIC_BASE_URL`).
+2. **Manage API Tokens → Create API Token** (o desde el bucket: Settings →
+   API Tokens) — permisos "Object Read & Write", limitado a ese bucket.
+   Copia el **Access Key ID** y el **Secret Access Key** que muestra (el
+   Secret solo se ve una vez, en la creación).
+3. Copia esas 4-5 variables en Railway (Settings → Variables del servicio
+   web) y redeploy.
+
+Con las variables puestas, tanto los archivos que se suban desde ahora
+como todos los flujos que ya usaban `media/` (Excel original de
+declaraciones importadas, PDFs de autorización de datos de trabajadores,
+fotos de referencia de cámaras) quedan en R2 automáticamente — no hace
+falta cambiar nada más en el código (`config/settings.py`, `USANDO_R2`).
+
+### Respaldo automático de la base de datos
+
+`python manage.py backup_db` (`core/management/commands/backup_db.py`)
+vuelca toda la base (`dumpdata`, excepto sesiones/permisos/tipos de
+contenido que se regeneran solos) comprimida en `.json.gz` y la sube al
+storage configurado — R2 si `USANDO_R2` está activo (ver arriba), disco
+local si no. Borra automáticamente los respaldos con más de 30 días
+(`DIAS_RETENCION` en el comando) para no crecer sin límite.
+
+El comando no se dispara solo — hay que programarlo como **Cron Job de
+Railway**, un tipo de servicio aparte que corre el comando y se apaga (no
+queda como servidor web escuchando):
+
+1. En el proyecto de Railway: **+ New → Empty Service**, conectarlo al
+   mismo repositorio de GitHub (mismo Root Directory que el backend).
+2. En **Settings** del servicio nuevo: **Cron Schedule** → `0 7 * * *`
+   (2:00 a.m. hora de Bogotá — Railway programa en UTC, y Bogotá es
+   UTC-5, así que 07:00 UTC = 2:00 a.m. Bogotá).
+3. **Custom Start Command** → `python manage.py backup_db`.
+4. **Variables**: copia las mismas variables del servicio web —
+   `DATABASE_URL` (o conéctalo al mismo Postgres del proyecto),
+   `SECRET_KEY`, `DEBUG=False` y las 4 de R2 de arriba (sin R2 el
+   respaldo se guarda en el disco efímero del propio Cron Job y se pierde
+   igual, así que para que sirva de algo hace falta R2 configurado acá
+   también).
+5. Deploy. Railway va a correr el comando todos los días a esa hora — se
+   puede probar de inmediato con el botón "Trigger" del servicio en vez
+   de esperar al horario programado.
 
 ### Nota sobre `disparar_alerta`
 

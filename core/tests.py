@@ -1,8 +1,15 @@
+import gzip
+import json
+import os
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from contratistas.models import EmpresaContratista
 from core.models import Empresa
@@ -278,3 +285,70 @@ class UsuarioAdminTests(TestCase):
         nuevo = Usuario.objects.get(username="nuevo_desde_admin")
         self.assertEqual(PerfilUsuario.objects.filter(usuario=nuevo).count(), 1)
         self.assertEqual(nuevo.perfil.rol, PerfilUsuario.Rol.OPERADOR)
+
+
+class BackupDbCommandTests(TestCase):
+    """manage.py backup_db — respaldo diario de la base al storage
+    configurado (Cloudflare R2 en producción, disco local en desarrollo).
+    Ver core/management/commands/backup_db.py."""
+
+    def setUp(self):
+        Empresa.objects.create(nombre="Empresa de prueba")
+        self._archivos_creados = []
+
+    def tearDown(self):
+        for ruta in self._archivos_creados:
+            if default_storage.exists(ruta):
+                default_storage.delete(ruta)
+
+    def _generar_respaldo(self):
+        antes = set(default_storage.listdir("backups/")[1]) if self._existe_backups() else set()
+        call_command("backup_db")
+        despues = set(default_storage.listdir("backups/")[1])
+        nuevos = despues - antes
+        for nombre in nuevos:
+            self._archivos_creados.append(f"backups/{nombre}")
+        return nuevos
+
+    def _existe_backups(self):
+        try:
+            default_storage.listdir("backups/")
+            return True
+        except (FileNotFoundError, OSError):
+            return False
+
+    def test_genera_un_respaldo_valido_con_los_datos_actuales(self):
+        nuevos = self._generar_respaldo()
+        self.assertEqual(len(nuevos), 1)
+        ruta = f"backups/{next(iter(nuevos))}"
+
+        with default_storage.open(ruta, "rb") as archivo:
+            contenido = gzip.decompress(archivo.read())
+        datos = json.loads(contenido)
+        self.assertTrue(any(fila["model"] == "core.empresa" for fila in datos))
+
+    def test_no_incluye_sesiones_ni_permisos(self):
+        nuevos = self._generar_respaldo()
+        ruta = f"backups/{next(iter(nuevos))}"
+        with default_storage.open(ruta, "rb") as archivo:
+            contenido = gzip.decompress(archivo.read())
+        datos = json.loads(contenido)
+        modelos = {fila["model"] for fila in datos}
+        self.assertNotIn("sessions.session", modelos)
+        self.assertNotIn("auth.permission", modelos)
+        self.assertNotIn("contenttypes.contenttype", modelos)
+
+    def test_elimina_respaldos_con_mas_de_30_dias(self):
+        # Respaldo "viejo": se guarda y se le retrasa la fecha de
+        # modificación en disco para simular que tiene más de 30 días.
+        viejos = self._generar_respaldo()
+        ruta_vieja = f"backups/{next(iter(viejos))}"
+        fecha_vieja = (timezone.now() - timezone.timedelta(days=31)).timestamp()
+        os.utime(default_storage.path(ruta_vieja), (fecha_vieja, fecha_vieja))
+
+        nuevos = self._generar_respaldo()
+        ruta_nueva = f"backups/{next(iter(nuevos))}"
+
+        self.assertFalse(default_storage.exists(ruta_vieja))
+        self.assertTrue(default_storage.exists(ruta_nueva))
+        self._archivos_creados = [r for r in self._archivos_creados if r != ruta_vieja]
