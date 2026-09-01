@@ -28,8 +28,9 @@ frontend en Vercel — pero viven en el mismo repositorio.
   - **Declaración de Método**: formulario dinámico de secuencia de
     actividades con evaluación de riesgo por el método Kinney
     (R = Probabilidad × Frecuencia × Impacto, antes y después de mitigación),
-    permisos de trabajo requeridos y **firmas electrónicas** — basado en el
-    formato real `REG.MAZ.SAFE.2.5.2` que ya usa el cliente.
+    permisos de trabajo y equipo de protección personal (EPP) requeridos
+    por actividad, y **firmas electrónicas** — basado en el formato real
+    `REG.MAZ.SAFE.2.5.2` que ya usa el cliente.
   - Ambos módulos, además: vencimiento de la planilla PILA visible con
     badge (Vigente/Por vencer/Vencida) y banner de aviso agregado; correo
     automático (Brevo) al contacto de la empresa contratista al
@@ -37,6 +38,17 @@ frontend en Vercel — pero viven en el mismo repositorio.
     puede aprobar una declaración sin al menos una firma vigente;
     exportación a Excel de las radicaciones (`openpyxl`) y a PDF de la
     declaración de método completa (`xhtml2pdf`).
+  - **Exportar Declaración de Método a Excel** (botón "Descargar Excel",
+    junto al de PDF; `contratistas/exportar_declaracion_excel.py`,
+    `openpyxl`): genera el mismo libro de 5 hojas que usa la empresa
+    contratista para sus propias declaraciones — Declaración de Método
+    (datos generales + actividades), Firmas/Permisos/EPP, Catálogo de
+    Peligros y Evaluación según Kinney (ambas hojas de referencia estática,
+    tomadas tal cual del formato real del cliente vía
+    `contratistas/catalogo_peligros.py`) y Control del Documento (footer con
+    los metadatos propios de SST Bavaria — deliberadamente sin replicar el
+    código de control documental interno de AB InBev, para no dar a
+    entender que el archivo es un documento emitido oficialmente por ellos).
   - **Firma electrónica de la Declaración de Método**: cada firma queda
     ligada a la cuenta autenticada que la ejecutó (`FirmaMetodo.firmante_usuario`,
     tomado de `request.user` — nunca del cliente) más un consentimiento
@@ -61,13 +73,16 @@ frontend en Vercel — pero viven en el mismo repositorio.
   - **Motor de reglas configurable** (pestaña "Reglas de contratistas" en
     Sistema, solo Administrador): los cursos Safety Academy
     (`contratistas.CursoSafetyAcademy`), los permisos de trabajo
-    (`contratistas.PermisoTrabajo`) y los días de alerta de vencimiento
-    (`contratistas.ConfiguracionAlertas`) dejaron de ser constantes fijas
-    en el código — ahora son catálogos editables (agregar/desactivar/
-    eliminar) desde el dashboard. La migración `0008_sembrar_cursos_y_permisos`
-    siembra los valores que antes estaban hardcodeados, así los
-    trabajadores/actividades ya guardados siguen encontrando su curso o
-    permiso por la misma clave/nombre.
+    (`contratistas.PermisoTrabajo`), el equipo de protección personal
+    (`contratistas.EquipoProteccionPersonal`) y los días de alerta de
+    vencimiento (`contratistas.ConfiguracionAlertas`) dejaron de ser
+    constantes fijas en el código — ahora son catálogos editables
+    (agregar/desactivar/eliminar) desde el dashboard. Las migraciones
+    `0008_sembrar_cursos_y_permisos` y `0016_sembrar_epp` siembran los
+    valores que antes estaban hardcodeados (el EPP tomado tal cual del
+    formato real de Declaración de Método del cliente), así los
+    trabajadores/actividades ya guardados siguen encontrando su curso,
+    permiso o EPP por la misma clave/nombre.
   - **Validación de cursos obligatorios**: un curso Safety Academy se puede
     marcar `obligatorio` (misma pestaña). El campo calculado
     `Trabajador.cursos_pendientes` avisa (⚠ en la lista de trabajadores y

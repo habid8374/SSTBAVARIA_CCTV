@@ -26,6 +26,7 @@ from .models import (
     CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
+    EquipoProteccionPersonal,
     FirmaMetodo,
     Funcionario,
     NotificacionInterna,
@@ -51,6 +52,7 @@ from .serializers import (
     DeclaracionMetodoSerializer,
     EmpresaContratistaCrearSerializer,
     EmpresaContratistaSerializer,
+    EquipoProteccionPersonalSerializer,
     FirmaMetodoSerializer,
     FuncionarioSerializer,
     NotificacionInternaSerializer,
@@ -283,6 +285,18 @@ class PermisoTrabajoListaDashboard(generics.ListCreateAPIView):
 class PermisoTrabajoDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = PermisoTrabajo.objects.all()
     serializer_class = PermisoTrabajoSerializer
+    permission_classes = [EsPersonalInterno, EsAdministradorParaEliminar]
+
+
+class EquipoProteccionPersonalListaDashboard(generics.ListCreateAPIView):
+    queryset = EquipoProteccionPersonal.objects.all()
+    serializer_class = EquipoProteccionPersonalSerializer
+    permission_classes = [EsPersonalInterno]
+
+
+class EquipoProteccionPersonalDetalle(generics.RetrieveUpdateDestroyAPIView):
+    queryset = EquipoProteccionPersonal.objects.all()
+    serializer_class = EquipoProteccionPersonalSerializer
     permission_classes = [EsPersonalInterno, EsAdministradorParaEliminar]
 
 
@@ -746,6 +760,29 @@ def declaracion_pdf(request, pk):
     resultado = pisa.CreatePDF(html, dest=respuesta)
     if resultado.err:
         return Response({"detail": "No se pudo generar el PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return respuesta
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def declaracion_excel(request, pk):
+    """Descarga la declaración de método en el mismo formato Excel (5 hojas)
+    que usa el cliente para las suyas — ver
+    contratistas/exportar_declaracion_excel.py."""
+    from django.http import HttpResponse
+
+    from .exportar_declaracion_excel import generar_excel_declaracion
+
+    qs = DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas")
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    declaracion = get_object_or_404(qs, pk=pk)
+
+    libro = generar_excel_declaracion(declaracion)
+    respuesta = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    respuesta["Content-Disposition"] = f'attachment; filename="declaracion-metodo-{declaracion.pk}.xlsx"'
+    libro.save(respuesta)
     return respuesta
 
 

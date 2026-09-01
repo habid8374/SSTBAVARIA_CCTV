@@ -245,6 +245,7 @@ class ActividadMetodo(models.Model):
     frecuencia_con = models.FloatField("frecuencia (con mitigación)", default=0)
     impacto_con = models.FloatField("impacto (con mitigación)", default=0)
     permisos_requeridos = models.JSONField(default=list, blank=True)
+    epp_requerido = models.JSONField("EPP requerido", default=list, blank=True)
     tarea_sif = models.BooleanField("tarea SIF", default=False)
 
     class Meta:
@@ -295,6 +296,7 @@ def calcular_hash_declaracion(declaracion):
             "frecuencia_con": a.frecuencia_con,
             "impacto_con": a.impacto_con,
             "permisos_requeridos": a.permisos_requeridos,
+            "epp_requerido": a.epp_requerido,
             "tarea_sif": a.tarea_sif,
         }
         for a in declaracion.actividades.order_by("orden")
@@ -429,6 +431,25 @@ class PermisoTrabajo(models.Model):
     class Meta:
         verbose_name = "permiso de trabajo"
         verbose_name_plural = "permisos de trabajo"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class EquipoProteccionPersonal(models.Model):
+    """Catálogo editable de EPP (elementos de protección personal) que se
+    puede marcar como requerido por actividad — mismo patrón que
+    PermisoTrabajo, tomado del formato real de Declaración de Método del
+    cliente (hoja "Firmas,Permisos, EPP")."""
+
+    nombre = models.CharField(max_length=200, unique=True)
+    activo = models.BooleanField(default=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "equipo de protección personal"
+        verbose_name_plural = "equipos de protección personal"
         ordering = ["orden", "nombre"]
 
     def __str__(self):

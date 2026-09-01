@@ -7,6 +7,7 @@ from .models import (
     CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
+    EquipoProteccionPersonal,
     FirmaMetodo,
     Funcionario,
     NotificacionInterna,
@@ -101,6 +102,12 @@ class CursoSafetyAcademyAdmin(admin.ModelAdmin):
 
 @admin.register(PermisoTrabajo)
 class PermisoTrabajoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "activo", "orden")
+    list_editable = ("activo", "orden")
+
+
+@admin.register(EquipoProteccionPersonal)
+class EquipoProteccionPersonalAdmin(admin.ModelAdmin):
     list_display = ("nombre", "activo", "orden")
     list_editable = ("activo", "orden")
 

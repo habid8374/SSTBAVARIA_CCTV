@@ -253,14 +253,16 @@ class IndicadoresDashboardTests(ApiTestsBase):
 
 class ReglasConfigurablesTests(ApiTestsBase):
     def test_catalogos_solo_incluye_cursos_y_permisos_activos(self):
-        from .models import ConfiguracionAlertas, CursoSafetyAcademy, PermisoTrabajo
+        from .models import ConfiguracionAlertas, CursoSafetyAcademy, EquipoProteccionPersonal, PermisoTrabajo
 
         CursoSafetyAcademy.objects.create(clave="curso_inactivo", etiqueta="Curso inactivo", activo=False)
         PermisoTrabajo.objects.create(nombre="Permiso inactivo", activo=False)
+        EquipoProteccionPersonal.objects.create(nombre="EPP inactivo", activo=False)
         response = self.client.get(reverse("contratistas:catalogos"), **self._auth(self.operador))
         claves = [c["clave"] for c in response.data["cursos_safety_academy"]]
         self.assertNotIn("curso_inactivo", claves)
         self.assertNotIn("Permiso inactivo", response.data["permisos_trabajo"])
+        self.assertNotIn("EPP inactivo", response.data["equipos_epp"])
 
     def test_crear_curso(self):
         response = self.client.post(
@@ -286,6 +288,33 @@ class ReglasConfigurablesTests(ApiTestsBase):
         permiso = PermisoTrabajo.objects.create(nombre="X")
         response = self.client.delete(
             reverse("contratistas:permisos_detalle", args=[permiso.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+
+    def test_crear_epp(self):
+        response = self.client.post(
+            reverse("contratistas:equipos_epp_lista"),
+            {"nombre": "Nuevo EPP de prueba", "orden": 1},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_operador_no_puede_eliminar_epp(self):
+        from .models import EquipoProteccionPersonal
+
+        epp = EquipoProteccionPersonal.objects.create(nombre="Guantes")
+        response = self.client.delete(
+            reverse("contratistas:equipos_epp_detalle", args=[epp.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_puede_eliminar_epp(self):
+        from .models import EquipoProteccionPersonal
+
+        epp = EquipoProteccionPersonal.objects.create(nombre="Guantes")
+        response = self.client.delete(
+            reverse("contratistas:equipos_epp_detalle", args=[epp.pk]), **self._auth(self.admin)
         )
         self.assertEqual(response.status_code, 204)
 
@@ -1177,6 +1206,45 @@ class DeclaracionMetodoTests(ApiTestsBase):
             descripcion_trabajo="Instalación de pórtico",
         )
         response = self.client.get(reverse("contratistas:declaraciones_pdf", args=[declaracion.pk]))
+        self.assertEqual(response.status_code, 401)
+
+    def test_excel_devuelve_documento(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Ingreso a planta",
+            probabilidad_sin=6,
+            frecuencia_sin=3,
+            impacto_sin=3,
+            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+            epp_requerido=["Casco de seguridad"],
+        )
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
+
+        response = self.client.get(
+            reverse("contratistas:declaraciones_excel", args=[declaracion.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertIn(f'declaracion-metodo-{declaracion.pk}.xlsx', response["Content-Disposition"])
+
+    def test_excel_requiere_autenticacion(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.get(reverse("contratistas:declaraciones_excel", args=[declaracion.pk]))
         self.assertEqual(response.status_code, 401)
 
     def test_firmar_declaracion(self):

@@ -10,6 +10,7 @@ from .models import (
     CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
+    EquipoProteccionPersonal,
     FirmaMetodo,
     Funcionario,
     NotificacionInterna,
@@ -232,6 +233,7 @@ class ActividadMetodoSerializer(serializers.ModelSerializer):
             "riesgo_con",
             "nivel_riesgo_con",
             "permisos_requeridos",
+            "epp_requerido",
             "tarea_sif",
         ]
         read_only_fields = ["id"]
@@ -332,6 +334,7 @@ class CatalogosSerializer(serializers.Serializer):
 
     cursos_safety_academy = serializers.SerializerMethodField()
     permisos_trabajo = serializers.SerializerMethodField()
+    equipos_epp = serializers.SerializerMethodField()
     roles_firma = serializers.SerializerMethodField()
 
     def get_cursos_safety_academy(self, obj):
@@ -342,6 +345,9 @@ class CatalogosSerializer(serializers.Serializer):
 
     def get_permisos_trabajo(self, obj):
         return list(PermisoTrabajo.objects.filter(activo=True).values_list("nombre", flat=True))
+
+    def get_equipos_epp(self, obj):
+        return list(EquipoProteccionPersonal.objects.filter(activo=True).values_list("nombre", flat=True))
 
     def get_roles_firma(self, obj):
         return [{"clave": clave, "etiqueta": etiqueta} for clave, etiqueta in FirmaMetodo.Rol.choices]
@@ -372,6 +378,13 @@ class CursoSafetyAcademySerializer(serializers.ModelSerializer):
 class PermisoTrabajoSerializer(serializers.ModelSerializer):
     class Meta:
         model = PermisoTrabajo
+        fields = ["id", "nombre", "activo", "orden"]
+        read_only_fields = ["id"]
+
+
+class EquipoProteccionPersonalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EquipoProteccionPersonal
         fields = ["id", "nombre", "activo", "orden"]
         read_only_fields = ["id"]
 

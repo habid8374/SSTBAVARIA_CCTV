@@ -7,16 +7,21 @@ import {
   ApiError,
   actualizarConfiguracionAlertas,
   actualizarCurso,
+  actualizarEquipoEpp,
   actualizarPermisoTrabajo,
   crearCurso,
+  crearEquipoEpp,
   crearPermisoTrabajo,
   eliminarCurso,
+  eliminarEquipoEpp,
   eliminarPermisoTrabajo,
   listarCursos,
+  listarEquiposEpp,
   listarPermisosTrabajo,
   obtenerConfiguracionAlertas,
   type ConfiguracionAlertas,
   type CursoSafetyAcademy,
+  type EquipoProteccionPersonal,
   type PermisoTrabajo,
 } from "@/lib/api";
 
@@ -33,6 +38,7 @@ export default function ReglasContratistasView({ token }: { token: string }) {
       <DiasAlerta token={token} />
       <Cursos token={token} />
       <Permisos token={token} />
+      <EquiposEpp token={token} />
     </div>
   );
 }
@@ -323,6 +329,91 @@ function Permisos({ token }: { token: string }) {
       <form onSubmit={agregar} className="mt-4 flex flex-wrap items-end gap-3">
         <label className="flex-1 space-y-1.5">
           <span className="text-sm font-medium text-corp-navy">Nombre del permiso</span>
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={INPUT} />
+        </label>
+        <button
+          type="submit"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+        >
+          + Agregar
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function EquiposEpp({ token }: { token: string }) {
+  const { confirmar } = useDialog();
+  const [equipos, setEquipos] = useState<EquipoProteccionPersonal[] | null>(null);
+  const [nombre, setNombre] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function cargar() {
+    listarEquiposEpp(token).then(setEquipos).catch(() => setError("No se pudo cargar la lista de EPP."));
+  }
+
+  useEffect(cargar, [token]);
+
+  async function agregar(event: FormEvent) {
+    event.preventDefault();
+    if (!nombre.trim()) return;
+    setError(null);
+    try {
+      await crearEquipoEpp(token, { nombre: nombre.trim() });
+      setNombre("");
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo crear el EPP.");
+    }
+  }
+
+  async function alternarActivo(epp: EquipoProteccionPersonal) {
+    try {
+      await actualizarEquipoEpp(token, epp.id, { activo: !epp.activo });
+      cargar();
+    } catch {
+      setError("No se pudo actualizar el EPP.");
+    }
+  }
+
+  async function eliminar(epp: EquipoProteccionPersonal) {
+    const ok = await confirmar({
+      titulo: "Eliminar equipo de protección personal",
+      mensaje: `¿Eliminar "${epp.nombre}"? Ya no aparecerá como opción en las actividades de una declaración de método.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminarEquipoEpp(token, epp.id);
+      cargar();
+    } catch {
+      setError("No se pudo eliminar el EPP.");
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-corp-border bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-corp-navy">Equipo de protección personal (EPP)</h3>
+      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      <div className="mt-3 space-y-2">
+        {equipos?.map((e) => (
+          <div key={e.id} className="flex items-center justify-between rounded-lg border border-corp-border px-3 py-2 text-sm">
+            <span className={e.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{e.nombre}</span>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => alternarActivo(e)} className="text-corp-blue hover:underline">
+                {e.activo ? "Desactivar" : "Activar"}
+              </button>
+              <button type="button" onClick={() => eliminar(e)} className="text-red-600 hover:underline">
+                Eliminar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={agregar} className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="flex-1 space-y-1.5">
+          <span className="text-sm font-medium text-corp-navy">Nombre del EPP</span>
           <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={INPUT} />
         </label>
         <button

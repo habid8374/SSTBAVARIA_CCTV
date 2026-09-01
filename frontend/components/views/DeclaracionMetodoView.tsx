@@ -6,6 +6,7 @@ import {
   ApiError,
   actualizarDeclaracion,
   crearDeclaracion,
+  descargarDeclaracionExcel,
   descargarDeclaracionPdf,
   firmarDeclaracion,
   listarContratistas,
@@ -234,6 +235,7 @@ function actividadVacia(orden: number): ActividadForm {
     frecuencia_con: 3,
     impacto_con: 1,
     permisos_requeridos: [],
+    epp_requerido: [],
     tarea_sif: false,
   };
 }
@@ -289,6 +291,7 @@ function FormularioDeclaracion({
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [descargandoPdf, setDescargandoPdf] = useState(false);
+  const [descargandoExcel, setDescargandoExcel] = useState(false);
 
   async function descargarPdf() {
     if (!declaracion) return;
@@ -299,6 +302,18 @@ function FormularioDeclaracion({
       setError("No se pudo descargar el PDF.");
     } finally {
       setDescargandoPdf(false);
+    }
+  }
+
+  async function descargarExcel() {
+    if (!declaracion) return;
+    setDescargandoExcel(true);
+    try {
+      await descargarDeclaracionExcel(token, declaracion.id);
+    } catch {
+      setError("No se pudo descargar el Excel.");
+    } finally {
+      setDescargandoExcel(false);
     }
   }
 
@@ -322,6 +337,16 @@ function FormularioDeclaracion({
           ? [...a.permisos_requeridos, permiso]
           : a.permisos_requeridos.filter((p) => p !== permiso);
         return { ...a, permisos_requeridos: permisos };
+      })
+    );
+  }
+
+  function alternarEpp(indice: number, epp: string, marcado: boolean) {
+    setActividades((actual) =>
+      actual.map((a, i) => {
+        if (i !== indice) return a;
+        const epps = marcado ? [...a.epp_requerido, epp] : a.epp_requerido.filter((e) => e !== epp);
+        return { ...a, epp_requerido: epps };
       })
     );
   }
@@ -356,6 +381,7 @@ function FormularioDeclaracion({
         frecuencia_con: a.frecuencia_con,
         impacto_con: a.impacto_con,
         permisos_requeridos: a.permisos_requeridos,
+        epp_requerido: a.epp_requerido,
         tarea_sif: a.tarea_sif,
       })),
     };
@@ -380,14 +406,24 @@ function FormularioDeclaracion({
           ← Volver a la lista
         </button>
         {declaracion && (
-          <button
-            type="button"
-            onClick={descargarPdf}
-            disabled={descargandoPdf}
-            className="rounded-lg border border-corp-border px-3 py-1.5 text-xs font-semibold text-corp-navy transition hover:border-corp-blue disabled:opacity-60"
-          >
-            {descargandoPdf ? "Generando…" : "Descargar PDF"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={descargarPdf}
+              disabled={descargandoPdf}
+              className="rounded-lg border border-corp-border px-3 py-1.5 text-xs font-semibold text-corp-navy transition hover:border-corp-blue disabled:opacity-60"
+            >
+              {descargandoPdf ? "Generando…" : "Descargar PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={descargarExcel}
+              disabled={descargandoExcel}
+              className="rounded-lg border border-corp-border px-3 py-1.5 text-xs font-semibold text-corp-navy transition hover:border-corp-blue disabled:opacity-60"
+            >
+              {descargandoExcel ? "Generando…" : "Descargar Excel"}
+            </button>
+          </div>
         )}
       </div>
 
@@ -645,6 +681,25 @@ function FormularioDeclaracion({
                             className="h-4 w-4 rounded border-corp-border accent-corp-blue"
                           />
                           {permiso}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <span className="text-sm font-medium text-corp-navy">
+                      Equipo de protección personal (EPP) requerido
+                    </span>
+                    <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      {catalogos.equipos_epp.map((epp) => (
+                        <label key={epp} className="flex items-center gap-2 text-sm text-corp-navy">
+                          <input
+                            type="checkbox"
+                            checked={actividad.epp_requerido.includes(epp)}
+                            onChange={(e) => alternarEpp(indice, epp, e.target.checked)}
+                            className="h-4 w-4 rounded border-corp-border accent-corp-blue"
+                          />
+                          {epp}
                         </label>
                       ))}
                     </div>

@@ -270,6 +270,8 @@ const TEMAS: Tema[] = [
             <strong>con</strong> ellas aplicadas — el nivel de riesgo (bajo/medio/alto/crítico) se calcula
             solo según el puntaje.</li>
           <li>Permisos de trabajo requeridos por actividad (altura, caliente, espacio confinado, etc.).</li>
+          <li>Equipo de protección personal (EPP) requerido por actividad (casco, gafas, arnés, etc.) — se
+            marca igual que los permisos de trabajo, con casillas por actividad.</li>
           <li>Firmas electrónicas por rol (supervisor del contratista, delegado ABI, seguridad de planta,
             etc.) y estado general del documento (borrador / enviada / aprobada / rechazada).</li>
         </Ul>
@@ -292,12 +294,18 @@ const TEMAS: Tema[] = [
           firma registrada, o si alguna firma quedó desactualizada por una edición posterior — evita aprobar
           un documento vacío o distinto al que se firmó.
         </P>
-        <Sub>Notificación y descarga en PDF</Sub>
+        <Sub>Notificación y descarga en PDF o Excel</Sub>
         <P>
           Al aprobar o rechazar, se le avisa por correo al contacto de la empresa contratista (si tiene correo
           registrado) — igual que en Contratistas. Botón <strong>&quot;Descargar PDF&quot;</strong> (arriba
           del formulario, una vez la declaración está guardada) genera el documento completo — datos
           generales, actividades con su evaluación de riesgo y firmas — listo para archivar o imprimir.
+        </P>
+        <P>
+          Botón <strong>&quot;Descargar Excel&quot;</strong>, al lado del PDF, genera el mismo libro de
+          Excel de 5 hojas que usa la empresa contratista para sus propias declaraciones (Declaración de
+          Método, Firmas/Permisos/EPP, Catálogo de Peligros, Evaluación según Kinney y Control del
+          Documento) — útil cuando quien recibe el archivo espera ese formato exacto en vez de un PDF.
         </P>
         <Sub>El ciclo enviar → revisar → aprobar/rechazar → subsanar</Sub>
         <P>
@@ -446,7 +454,8 @@ const TEMAS: Tema[] = [
         <P>
           Catálogos que antes estaban fijos en el código, ahora editables acá: los <strong>cursos Safety
           Academy</strong> que aparecen al registrar un trabajador, los <strong>permisos de trabajo /
-          certificados requeridos</strong> que aparecen en las actividades de una declaración de método, y
+          certificados requeridos</strong> y el <strong>equipo de protección personal (EPP)</strong> que
+          aparecen en las actividades de una declaración de método, y
           los <strong>días de alerta de vencimiento</strong> (a cuántos días de vencer una planilla se
           considera &quot;por vencer&quot; en el banner de Contratistas), y el <strong>correo para avisos
           de revisión pendiente</strong>. Se pueden desactivar sin borrar el historial de

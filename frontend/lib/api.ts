@@ -476,6 +476,7 @@ export type Opcion = { clave: string; etiqueta: string };
 export type Catalogos = {
   cursos_safety_academy: (Opcion & { obligatorio: boolean })[];
   permisos_trabajo: string[];
+  equipos_epp: string[];
   roles_firma: Opcion[];
 };
 
@@ -558,6 +559,44 @@ export function actualizarPermisoTrabajo(
 
 export function eliminarPermisoTrabajo(token: string, id: number): Promise<void> {
   return request<void>(`/api/contratistas/permisos-trabajo/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
+export type EquipoProteccionPersonal = { id: number; nombre: string; activo: boolean; orden: number };
+
+export type NuevoEquipoProteccionPersonal = { nombre: string; activo?: boolean; orden?: number };
+
+export function listarEquiposEpp(token: string): Promise<EquipoProteccionPersonal[]> {
+  return request<EquipoProteccionPersonal[]>("/api/contratistas/equipos-epp/", { headers: authHeaders(token) });
+}
+
+export function crearEquipoEpp(
+  token: string,
+  datos: NuevoEquipoProteccionPersonal
+): Promise<EquipoProteccionPersonal> {
+  return request<EquipoProteccionPersonal>("/api/contratistas/equipos-epp/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarEquipoEpp(
+  token: string,
+  id: number,
+  cambios: Partial<NuevoEquipoProteccionPersonal>
+): Promise<EquipoProteccionPersonal> {
+  return request<EquipoProteccionPersonal>(`/api/contratistas/equipos-epp/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarEquipoEpp(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/equipos-epp/${id}/`, {
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -981,6 +1020,7 @@ export type ActividadMetodo = {
   riesgo_con: number;
   nivel_riesgo_con: NivelRiesgo;
   permisos_requeridos: string[];
+  epp_requerido: string[];
   tarea_sif: boolean;
 };
 
@@ -1160,6 +1200,10 @@ export function firmarDeclaracion(
 
 export function descargarDeclaracionPdf(token: string, id: number): Promise<void> {
   return descargarArchivo(token, `/api/contratistas/declaraciones/${id}/pdf/`, `declaracion-metodo-${id}.pdf`);
+}
+
+export function descargarDeclaracionExcel(token: string, id: number): Promise<void> {
+  return descargarArchivo(token, `/api/contratistas/declaraciones/${id}/excel/`, `declaracion-metodo-${id}.xlsx`);
 }
 
 export type TrabajadorAutorizacionIngreso = {

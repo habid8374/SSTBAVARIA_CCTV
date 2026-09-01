@@ -14,6 +14,8 @@ urlpatterns = [
     path("cursos/<int:pk>/", views.CursoSafetyAcademyDetalle.as_view(), name="cursos_detalle"),
     path("permisos-trabajo/", views.PermisoTrabajoListaDashboard.as_view(), name="permisos_lista"),
     path("permisos-trabajo/<int:pk>/", views.PermisoTrabajoDetalle.as_view(), name="permisos_detalle"),
+    path("equipos-epp/", views.EquipoProteccionPersonalListaDashboard.as_view(), name="equipos_epp_lista"),
+    path("equipos-epp/<int:pk>/", views.EquipoProteccionPersonalDetalle.as_view(), name="equipos_epp_detalle"),
     path("configuracion-alertas/", views.ConfiguracionAlertasDetalle.as_view(), name="configuracion_alertas"),
     path("auditoria/", views.RegistroAuditoriaLista.as_view(), name="auditoria_lista"),
     path("notificaciones-internas/", views.NotificacionInternaLista.as_view(), name="notificaciones_internas_lista"),
@@ -40,6 +42,7 @@ urlpatterns = [
     path("declaraciones/<int:pk>/", views.DeclaracionMetodoDetalle.as_view(), name="declaraciones_detalle"),
     path("declaraciones/<int:pk>/firmar/", views.firmar_declaracion, name="declaraciones_firmar"),
     path("declaraciones/<int:pk>/pdf/", views.declaracion_pdf, name="declaraciones_pdf"),
+    path("declaraciones/<int:pk>/excel/", views.declaracion_excel, name="declaraciones_excel"),
     path(
         "autorizaciones-ingreso/",
         views.AutorizacionIngresoListaDashboard.as_view(),
