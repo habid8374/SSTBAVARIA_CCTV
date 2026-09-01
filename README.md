@@ -392,7 +392,7 @@ creado ahí.
    | `DEBUG` | `False` |
    | `ALLOWED_HOSTS` | el dominio que asigna Railway, ej. `sstbavaria-cctv-production.up.railway.app` |
    | `CSRF_TRUSTED_ORIGINS` | `https://<mismo-dominio-de-arriba>` |
-   | `CORS_ALLOWED_ORIGINS` | el dominio de Vercel del frontend, ej. `https://sstbavaria-cctv.vercel.app` (agrega también el dominio de preview si lo vas a usar) |
+   | `CORS_ALLOWED_ORIGINS` | los dominios donde vive el frontend, separados por coma si son varios — el dominio propio `https://sst-cctv.com` y `https://www.sst-cctv.com`, más el de Vercel `https://sstbavaria-cctv.vercel.app` como respaldo (agrega también el dominio de preview si lo vas a usar) |
    | `DATABASE_URL` | la inyecta Railway automáticamente al agregar Postgres |
    | `BREVO_API_KEY` | API key de [Brevo](https://app.brevo.com) (Settings → SMTP & API → API Keys) — opcional: también se puede digitar desde el dashboard (Sistema → Brevo), que tiene prioridad sobre esta variable; sin ninguna de las dos, las alertas por correo quedan registradas como error pero no rompen nada |
    | `BREVO_REMITENTE_EMAIL` | correo remitente verificado en Brevo (Settings → Senders) — también configurable desde el dashboard |
@@ -441,6 +441,28 @@ su dominio), después el frontend en Vercel con `NEXT_PUBLIC_API_URL`
 apuntando a ese dominio, y por último vuelve a Railway a completar
 `CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` con el dominio de Vercel ya
 generado.
+
+### Dominio propio (`sst-cctv.com`)
+
+El frontend en producción vive en **`https://www.sst-cctv.com`** (dominio
+propio comprado en Porkbun, `sst-cctv.com` redirige ahí con 308) además del
+dominio gratis `sstbavaria-cctv.vercel.app` que Vercel asigna por defecto.
+Para conectar un dominio propio nuevo: agregarlo en Vercel (**Settings →
+Domains → Add Existing**, no "Buy") y crear en el DNS del registrador los
+registros que Vercel indique — típicamente un **A** en la raíz (`@`) hacia
+la IP que muestre Vercel, y un **CNAME** en `www` hacia el destino
+`*.vercel-dns-*.com` que también muestre Vercel (varían por proyecto, hay
+que copiar los valores exactos de la pantalla "View DNS configuration" de
+cada dominio, no reusar los de otro dominio). En Porkbun, si el dominio
+trae parking/forwarding por defecto, primero hay que borrar el registro
+`ALIAS`/`A` de la raíz que apunta a la página de parking de Porkbun antes
+de crear el `A` nuevo — y en el campo "Host" del formulario dejar el campo
+**vacío** para la raíz (escribir el propio dominio ahí lo duplica, ej.
+`sst-cctv.com.sst-cctv.com`, y la validación en Vercel no cierra). Una vez
+que el dominio queda en "Valid Configuration" en Vercel, hay que sumarlo a
+`CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` en Railway (ver tabla
+arriba) — sin ese paso el login funciona por IP/vercel.app pero falla en
+el dominio propio.
 
 ### Nota sobre `media/` (fotos de eventos)
 
