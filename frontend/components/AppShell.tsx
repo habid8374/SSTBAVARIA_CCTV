@@ -108,6 +108,13 @@ export default function AppShell({
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">{children}</main>
+
+        <footer className="flex items-center justify-center gap-2 border-t border-corp-border bg-white px-4 py-2.5 text-xs text-corp-muted">
+          <span>Powered by</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-axentia.png" alt="Axentia Technologies" className="h-4 w-auto" />
+          <span className="font-medium text-corp-navy">Axentia Technologies</span>
+        </footer>
       </div>
     </div>
   );
