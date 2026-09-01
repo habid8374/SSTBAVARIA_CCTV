@@ -179,6 +179,24 @@ class IndicadoresTests(ApiTestsBase):
         response = self.client.get(reverse("contratistas:indicadores"))
         self.assertEqual(response.status_code, 401)
 
+    def test_cuenta_certificaciones_de_trabajadores_vencidas_y_por_vencer(self):
+        self.trabajador.fecha_vencimiento_examen_medico = timezone.localdate() - datetime.timedelta(days=1)
+        self.trabajador.fecha_vencimiento_certificacion_alturas = timezone.localdate() + datetime.timedelta(days=5)
+        self.trabajador.save(
+            update_fields=["fecha_vencimiento_examen_medico", "fecha_vencimiento_certificacion_alturas"]
+        )
+        response = self.client.get(reverse("contratistas:indicadores"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["examenes_medicos_vencidos"], 1)
+        self.assertEqual(response.data["certificaciones_alturas_por_vencer"], 1)
+
+    def test_no_cuenta_certificaciones_de_trabajadores_inactivos(self):
+        self.trabajador.activo = False
+        self.trabajador.fecha_vencimiento_examen_medico = timezone.localdate() - datetime.timedelta(days=1)
+        self.trabajador.save(update_fields=["activo", "fecha_vencimiento_examen_medico"])
+        response = self.client.get(reverse("contratistas:indicadores"), **self._auth(self.operador))
+        self.assertEqual(response.data["examenes_medicos_vencidos"], 0)
+
 
 class IndicadoresDashboardTests(ApiTestsBase):
     def test_requiere_autenticacion(self):
@@ -716,6 +734,31 @@ class TrabajadorTests(ApiTestsBase):
             reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
         )
         self.assertEqual(response.data["cursos_pendientes"], [])
+
+    def test_examen_medico_vencido_expuesto_en_el_detalle(self):
+        self.trabajador.fecha_vencimiento_examen_medico = timezone.localdate() - datetime.timedelta(days=1)
+        self.trabajador.save(update_fields=["fecha_vencimiento_examen_medico"])
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertTrue(response.data["examen_medico_vencido"])
+        self.assertEqual(response.data["dias_para_vencer_examen_medico"], -1)
+
+    def test_certificacion_alturas_vigente_expuesta_en_el_detalle(self):
+        self.trabajador.fecha_vencimiento_certificacion_alturas = timezone.localdate() + datetime.timedelta(days=10)
+        self.trabajador.save(update_fields=["fecha_vencimiento_certificacion_alturas"])
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertFalse(response.data["certificacion_alturas_vencida"])
+        self.assertEqual(response.data["dias_para_vencer_certificacion_alturas"], 10)
+
+    def test_sin_fecha_de_vencimiento_no_marca_vencido(self):
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertFalse(response.data["examen_medico_vencido"])
+        self.assertIsNone(response.data["dias_para_vencer_examen_medico"])
 
     def test_crear_trabajador(self):
         response = self.client.post(

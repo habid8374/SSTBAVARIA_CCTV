@@ -37,6 +37,20 @@ def soporte_autorizacion_upload_to(instance, filename):
     return f"autorizaciones_datos/{instance.contratista_id}/{filename}"
 
 
+def _vencido(fecha):
+    """True si `fecha` ya pasó — nada la marca sola en la base, se calcula
+    al vuelo contra la fecha de hoy. None si `fecha` no está registrada."""
+    return bool(fecha and fecha < timezone.localdate())
+
+
+def _dias_para_vencer(fecha):
+    """Días que faltan para que venza `fecha` (negativo si ya venció).
+    None si `fecha` no está registrada."""
+    if not fecha:
+        return None
+    return (fecha - timezone.localdate()).days
+
+
 class Trabajador(models.Model):
     """Trabajador de una empresa contratista, con sus datos de afiliación."""
 
@@ -53,6 +67,18 @@ class Trabajador(models.Model):
     afp = models.CharField("AFP", max_length=100, blank=True)
     tipo_vinculacion = models.CharField(max_length=20, choices=TipoVinculacion.choices, default=TipoVinculacion.FIJO)
     fecha_inicio_contrato = models.DateField(null=True, blank=True)
+    fecha_vencimiento_examen_medico = models.DateField(
+        "vencimiento examen médico ocupacional",
+        null=True,
+        blank=True,
+        help_text="Opcional — solo si el trabajador hace trabajo en altura (el SOP exige examen vigente hace menos de 1 año).",
+    )
+    fecha_vencimiento_certificacion_alturas = models.DateField(
+        "vencimiento certificación de trabajo en alturas",
+        null=True,
+        blank=True,
+        help_text="Opcional — solo si el trabajador hace trabajo en altura (el SOP exige recertificación cada 2 años).",
+    )
     cursos_safety_academy = models.JSONField(
         "cursos Safety Academy",
         default=dict,
@@ -119,6 +145,22 @@ class Trabajador(models.Model):
             for c in CursoSafetyAcademy.objects.filter(activo=True, obligatorio=True)
             if not completados.get(c.clave)
         ]
+
+    @property
+    def examen_medico_vencido(self):
+        return _vencido(self.fecha_vencimiento_examen_medico)
+
+    @property
+    def dias_para_vencer_examen_medico(self):
+        return _dias_para_vencer(self.fecha_vencimiento_examen_medico)
+
+    @property
+    def certificacion_alturas_vencida(self):
+        return _vencido(self.fecha_vencimiento_certificacion_alturas)
+
+    @property
+    def dias_para_vencer_certificacion_alturas(self):
+        return _dias_para_vencer(self.fecha_vencimiento_certificacion_alturas)
 
 
 def soporte_pago_upload_to(instance, filename):

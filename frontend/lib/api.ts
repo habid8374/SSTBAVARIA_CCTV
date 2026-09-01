@@ -763,6 +763,12 @@ export type Trabajador = {
   fecha_inicio_contrato: string | null;
   cursos_safety_academy: Record<string, string | null>;
   cursos_pendientes: Opcion[];
+  fecha_vencimiento_examen_medico: string | null;
+  examen_medico_vencido: boolean;
+  dias_para_vencer_examen_medico: number | null;
+  fecha_vencimiento_certificacion_alturas: string | null;
+  certificacion_alturas_vencida: boolean;
+  dias_para_vencer_certificacion_alturas: number | null;
   activo: boolean;
   creado_en: string;
   autorizacion_datos: boolean;
@@ -782,6 +788,8 @@ export type NuevoTrabajador = {
   tipo_vinculacion?: TipoVinculacion;
   fecha_inicio_contrato?: string | null;
   cursos_safety_academy?: Record<string, string | null>;
+  fecha_vencimiento_examen_medico?: string | null;
+  fecha_vencimiento_certificacion_alturas?: string | null;
   activo?: boolean;
   autorizacion_datos: boolean;
 };
@@ -906,6 +914,10 @@ export function exportarRadicacionesExcel(token: string, filtros: FiltrosRadicac
 export type IndicadoresContratistas = {
   radicaciones_vencidas: number;
   radicaciones_por_vencer: number;
+  examenes_medicos_vencidos: number;
+  examenes_medicos_por_vencer: number;
+  certificaciones_alturas_vencidas: number;
+  certificaciones_alturas_por_vencer: number;
 };
 
 export function obtenerIndicadoresContratistas(token: string): Promise<IndicadoresContratistas> {

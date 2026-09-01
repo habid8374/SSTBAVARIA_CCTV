@@ -24,7 +24,13 @@ frontend en Vercel — pero viven en el mismo repositorio.
   - **Contratistas**: empresas contratistas, su personal (con EPS/ARL/AFP y
     cursos Safety Academy) y la radicación mensual del soporte de pago de
     seguridad social (planilla PILA), con aprobación/rechazo por un
-    interventor.
+    interventor. Cada trabajador tiene además dos campos opcionales —
+    vencimiento de examen médico ocupacional y de certificación de trabajo
+    en alturas (`Trabajador.fecha_vencimiento_examen_medico`/
+    `fecha_vencimiento_certificacion_alturas`) — solo para quienes hacen
+    trabajo en altura, con el mismo tratamiento de vencido/por vencer/
+    vigente que la planilla PILA (badge, aviso junto al nombre, conteo en
+    el banner y en `GET /api/contratistas/indicadores/`).
   - **Declaración de Método**: formulario dinámico de secuencia de
     actividades con evaluación de riesgo por el método Kinney
     (R = Probabilidad × Frecuencia × Impacto, antes y después de mitigación),

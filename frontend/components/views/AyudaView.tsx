@@ -252,6 +252,15 @@ const TEMAS: Tema[] = [
           las radicaciones con contratista, trabajador, planilla, vencimiento y estado — útil para reportes o
           auditoría fuera de la app.
         </P>
+        <Sub>Vencimiento de examen médico y certificación de alturas</Sub>
+        <P>
+          En el formulario de cada trabajador hay dos campos opcionales — <strong>vencimiento del examen
+          médico ocupacional</strong> y <strong>vencimiento de la certificación de trabajo en alturas</strong>{" "}
+          — pensados solo para trabajadores que hacen trabajo en altura (el SOP del cliente exige examen
+          vigente hace menos de 1 año y recertificación de alturas cada 2 años). Igual que con la seguridad
+          social, si alguno queda vencido o vence en 15 días o menos aparece un aviso ⚠ junto al nombre del
+          trabajador en la lista, y un conteo en el banner de arriba de toda la vista de Contratistas.
+        </P>
       </>
     ),
   },

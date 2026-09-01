@@ -85,6 +85,10 @@ class TrabajadorSerializer(serializers.ModelSerializer):
     contratista_nombre = serializers.CharField(source="contratista.nombre", read_only=True)
     ultima_radicacion = serializers.SerializerMethodField()
     cursos_pendientes = serializers.ReadOnlyField()
+    examen_medico_vencido = serializers.BooleanField(read_only=True)
+    dias_para_vencer_examen_medico = serializers.IntegerField(read_only=True, allow_null=True)
+    certificacion_alturas_vencida = serializers.BooleanField(read_only=True)
+    dias_para_vencer_certificacion_alturas = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:
         model = Trabajador
@@ -102,6 +106,12 @@ class TrabajadorSerializer(serializers.ModelSerializer):
             "fecha_inicio_contrato",
             "cursos_safety_academy",
             "cursos_pendientes",
+            "fecha_vencimiento_examen_medico",
+            "examen_medico_vencido",
+            "dias_para_vencer_examen_medico",
+            "fecha_vencimiento_certificacion_alturas",
+            "certificacion_alturas_vencida",
+            "dias_para_vencer_certificacion_alturas",
             "activo",
             "creado_en",
             "autorizacion_datos",

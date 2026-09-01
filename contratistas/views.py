@@ -104,21 +104,35 @@ def catalogos(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def indicadores(request):
-    """Conteo de radicaciones de seguridad social vencidas o por vencer —
-    para el banner de aviso en la vista de Contratistas. Nada se marca solo
-    en la base; se calcula al vuelo contra la fecha de hoy."""
+    """Conteo de radicaciones de seguridad social y de certificaciones de
+    trabajadores (examen médico ocupacional, trabajo en alturas) vencidas o
+    por vencer — para el banner de aviso en la vista de Contratistas. Nada
+    se marca solo en la base; se calcula al vuelo contra la fecha de hoy."""
     hoy = timezone.localdate()
     dias_alerta = ConfiguracionAlertas.obtener().dias_alerta_vencimiento
     limite_por_vencer = hoy + timedelta(days=dias_alerta)
     radicaciones = RadicacionSeguridadSocial.objects.exclude(estado=RadicacionSeguridadSocial.Estado.RECHAZADA)
+    trabajadores = Trabajador.objects.filter(activo=True)
     contratista_id = _contratista_de(request)
     if contratista_id is not None:
         radicaciones = radicaciones.filter(trabajador__contratista_id=contratista_id)
+        trabajadores = trabajadores.filter(contratista_id=contratista_id)
     return Response(
         {
             "radicaciones_vencidas": radicaciones.filter(fecha_vencimiento__lt=hoy).count(),
             "radicaciones_por_vencer": radicaciones.filter(
                 fecha_vencimiento__gte=hoy, fecha_vencimiento__lte=limite_por_vencer
+            ).count(),
+            "examenes_medicos_vencidos": trabajadores.filter(fecha_vencimiento_examen_medico__lt=hoy).count(),
+            "examenes_medicos_por_vencer": trabajadores.filter(
+                fecha_vencimiento_examen_medico__gte=hoy, fecha_vencimiento_examen_medico__lte=limite_por_vencer
+            ).count(),
+            "certificaciones_alturas_vencidas": trabajadores.filter(
+                fecha_vencimiento_certificacion_alturas__lt=hoy
+            ).count(),
+            "certificaciones_alturas_por_vencer": trabajadores.filter(
+                fecha_vencimiento_certificacion_alturas__gte=hoy,
+                fecha_vencimiento_certificacion_alturas__lte=limite_por_vencer,
             ).count(),
         }
     )

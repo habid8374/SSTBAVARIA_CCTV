@@ -105,24 +105,58 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
         </div>
       </div>
 
-      {indicadores && (indicadores.radicaciones_vencidas > 0 || indicadores.radicaciones_por_vencer > 0) && (
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {indicadores.radicaciones_vencidas > 0 && (
-            <p>
-              ⚠ <strong>{indicadores.radicaciones_vencidas}</strong> radicación
-              {indicadores.radicaciones_vencidas === 1 ? "" : "es"} de seguridad social{" "}
-              <strong>vencida{indicadores.radicaciones_vencidas === 1 ? "" : "s"}</strong>.
-            </p>
-          )}
-          {indicadores.radicaciones_por_vencer > 0 && (
-            <p>
-              {indicadores.radicaciones_vencidas > 0 && <br />}
-              <strong>{indicadores.radicaciones_por_vencer}</strong> radicación
-              {indicadores.radicaciones_por_vencer === 1 ? "" : "es"} por vencer en los próximos 15 días.
-            </p>
-          )}
-        </div>
-      )}
+      {indicadores &&
+        (indicadores.radicaciones_vencidas > 0 ||
+          indicadores.radicaciones_por_vencer > 0 ||
+          indicadores.examenes_medicos_vencidos > 0 ||
+          indicadores.examenes_medicos_por_vencer > 0 ||
+          indicadores.certificaciones_alturas_vencidas > 0 ||
+          indicadores.certificaciones_alturas_por_vencer > 0) && (
+          <div className="mt-4 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {indicadores.radicaciones_vencidas > 0 && (
+              <p>
+                ⚠ <strong>{indicadores.radicaciones_vencidas}</strong> radicación
+                {indicadores.radicaciones_vencidas === 1 ? "" : "es"} de seguridad social{" "}
+                <strong>vencida{indicadores.radicaciones_vencidas === 1 ? "" : "s"}</strong>.
+              </p>
+            )}
+            {indicadores.radicaciones_por_vencer > 0 && (
+              <p>
+                <strong>{indicadores.radicaciones_por_vencer}</strong> radicación
+                {indicadores.radicaciones_por_vencer === 1 ? "" : "es"} por vencer en los próximos 15 días.
+              </p>
+            )}
+            {indicadores.examenes_medicos_vencidos > 0 && (
+              <p>
+                ⚠ <strong>{indicadores.examenes_medicos_vencidos}</strong> examen
+                {indicadores.examenes_medicos_vencidos === 1 ? "" : "es"} médico
+                {indicadores.examenes_medicos_vencidos === 1 ? "" : "s"}{" "}
+                <strong>vencido{indicadores.examenes_medicos_vencidos === 1 ? "" : "s"}</strong>.
+              </p>
+            )}
+            {indicadores.examenes_medicos_por_vencer > 0 && (
+              <p>
+                <strong>{indicadores.examenes_medicos_por_vencer}</strong> examen
+                {indicadores.examenes_medicos_por_vencer === 1 ? "" : "es"} médico
+                {indicadores.examenes_medicos_por_vencer === 1 ? "" : "s"} por vencer en los próximos 15 días.
+              </p>
+            )}
+            {indicadores.certificaciones_alturas_vencidas > 0 && (
+              <p>
+                ⚠ <strong>{indicadores.certificaciones_alturas_vencidas}</strong> certificación
+                {indicadores.certificaciones_alturas_vencidas === 1 ? "" : "es"} de trabajo en alturas{" "}
+                <strong>vencida{indicadores.certificaciones_alturas_vencidas === 1 ? "" : "s"}</strong>.
+              </p>
+            )}
+            {indicadores.certificaciones_alturas_por_vencer > 0 && (
+              <p>
+                <strong>{indicadores.certificaciones_alturas_por_vencer}</strong> certificación
+                {indicadores.certificaciones_alturas_por_vencer === 1 ? "" : "es"} de trabajo en alturas por vencer
+                en los próximos 15 días.
+              </p>
+            )}
+          </div>
+        )}
 
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -229,6 +263,33 @@ function VencimientoBadge({ radicacion }: { radicacion: RadicacionSeguridadSocia
     );
   }
   return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Vigente</span>;
+}
+
+function AvisoVencimientoCertificacion({
+  etiqueta,
+  trabajador,
+  tipo,
+}: {
+  etiqueta: string;
+  trabajador: Trabajador;
+  tipo: "examen_medico" | "certificacion_alturas";
+}) {
+  const vencido = tipo === "examen_medico" ? trabajador.examen_medico_vencido : trabajador.certificacion_alturas_vencida;
+  const dias =
+    tipo === "examen_medico"
+      ? trabajador.dias_para_vencer_examen_medico
+      : trabajador.dias_para_vencer_certificacion_alturas;
+  if (vencido) {
+    return <p className="mt-0.5 text-xs font-normal text-red-700">⚠ {etiqueta} vencido</p>;
+  }
+  if (dias !== null && dias <= 15) {
+    return (
+      <p className="mt-0.5 text-xs font-normal text-amber-700">
+        ⚠ {etiqueta} vence en {dias} día{dias === 1 ? "" : "s"}
+      </p>
+    );
+  }
+  return null;
 }
 
 function PanelContratista({
@@ -341,6 +402,12 @@ function PanelContratista({
                           {t.cursos_pendientes.length === 1 ? "" : "s"}
                         </p>
                       )}
+                      <AvisoVencimientoCertificacion etiqueta="Examen médico" trabajador={t} tipo="examen_medico" />
+                      <AvisoVencimientoCertificacion
+                        etiqueta="Certificación de alturas"
+                        trabajador={t}
+                        tipo="certificacion_alturas"
+                      />
                     </td>
                     <td className="px-4 py-2.5">{t.documento}</td>
                     <td className="px-4 py-2.5 text-xs text-corp-muted">
@@ -682,6 +749,12 @@ function FormularioTrabajador({
   const [afp, setAfp] = useState(trabajador?.afp ?? "");
   const [tipoVinculacion, setTipoVinculacion] = useState<TipoVinculacion>(trabajador?.tipo_vinculacion ?? "fijo");
   const [fechaInicio, setFechaInicio] = useState(trabajador?.fecha_inicio_contrato ?? "");
+  const [fechaVencExamenMedico, setFechaVencExamenMedico] = useState(
+    trabajador?.fecha_vencimiento_examen_medico ?? ""
+  );
+  const [fechaVencCertAlturas, setFechaVencCertAlturas] = useState(
+    trabajador?.fecha_vencimiento_certificacion_alturas ?? ""
+  );
   const [cursos, setCursos] = useState<Record<string, string | null>>(trabajador?.cursos_safety_academy ?? {});
   const [autorizacionDatos, setAutorizacionDatos] = useState(trabajador?.autorizacion_datos ?? false);
   const [evidenciaAutorizacion, setEvidenciaAutorizacion] = useState<File | null>(null);
@@ -715,6 +788,8 @@ function FormularioTrabajador({
       afp,
       tipo_vinculacion: tipoVinculacion,
       fecha_inicio_contrato: fechaInicio || null,
+      fecha_vencimiento_examen_medico: fechaVencExamenMedico || null,
+      fecha_vencimiento_certificacion_alturas: fechaVencCertAlturas || null,
       cursos_safety_academy: cursos,
       autorizacion_datos: autorizacionDatos,
     };
@@ -781,6 +856,29 @@ function FormularioTrabajador({
               className={INPUT}
             />
           </Campo>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Vencimiento examen médico — opcional">
+              <input
+                type="date"
+                value={fechaVencExamenMedico ?? ""}
+                onChange={(e) => setFechaVencExamenMedico(e.target.value)}
+                className={INPUT}
+              />
+            </Campo>
+            <Campo label="Vencimiento certificación de alturas — opcional">
+              <input
+                type="date"
+                value={fechaVencCertAlturas ?? ""}
+                onChange={(e) => setFechaVencCertAlturas(e.target.value)}
+                className={INPUT}
+              />
+            </Campo>
+          </div>
+          <p className="-mt-2 text-xs text-corp-muted">
+            Solo si el trabajador hace trabajo en altura — el SOP del cliente exige examen médico vigente
+            hace menos de 1 año y recertificación de alturas cada 2 años.
+          </p>
 
           <div>
             <span className="text-sm font-medium text-corp-navy">Cursos Safety Academy</span>
