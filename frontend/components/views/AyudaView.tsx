@@ -309,6 +309,17 @@ const TEMAS: Tema[] = [
           Excel&quot;, para que quien revisa pueda abrir el documento tal como llegó y compararlo contra lo
           que quedó cargado en el formulario.
         </P>
+        <P>
+          En una declaración importada, la tabla larga con el detalle de cada actividad (Kinney, permisos,
+          EPP) <strong>queda oculta por defecto</strong> — en su lugar se ve solo un resumen (cuántas
+          actividades se importaron) con un enlace <strong>&quot;Ver detalle de actividades&quot;</strong>{" "}
+          para desplegarla si hace falta corregir algo puntual. Así lo que queda a la vista de una vez es lo
+          que de verdad hay que revisar: Datos generales, Alertas automáticas, Firmas electrónicas y el
+          Excel original — sin tener que bajar por 20+ tarjetas de actividad ya cargadas. Los datos siguen
+          ahí y se guardan igual, se despliegue o no la tabla. Esto no aplica a una declaración que se llena
+          a mano desde cero (sin Excel de origen) — ahí el detalle de actividades siempre está a la vista,
+          porque es justo lo que se está diligenciando.
+        </P>
         <Sub>Firmas electrónicas — no son solo un nombre escrito</Sub>
         <P>
           Al firmar, además del nombre de la persona hay que marcar una casilla de consentimiento explícito

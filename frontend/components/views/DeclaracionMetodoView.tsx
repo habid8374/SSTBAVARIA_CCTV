@@ -340,6 +340,12 @@ function FormularioDeclaracion({
   const [notasAlertas, setNotasAlertas] = useState<NotaAlerta[]>([]);
   const [alertasSeleccionadas, setAlertasSeleccionadas] = useState<Set<string>>(new Set());
   const [alertasAplicadas, setAlertasAplicadas] = useState<Set<string>>(new Set());
+  // Una declaración que vino de un Excel importado no necesita mostrar el
+  // detalle completo de cada actividad (Kinney/permisos/EPP) por defecto —
+  // ya quedó cargado, y lo que importa revisar es Datos generales, Alertas
+  // y Firmas. Se puede desplegar si hace falta corregir algo puntual.
+  const esImportada = Boolean(declaracion?.archivo_origen_excel || archivoOrigenExcel);
+  const [mostrarActividades, setMostrarActividades] = useState(!esImportada);
 
   useEffect(() => {
     const id = declaracion?.id;
@@ -473,6 +479,7 @@ function FormularioDeclaracion({
       );
       setAvisosImportacion(datos.avisos);
       setArchivoOrigenExcel(archivo);
+      setMostrarActividades(false);
       setMensaje(
         "Se importaron los datos del Excel — revísalos y ajusta lo que haga falta antes de guardar. Todavía no se ha guardado nada ni se firmó nada automáticamente."
       );
@@ -829,8 +836,28 @@ function FormularioDeclaracion({
             <h3 className="text-base font-semibold text-corp-navy">
               Secuencia de actividades y evaluación de riesgo (Kinney: R = P × F × I)
             </h3>
+            {esImportada && (
+              <button
+                type="button"
+                onClick={() => setMostrarActividades((actual) => !actual)}
+                className="text-sm font-medium text-corp-blue hover:underline"
+              >
+                {mostrarActividades ? "Ocultar detalle de actividades" : "Ver detalle de actividades"}
+              </button>
+            )}
           </div>
 
+          {esImportada && !mostrarActividades && (
+            <div className="mt-4 rounded-2xl border border-dashed border-corp-border bg-zinc-50 p-5 text-sm text-corp-muted">
+              {actividades.length} actividad{actividades.length === 1 ? "" : "es"} importada
+              {actividades.length === 1 ? "" : "s"} desde el Excel original, con su evaluación de riesgo,
+              permisos y EPP ya cargados. Usa &quot;Ver detalle de actividades&quot; arriba solo si necesitas
+              revisar o corregir algo puntual.
+            </div>
+          )}
+
+          {mostrarActividades && (
+          <>
           <div className="mt-4 space-y-4">
             {actividades.map((actividad, indice) => {
               const riesgoSin = actividad.probabilidad_sin * actividad.frecuencia_sin * actividad.impacto_sin;
@@ -1051,6 +1078,8 @@ function FormularioDeclaracion({
           >
             + Agregar actividad
           </button>
+          </>
+          )}
         </div>
 
         {error && (

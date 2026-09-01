@@ -96,6 +96,18 @@ frontend en Vercel — pero viven en el mismo repositorio.
     en el formulario — pedido explícito del cliente para poder contrastar
     la evaluación del sistema contra el archivo fuente. También es la base
     del botón "Descargar Excel" cuando existe (ver más arriba).
+  - **Detalle de actividades colapsado en declaraciones importadas**
+    (`DeclaracionMetodoView.tsx`, pedido del cliente): cuando la
+    declaración tiene un Excel original adjunto, la tabla larga de
+    actividades (Kinney/permisos/EPP por actividad) no se muestra por
+    defecto — en su lugar aparece un resumen ("N actividades importadas…")
+    con un enlace "Ver detalle de actividades" que la despliega solo si
+    hace falta corregir algo puntual. Lo que queda siempre visible: Datos
+    generales, Alertas automáticas, Firmas electrónicas y el Excel
+    original. Es solo un `useState` de UI — las actividades ya están
+    cargadas en el estado del formulario y se guardan igual, se despliegue
+    o no la tabla; una declaración sin Excel de origen (llenada a mano)
+    sigue mostrando el detalle completo siempre, sin cambios.
   - **Alertas automáticas** (`contratistas/alertas_automaticas.py`,
     `GET /api/contratistas/declaraciones/<id>/alertas/`, solo
     `EsPersonalInterno`): al revisar una declaración, un motor de reglas
