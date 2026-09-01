@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
   ApiError,
@@ -339,6 +339,30 @@ function PasoVideo({
   onCancelar: () => void;
 }) {
   const [terminado, setTerminado] = useState(false);
+  const [avisoAdelanto, setAvisoAdelanto] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const maxAlcanzado = useRef(0);
+
+  function manejarTimeUpdate() {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.currentTime > maxAlcanzado.current) {
+      maxAlcanzado.current = video.currentTime;
+    }
+  }
+
+  // No se puede adelantar el video (arrastrando la barra o con el teclado):
+  // si intenta saltar más allá de lo que ya vio, se regresa ahí mismo — solo
+  // puede retroceder para repasar algo, no saltarse el resto.
+  function manejarSeeking() {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.currentTime > maxAlcanzado.current + 0.5) {
+      video.currentTime = maxAlcanzado.current;
+      setAvisoAdelanto(true);
+      window.setTimeout(() => setAvisoAdelanto(false), 2500);
+    }
+  }
 
   return (
     <div>
@@ -349,10 +373,15 @@ function PasoVideo({
         <h2 className="text-lg font-semibold text-corp-navy">{config?.titulo_curso || "Video de Capacitación"}</h2>
         {config?.video_url ? (
           <video
+            ref={videoRef}
             controls
             playsInline
             preload="metadata"
-            controlsList="nodownload"
+            controlsList="nodownload noplaybackrate"
+            disablePictureInPicture
+            onContextMenu={(e) => e.preventDefault()}
+            onTimeUpdate={manejarTimeUpdate}
+            onSeeking={manejarSeeking}
             onEnded={() => setTerminado(true)}
             className="mt-4 w-full rounded-lg bg-black"
           >
@@ -361,6 +390,12 @@ function PasoVideo({
           </video>
         ) : (
           <p className="mt-4 text-sm text-corp-muted">Cargando video…</p>
+        )}
+
+        {avisoAdelanto && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            No puedes adelantar el video — debes verlo completo de principio a fin.
+          </div>
         )}
 
         <div

@@ -498,8 +498,10 @@ const TEMAS: Tema[] = [
           <li><strong>Registro</strong>: nombre, correo y documento (los dos últimos opcionales). El personal
             interno además elige a nombre de qué empresa contratista es; el portal de contratistas queda
             siempre fijado a la suya.</li>
-          <li><strong>Video</strong>: hay que verlo completo — el botón &quot;Continuar a evaluación&quot;
-            permanece deshabilitado hasta que termina.</li>
+          <li><strong>Video</strong>: hay que verlo completo, de principio a fin — el botón &quot;Continuar a
+            evaluación&quot; permanece deshabilitado hasta que termina, y no se puede adelantar arrastrando la
+            barra ni con el teclado: si se intenta saltar más allá de lo que ya se vio, el video regresa solo a
+            ese punto. Sí se puede retroceder para repasar algo.</li>
           <li><strong>Evaluación</strong>: 10 preguntas de opción múltiple. La calificación se calcula en el
             servidor — el navegador nunca recibe cuál es la respuesta correcta, ni antes ni durante la
             evaluación.</li>
