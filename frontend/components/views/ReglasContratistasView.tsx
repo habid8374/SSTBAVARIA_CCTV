@@ -208,7 +208,10 @@ function Cursos({ token }: { token: string }) {
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       <div className="mt-3 space-y-2">
         {cursos?.map((c) => (
-          <div key={c.id} className="flex items-center justify-between rounded-lg border border-corp-border px-3 py-2 text-sm">
+          <div
+            key={c.id}
+            className="flex flex-col gap-2 rounded-lg border border-corp-border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
             <div>
               <span className={c.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{c.etiqueta}</span>
               <span className="ml-2 text-xs text-corp-muted">({c.clave})</span>
@@ -218,7 +221,7 @@ function Cursos({ token }: { token: string }) {
                 </span>
               )}
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
               <button type="button" onClick={() => alternarObligatorio(c)} className="text-corp-blue hover:underline">
                 {c.obligatorio ? "Quitar obligatoriedad" : "Marcar obligatorio"}
               </button>
@@ -313,9 +316,12 @@ function Permisos({ token }: { token: string }) {
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       <div className="mt-3 space-y-2">
         {permisos?.map((p) => (
-          <div key={p.id} className="flex items-center justify-between rounded-lg border border-corp-border px-3 py-2 text-sm">
+          <div
+            key={p.id}
+            className="flex flex-col gap-2 rounded-lg border border-corp-border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
             <span className={p.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{p.nombre}</span>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
               <button type="button" onClick={() => alternarActivo(p)} className="text-corp-blue hover:underline">
                 {p.activo ? "Desactivar" : "Activar"}
               </button>
@@ -398,9 +404,12 @@ function EquiposEpp({ token }: { token: string }) {
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       <div className="mt-3 space-y-2">
         {equipos?.map((e) => (
-          <div key={e.id} className="flex items-center justify-between rounded-lg border border-corp-border px-3 py-2 text-sm">
+          <div
+            key={e.id}
+            className="flex flex-col gap-2 rounded-lg border border-corp-border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
             <span className={e.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{e.nombre}</span>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
               <button type="button" onClick={() => alternarActivo(e)} className="text-corp-blue hover:underline">
                 {e.activo ? "Desactivar" : "Activar"}
               </button>
