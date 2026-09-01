@@ -20,6 +20,7 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
   const [camaras, setCamaras] = useState<CamaraDashboard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formulario, setFormulario] = useState<"nueva" | CamaraDashboard | null>(null);
+  const [mostrarVideoCamara, setMostrarVideoCamara] = useState(false);
 
   function cargar() {
     listarCamarasDashboard(token)
@@ -74,11 +75,32 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
       )}
 
       {camaras?.length === 0 && (
-        <p className="mt-6 text-sm text-corp-muted">
-          Todavía no hay cámaras registradas
-          {esAdmin ? " — usa el botón “+ Nueva cámara” de arriba." : "."}
-        </p>
+        <div className="mt-6">
+          <p className="text-sm text-corp-muted">
+            Todavía no hay cámaras registradas
+            {esAdmin ? " — usa el botón “+ Nueva cámara” de arriba." : "."}
+          </p>
+          <button
+            type="button"
+            onClick={() => setMostrarVideoCamara(true)}
+            className="group relative mt-4 block w-full max-w-sm overflow-hidden rounded-2xl border border-corp-border shadow-sm transition hover:shadow-md"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/camara-dahua-poster.jpg"
+              alt="Cámara PTZ Dahua que usa el sistema"
+              className="aspect-video w-full object-cover"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/25 transition group-hover:bg-black/35">
+              <span className="flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-corp-navy shadow">
+                ▶ Ver la cámara que usa el sistema
+              </span>
+            </div>
+          </button>
+        </div>
       )}
+
+      {mostrarVideoCamara && <ModalCamaraDemo onCerrar={() => setMostrarVideoCamara(false)} />}
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
         {camaras?.map((camara) => (
@@ -103,6 +125,40 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
           }}
         />
       )}
+    </div>
+  );
+}
+
+function ModalCamaraDemo({ onCerrar }: { onCerrar: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4" onClick={onCerrar}>
+      <div
+        className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-corp-border px-5 py-3">
+          <h2 className="text-base font-semibold text-corp-navy">Cámara PTZ Dahua — la que usa el sistema</h2>
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="rounded-lg p-1 text-corp-muted hover:bg-zinc-100 hover:text-corp-navy"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
+        </div>
+        <video
+          src="/camara-dahua-demo.mp4"
+          poster="/camara-dahua-poster.jpg"
+          controls
+          autoPlay
+          className="w-full bg-black"
+        >
+          Tu navegador no puede reproducir este video.
+        </video>
+      </div>
     </div>
   );
 }

@@ -139,6 +139,11 @@ const TEMAS: Tema[] = [
           Activar/desactivar una cámara (en vez de eliminarla) es la forma de pausarla temporalmente sin
           perder sus zonas y reglas configuradas.
         </Nota>
+        <P>
+          Mientras no hay ninguna cámara registrada, aparece una tarjeta con la foto de la cámara PTZ Dahua
+          que usa el sistema — clic ahí abre un video corto mostrándola por dentro y por fuera, solo como
+          referencia visual de cuál es el equipo antes de configurarlo.
+        </P>
       </>
     ),
   },
