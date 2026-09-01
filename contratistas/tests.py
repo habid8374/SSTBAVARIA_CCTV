@@ -1533,6 +1533,64 @@ class DeclaracionMetodoTests(ApiTestsBase):
         response = self.client.get(reverse("contratistas:declaraciones_excel", args=[declaracion.pk]))
         self.assertEqual(response.status_code, 401)
 
+    def test_excel_sin_archivo_original_usa_formato_propio(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        import io
+
+        from openpyxl import load_workbook
+
+        response = self.client.get(
+            reverse("contratistas:declaraciones_excel", args=[declaracion.pk]), **self._auth(self.operador)
+        )
+        libro = load_workbook(io.BytesIO(response.content))
+        self.assertIn("Control del Documento", libro.sheetnames)
+
+    def test_excel_con_archivo_original_lo_reutiliza_y_agrega_decision(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+            estado=DeclaracionMetodo.Estado.RECHAZADA,
+            observaciones="Falta el permiso de trabajo en altura marcado.",
+        )
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        declaracion.archivo_origen_excel.save(
+            "original.xlsx",
+            SimpleUploadedFile("original.xlsx", _construir_excel_declaracion_prueba()),
+            save=True,
+        )
+
+        import io
+
+        from openpyxl import load_workbook
+
+        response = self.client.get(
+            reverse("contratistas:declaraciones_excel", args=[declaracion.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        libro = load_workbook(io.BytesIO(response.content))
+
+        # El libro descargado debe ser el original (no el reconstruido por
+        # generar_excel_declaracion) con una hoja "Decisión SST" agregada.
+        self.assertNotIn("Control del Documento", libro.sheetnames)
+        self.assertIn("Decisión SST", libro.sheetnames)
+        hoja_original = libro["Declaración de Método"]
+        self.assertEqual(hoja_original["B3"].value, "Planta Prueba")
+
+        hoja_decision = libro["Decisión SST"]
+        contenido = " ".join(
+            str(hoja_decision.cell(row=f, column=c).value or "")
+            for f in range(1, hoja_decision.max_row + 1)
+            for c in range(1, hoja_decision.max_column + 1)
+        )
+        self.assertIn("Rechazada", contenido)
+        self.assertIn("Falta el permiso de trabajo en altura marcado.", contenido)
+
     def test_firmar_declaracion(self):
         declaracion = DeclaracionMetodo.objects.create(
             contratista=self.contratista,

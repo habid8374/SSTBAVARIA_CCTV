@@ -336,10 +336,14 @@ const TEMAS: Tema[] = [
           generales, actividades con su evaluación de riesgo y firmas — listo para archivar o imprimir.
         </P>
         <P>
-          Botón <strong>&quot;Descargar Excel&quot;</strong>, al lado del PDF, genera el mismo libro de
-          Excel de 5 hojas que usa la empresa contratista para sus propias declaraciones (Declaración de
-          Método, Firmas/Permisos/EPP, Catálogo de Peligros, Evaluación según Kinney y Control del
-          Documento) — útil cuando quien recibe el archivo espera ese formato exacto en vez de un PDF.
+          Botón <strong>&quot;Descargar Excel&quot;</strong>, al lado del PDF. Si la declaración se creó
+          importando un Excel, descarga <strong>ese mismo archivo original</strong> (mismo formato con el
+          que lo diligenció el contratista, sin reconstruirlo) con una hoja &quot;Decisión SST&quot; agregada
+          al final — estado, fecha de la decisión y las observaciones/motivo de la revisión — así el archivo
+          que se sube y el que se descarga quedan en el mismo formato. Si la declaración se llenó a mano (sin
+          Excel de origen), genera en su lugar el libro propio de 5 hojas que usa la empresa contratista para
+          sus propias declaraciones (Declaración de Método, Firmas/Permisos/EPP, Catálogo de Peligros,
+          Evaluación según Kinney y Control del Documento).
         </P>
         <Sub>Alertas automáticas — solo son un aviso, nunca deciden</Sub>
         <P>

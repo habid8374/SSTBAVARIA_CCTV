@@ -781,12 +781,16 @@ def declaracion_pdf(request, pk):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def declaracion_excel(request, pk):
-    """Descarga la declaración de método en el mismo formato Excel (5 hojas)
-    que usa el cliente para las suyas — ver
-    contratistas/exportar_declaracion_excel.py."""
+    """Descarga la declaración de método en Excel. Si se creó importando un
+    Excel, descarga ese mismo archivo original (mismo formato con el que lo
+    diligenció el contratista) con una hoja "Decisión SST" agregada al
+    final con el estado y las observaciones de la revisión — así el
+    archivo que se sube y el que se descarga quedan en el mismo formato.
+    Si no tiene un Excel original adjunto (se llenó a mano), genera el
+    libro de 5 hojas propio — ver contratistas/exportar_declaracion_excel.py."""
     from django.http import HttpResponse
 
-    from .exportar_declaracion_excel import generar_excel_declaracion
+    from .exportar_declaracion_excel import generar_excel_declaracion, generar_excel_desde_original
 
     qs = DeclaracionMetodo.objects.select_related("contratista").prefetch_related("actividades", "firmas")
     contratista_id = _contratista_de(request)
@@ -794,7 +798,7 @@ def declaracion_excel(request, pk):
         qs = qs.filter(contratista_id=contratista_id)
     declaracion = get_object_or_404(qs, pk=pk)
 
-    libro = generar_excel_declaracion(declaracion)
+    libro = generar_excel_desde_original(declaracion) or generar_excel_declaracion(declaracion)
     respuesta = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     respuesta["Content-Disposition"] = f'attachment; filename="declaracion-metodo-{declaracion.pk}.xlsx"'
     libro.save(respuesta)

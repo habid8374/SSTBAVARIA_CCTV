@@ -46,15 +46,26 @@ frontend en Vercel — pero viven en el mismo repositorio.
     declaración de método completa (`xhtml2pdf`).
   - **Exportar Declaración de Método a Excel** (botón "Descargar Excel",
     junto al de PDF; `contratistas/exportar_declaracion_excel.py`,
-    `openpyxl`): genera el mismo libro de 5 hojas que usa la empresa
-    contratista para sus propias declaraciones — Declaración de Método
-    (datos generales + actividades), Firmas/Permisos/EPP, Catálogo de
-    Peligros y Evaluación según Kinney (ambas hojas de referencia estática,
-    tomadas tal cual del formato real del cliente vía
-    `contratistas/catalogo_peligros.py`) y Control del Documento (footer con
-    los metadatos propios de SST Bavaria — deliberadamente sin replicar el
-    código de control documental interno de AB InBev, para no dar a
-    entender que el archivo es un documento emitido oficialmente por ellos).
+    `openpyxl`). Dos caminos, según si la declaración tiene un Excel
+    original adjunto (ver "Archivo Excel original adjunto" abajo):
+    - **Con Excel original** (`generar_excel_desde_original`): reutiliza
+      tal cual el archivo que se subió al importar — mismo formato con el
+      que lo diligenció el contratista, sin reconstruirlo — y le agrega
+      una hoja "Decisión SST" al final (estado, fecha de la decisión,
+      observaciones/motivo). Así el archivo que se sube y el que se
+      descarga quedan en el mismo formato, con la decisión de SST
+      incluida.
+    - **Sin Excel original** (`generar_excel_declaracion`, declaraciones
+      llenadas a mano): genera el libro propio de 5 hojas que usa la
+      empresa contratista para sus propias declaraciones — Declaración de
+      Método (datos generales + actividades), Firmas/Permisos/EPP,
+      Catálogo de Peligros y Evaluación según Kinney (ambas hojas de
+      referencia estática, tomadas tal cual del formato real del cliente
+      vía `contratistas/catalogo_peligros.py`) y Control del Documento
+      (footer con los metadatos propios de SST Bavaria — deliberadamente
+      sin replicar el código de control documental interno de AB InBev,
+      para no dar a entender que el archivo es un documento emitido
+      oficialmente por ellos).
   - **Importar Declaración de Método desde Excel** (botón "Importar desde
     Excel" en el formulario, antes de guardar por primera vez;
     `contratistas/importar_declaracion_excel.py`,
@@ -83,7 +94,8 @@ frontend en Vercel — pero viven en el mismo repositorio.
     "Descargar PDF"/"Descargar Excel") para que quien revisa pueda abrir
     el documento tal como llegó y compararlo contra lo que quedó cargado
     en el formulario — pedido explícito del cliente para poder contrastar
-    la evaluación del sistema contra el archivo fuente.
+    la evaluación del sistema contra el archivo fuente. También es la base
+    del botón "Descargar Excel" cuando existe (ver más arriba).
   - **Alertas automáticas** (`contratistas/alertas_automaticas.py`,
     `GET /api/contratistas/declaraciones/<id>/alertas/`, solo
     `EsPersonalInterno`): al revisar una declaración, un motor de reglas

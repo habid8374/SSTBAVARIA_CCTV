@@ -335,3 +335,40 @@ def generar_excel_declaracion(declaracion):
     _hoja_kinney(libro.create_sheet())
     _hoja_control_documento(libro.create_sheet(), declaracion)
     return libro
+
+
+def _hoja_decision_sst(hoja, declaracion):
+    hoja.title = "Decisión SST"
+    from django.utils import timezone
+
+    _titulo(hoja, "DECISIÓN DE SST / INTERVENTORÍA", 1, 1, 2)
+    _etiqueta_valor(hoja, 3, 1, "Empresa contratista:", declaracion.contratista.nombre)
+    _etiqueta_valor(hoja, 4, 1, "Estado:", declaracion.get_estado_display())
+    _etiqueta_valor(
+        hoja, 5, 1, "Fecha de la decisión:", timezone.localtime(declaracion.actualizada_en).strftime("%Y-%m-%d %H:%M")
+    )
+    celda_etiqueta = hoja.cell(row=7, column=1, value="Observaciones / motivo:")
+    celda_etiqueta.font = Font(bold=True)
+    celda_valor = hoja.cell(row=8, column=1, value=declaracion.observaciones or "—")
+    celda_valor.alignment = ENVOLVER
+    hoja.merge_cells(start_row=8, start_column=1, end_row=8, end_column=6)
+    hoja.row_dimensions[8].height = 90
+    hoja.column_dimensions["A"].width = 100
+
+
+def generar_excel_desde_original(declaracion):
+    """Si esta declaración se creó importando un Excel (ver
+    DeclaracionMetodo.archivo_origen_excel), abre ese mismo archivo tal
+    cual llegó — mismo formato con el que lo diligenció el contratista —
+    y le agrega una hoja "Decisión SST" con el estado y las observaciones
+    de la revisión, en vez de reconstruir el libro desde cero. Devuelve
+    None si la declaración no tiene un Excel original adjunto, para que
+    quien llama use generar_excel_declaracion() como respaldo."""
+    from openpyxl import load_workbook
+
+    if not declaracion.archivo_origen_excel:
+        return None
+    with declaracion.archivo_origen_excel.open("rb") as archivo:
+        libro = load_workbook(archivo)
+    _hoja_decision_sst(libro.create_sheet(), declaracion)
+    return libro
