@@ -1257,6 +1257,13 @@ export function descargarDeclaracionExcel(token: string, id: number): Promise<vo
   return descargarArchivo(token, `/api/contratistas/declaraciones/${id}/excel/`, `declaracion-metodo-${id}.xlsx`);
 }
 
+export function eliminarDeclaracion(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/declaraciones/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
 export type AlertaAutomatica = {
   codigo: string;
   actividad_id: number;

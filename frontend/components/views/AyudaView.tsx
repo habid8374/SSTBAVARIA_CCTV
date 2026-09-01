@@ -373,6 +373,12 @@ const TEMAS: Tema[] = [
           las escribió y la fecha, y se ven ahí mismo cada vez que alguien vuelva a abrir la declaración; no
           reemplazan el campo Observaciones general ni cambian el estado de la declaración por sí solas.
         </P>
+        <Sub>Eliminar una declaración</Sub>
+        <P>
+          En la lista de declaraciones, cada fila tiene un enlace <strong>&quot;Eliminar&quot;</strong> — solo
+          visible para el rol Administrador — que pide confirmación con el modal del sistema antes de borrar
+          nada (acción irreversible). Queda registrada en Auditoría igual que cualquier otra eliminación.
+        </P>
         <Sub>El ciclo enviar → revisar → aprobar/rechazar → subsanar</Sub>
         <P>
           Este es el único formulario en el que el rol Contratista puede escribir (el resto de la app es de

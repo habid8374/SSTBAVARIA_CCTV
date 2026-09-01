@@ -1672,6 +1672,32 @@ class DeclaracionMetodoTests(ApiTestsBase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("estado", response.data)
 
+    def test_operador_no_puede_eliminar_declaracion(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.delete(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(DeclaracionMetodo.objects.filter(pk=declaracion.pk).exists())
+
+    def test_admin_puede_eliminar_declaracion(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.delete(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(DeclaracionMetodo.objects.filter(pk=declaracion.pk).exists())
+        registro = RegistroAuditoria.objects.filter(modelo="DeclaracionMetodo", accion="eliminado").latest("fecha")
+        self.assertEqual(registro.usuario, self.admin)
+
 
 def _construir_excel_declaracion_prueba():
     """Arma en memoria un Excel mínimo con el mismo formato real del

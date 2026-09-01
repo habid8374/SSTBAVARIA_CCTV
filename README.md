@@ -630,7 +630,10 @@ Controles aplicados, con su categoría OWASP correspondiente:
   explícitamente. Eliminar contratistas, trabajadores, radicaciones y
   declaraciones de método requiere rol Administrador
   (`EsAdministradorParaEliminar`) — crear/editar sigue abierto a cualquier
-  usuario autenticado, para no frenar el trabajo operativo diario.
+  usuario autenticado, para no frenar el trabajo operativo diario. En
+  Declaración de Método, el enlace "Eliminar" de la lista (solo visible
+  para Administrador) usa el modal de confirmación del sistema
+  (`DialogProvider`) antes de mandar el DELETE.
 - **A07 Fallas de identificación y autenticación**: el login tiene límite de
   intentos por IP (`core.throttling.LoginRateThrottle`, 10/min) para
   dificultar fuerza bruta de contraseñas — solo en ese endpoint, no en el

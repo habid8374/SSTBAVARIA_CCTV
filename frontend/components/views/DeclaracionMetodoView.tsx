@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
 
+import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
   actualizarDeclaracion,
@@ -9,6 +10,7 @@ import {
   descargarDeclaracionExcel,
   descargarDeclaracionPdf,
   crearNotaAlerta,
+  eliminarDeclaracion,
   firmarDeclaracion,
   importarDeclaracionExcel,
   listarAlertasDeclaracion,
@@ -105,11 +107,29 @@ export default function DeclaracionMetodoView({ token, rol }: { token: string; r
   const [catalogos, setCatalogos] = useState<Catalogos | null>(null);
   const [seleccionada, setSeleccionada] = useState<DeclaracionMetodo | "nueva" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { confirmar } = useDialog();
 
   function cargarDeclaraciones() {
     listarDeclaraciones(token)
       .then(setDeclaraciones)
       .catch(() => setError("No se pudo cargar la lista de declaraciones de método."));
+  }
+
+  async function eliminar(declaracion: DeclaracionMetodo, event: MouseEvent) {
+    event.stopPropagation();
+    const ok = await confirmar({
+      titulo: "Eliminar declaración de método",
+      mensaje: `¿Eliminar la declaración "${declaracion.descripcion_trabajo}" de ${declaracion.contratista_nombre}? Esta acción no se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminarDeclaracion(token, declaracion.id);
+      cargarDeclaraciones();
+    } catch {
+      setError("No se pudo eliminar la declaración.");
+    }
   }
 
   useEffect(cargarDeclaraciones, [token]);
@@ -179,6 +199,7 @@ export default function DeclaracionMetodoView({ token, rol }: { token: string; r
                 <th className="px-4 py-2.5">Actividades</th>
                 <th className="px-4 py-2.5">Riesgo más alto</th>
                 <th className="px-4 py-2.5">Estado</th>
+                <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-corp-border">
@@ -209,6 +230,17 @@ export default function DeclaracionMetodoView({ token, rol }: { token: string; r
                     </td>
                     <td className="px-4 py-2.5">
                       <EstadoBadge estado={d.estado} />
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {rol === "administrador" && (
+                        <button
+                          type="button"
+                          onClick={(e) => eliminar(d, e)}
+                          className="text-xs font-medium text-red-600 hover:underline"
+                        >
+                          Eliminar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
