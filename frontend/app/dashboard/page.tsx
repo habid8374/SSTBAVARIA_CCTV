@@ -9,6 +9,7 @@ import AlertasView from "@/components/views/AlertasView";
 import AutorizacionIngresoView from "@/components/views/AutorizacionIngresoView";
 import AyudaView from "@/components/views/AyudaView";
 import CamarasView from "@/components/views/CamarasView";
+import CapacitacionView from "@/components/views/CapacitacionView";
 import ContratistasView from "@/components/views/ContratistasView";
 import DeclaracionMetodoView from "@/components/views/DeclaracionMetodoView";
 import FuncionariosView from "@/components/views/FuncionariosView";
@@ -30,6 +31,7 @@ const TITULOS: Record<SeccionId, string> = {
   contratistas: "Contratistas",
   "declaracion-metodo": "Declaración de Método",
   "autorizacion-ingreso": "Autorización de Ingreso",
+  capacitacion: "Capacitación",
   funcionarios: "Funcionarios firmantes",
   "indicadores-contratistas": "Indicadores",
   sistema: "Sistema",
@@ -95,6 +97,7 @@ export default function DashboardPage() {
       {seccion === "contratistas" && <ContratistasView token={token} rol={usuario.rol} />}
       {seccion === "declaracion-metodo" && <DeclaracionMetodoView token={token} rol={usuario.rol} />}
       {seccion === "autorizacion-ingreso" && <AutorizacionIngresoView token={token} rol={usuario.rol} />}
+      {seccion === "capacitacion" && <CapacitacionView token={token} rol={usuario.rol} />}
       {seccion === "funcionarios" && <FuncionariosView token={token} rol={usuario.rol} />}
       {seccion === "indicadores-contratistas" && <IndicadoresContratistasView token={token} />}
       {seccion === "sistema" && usuario.rol === "administrador" && <SistemaView token={token} />}

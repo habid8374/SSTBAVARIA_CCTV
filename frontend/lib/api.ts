@@ -701,13 +701,15 @@ export type EmpresaContratista = {
   responsable_sst_nombre: string;
   responsable_sst_telefono: string;
   activa: boolean;
+  capacitacion_habilitada_manual: boolean;
+  capacitacion_habilitada: boolean;
   creada_en: string;
   trabajadores_count: number;
 };
 
 export type NuevaEmpresaContratista = Omit<
   EmpresaContratista,
-  "id" | "creada_en" | "trabajadores_count"
+  "id" | "creada_en" | "trabajadores_count" | "capacitacion_habilitada"
 >;
 
 export function listarContratistas(token: string): Promise<EmpresaContratista[]> {
@@ -1409,4 +1411,99 @@ export function descargarAutorizacionIngresoPdf(token: string, id: number): Prom
     `/api/contratistas/autorizaciones-ingreso/${id}/pdf/`,
     `autorizacion-ingreso-${id}.pdf`
   );
+}
+
+// --- Capacitación previa a ingreso ---
+
+export type ConfiguracionCapacitacion = {
+  titulo_curso: string;
+  video_url: string;
+  puntaje_minimo_aprobacion: number;
+  actualizada_en: string;
+};
+
+export type PreguntaCapacitacion = {
+  id: number;
+  texto: string;
+  opciones: string[];
+  orden: number;
+};
+
+export type EstadoCapacitacion = "en_curso" | "aprobado" | "no_aprobado";
+
+export type RegistroCapacitacion = {
+  id: number;
+  contratista: number;
+  contratista_nombre: string;
+  trabajador: number | null;
+  trabajador_nombre: string;
+  nombres: string;
+  correo: string;
+  documento: string;
+  calificacion: number | null;
+  estado: EstadoCapacitacion;
+  estado_display: string;
+  iniciado_en: string;
+  finalizado_en: string | null;
+};
+
+export type ResultadoCapacitacion = RegistroCapacitacion & {
+  correctas: number;
+  total: number;
+};
+
+export function obtenerConfiguracionCapacitacion(token: string): Promise<ConfiguracionCapacitacion> {
+  return request<ConfiguracionCapacitacion>("/api/contratistas/capacitacion/configuracion/", {
+    headers: authHeaders(token),
+  });
+}
+
+export function actualizarConfiguracionCapacitacion(
+  token: string,
+  cambios: Partial<Pick<ConfiguracionCapacitacion, "titulo_curso" | "video_url" | "puntaje_minimo_aprobacion">>
+): Promise<ConfiguracionCapacitacion> {
+  return request<ConfiguracionCapacitacion>("/api/contratistas/capacitacion/configuracion/", {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function listarPreguntasCapacitacion(token: string): Promise<PreguntaCapacitacion[]> {
+  return request<PreguntaCapacitacion[]>("/api/contratistas/capacitacion/preguntas/", {
+    headers: authHeaders(token),
+  });
+}
+
+export function listarRegistrosCapacitacion(
+  token: string,
+  contratistaId?: number
+): Promise<RegistroCapacitacion[]> {
+  const query = contratistaId ? `?contratista=${contratistaId}` : "";
+  return request<RegistroCapacitacion[]>(`/api/contratistas/capacitacion/registros/${query}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function iniciarCapacitacion(
+  token: string,
+  datos: { contratista?: number; nombres: string; correo?: string; documento?: string }
+): Promise<RegistroCapacitacion> {
+  return request<RegistroCapacitacion>("/api/contratistas/capacitacion/iniciar/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function calificarCapacitacion(
+  token: string,
+  id: number,
+  respuestas: number[]
+): Promise<ResultadoCapacitacion> {
+  return request<ResultadoCapacitacion>(`/api/contratistas/capacitacion/${id}/calificar/`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ respuestas }),
+  });
 }

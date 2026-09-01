@@ -4,6 +4,7 @@ from .models import (
     ActividadMetodo,
     AutorizacionIngreso,
     ConfiguracionAlertas,
+    ConfiguracionCapacitacion,
     CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
@@ -13,8 +14,10 @@ from .models import (
     NotaAlerta,
     NotificacionInterna,
     PermisoTrabajo,
+    PreguntaCapacitacion,
     RadicacionSeguridadSocial,
     RegistroAuditoria,
+    RegistroCapacitacion,
     Trabajador,
     TrabajadorAutorizacionIngreso,
 )
@@ -28,7 +31,7 @@ class TrabajadorInline(admin.TabularInline):
 
 @admin.register(EmpresaContratista)
 class EmpresaContratistaAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "nit", "empresa", "responsable_sst_nombre", "activa")
+    list_display = ("nombre", "nit", "empresa", "responsable_sst_nombre", "activa", "capacitacion_habilitada_manual")
     list_filter = ("empresa", "activa")
     search_fields = ("nombre", "nit")
     inlines = [TrabajadorInline]
@@ -157,3 +160,22 @@ class NotificacionInternaAdmin(admin.ModelAdmin):
     list_display = ("creada_en", "tipo", "mensaje", "leida")
     list_filter = ("tipo", "leida")
     search_fields = ("mensaje",)
+
+
+@admin.register(ConfiguracionCapacitacion)
+class ConfiguracionCapacitacionAdmin(admin.ModelAdmin):
+    list_display = ("titulo_curso", "puntaje_minimo_aprobacion", "actualizada_en")
+
+
+@admin.register(PreguntaCapacitacion)
+class PreguntaCapacitacionAdmin(admin.ModelAdmin):
+    list_display = ("texto", "activa", "orden")
+    list_editable = ("activa", "orden")
+
+
+@admin.register(RegistroCapacitacion)
+class RegistroCapacitacionAdmin(admin.ModelAdmin):
+    list_display = ("nombres", "documento", "contratista", "calificacion", "estado", "iniciado_en")
+    list_filter = ("estado", "contratista")
+    search_fields = ("nombres", "documento", "correo")
+    readonly_fields = ("iniciado_en", "finalizado_en", "creado_por")

@@ -7,6 +7,7 @@ from .models import (
     ActividadMetodo,
     AutorizacionIngreso,
     ConfiguracionAlertas,
+    ConfiguracionCapacitacion,
     CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
@@ -16,8 +17,10 @@ from .models import (
     NotaAlerta,
     NotificacionInterna,
     PermisoTrabajo,
+    PreguntaCapacitacion,
     RadicacionSeguridadSocial,
     RegistroAuditoria,
+    RegistroCapacitacion,
     Trabajador,
     TrabajadorAutorizacionIngreso,
     nivel_riesgo,
@@ -26,6 +29,7 @@ from .models import (
 
 class EmpresaContratistaSerializer(serializers.ModelSerializer):
     trabajadores_count = serializers.SerializerMethodField()
+    capacitacion_habilitada = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = EmpresaContratista
@@ -39,6 +43,8 @@ class EmpresaContratistaSerializer(serializers.ModelSerializer):
             "responsable_sst_nombre",
             "responsable_sst_telefono",
             "activa",
+            "capacitacion_habilitada_manual",
+            "capacitacion_habilitada",
             "creada_en",
             "trabajadores_count",
         ]
@@ -63,6 +69,7 @@ class EmpresaContratistaCrearSerializer(serializers.ModelSerializer):
             "responsable_sst_nombre",
             "responsable_sst_telefono",
             "activa",
+            "capacitacion_habilitada_manual",
         ]
         read_only_fields = ["id"]
 
@@ -531,3 +538,68 @@ class NotificacionInternaSerializer(serializers.ModelSerializer):
         model = NotificacionInterna
         fields = ["id", "tipo", "tipo_display", "mensaje", "modelo", "objeto_id", "leida", "creada_en"]
         read_only_fields = fields
+
+
+class ConfiguracionCapacitacionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracionCapacitacion
+        fields = ["titulo_curso", "video_url", "puntaje_minimo_aprobacion", "actualizada_en"]
+        read_only_fields = ["actualizada_en"]
+
+
+class PreguntaCapacitacionPublicaSerializer(serializers.ModelSerializer):
+    """Lo que ve el participante mientras hace la evaluación — sin
+    `respuesta_correcta`, para no repetir el hueco de seguridad del Apps
+    Script original (mandaba la respuesta al navegador antes de calificar)."""
+
+    class Meta:
+        model = PreguntaCapacitacion
+        fields = ["id", "texto", "opciones", "orden"]
+
+
+class RegistroCapacitacionSerializer(serializers.ModelSerializer):
+    contratista_nombre = serializers.CharField(source="contratista.nombre", read_only=True)
+    trabajador_nombre = serializers.SerializerMethodField()
+    estado_display = serializers.CharField(source="get_estado_display", read_only=True)
+
+    class Meta:
+        model = RegistroCapacitacion
+        fields = [
+            "id",
+            "contratista",
+            "contratista_nombre",
+            "trabajador",
+            "trabajador_nombre",
+            "nombres",
+            "correo",
+            "documento",
+            "calificacion",
+            "estado",
+            "estado_display",
+            "iniciado_en",
+            "finalizado_en",
+        ]
+        read_only_fields = fields
+
+    def get_trabajador_nombre(self, registro):
+        return str(registro.trabajador) if registro.trabajador else ""
+
+
+class RegistroCapacitacionIniciarSerializer(serializers.ModelSerializer):
+    """Alta del participante — arranca el intento (estado EN_CURSO)."""
+
+    class Meta:
+        model = RegistroCapacitacion
+        fields = ["id", "contratista", "nombres", "correo", "documento"]
+        read_only_fields = ["id"]
+
+    def validate_nombres(self, valor):
+        if not valor.strip():
+            raise serializers.ValidationError("El nombre es obligatorio.")
+        return valor
+
+
+class CalificarCapacitacionSerializer(serializers.Serializer):
+    respuestas = serializers.ListField(
+        child=serializers.IntegerField(min_value=0), allow_empty=False
+    )

@@ -203,3 +203,13 @@ export function IconAutorizacionIngreso({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconCapacitacion({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path d="M2 8 12 4l10 4-10 4L2 8Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 10.5V15c0 1.4 2.7 3 6 3s6-1.6 6-3v-4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 8v6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

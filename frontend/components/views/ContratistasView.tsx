@@ -610,6 +610,9 @@ function FormularioContratista({
   const [responsableNombre, setResponsableNombre] = useState(contratista?.responsable_sst_nombre ?? "");
   const [responsableTelefono, setResponsableTelefono] = useState(contratista?.responsable_sst_telefono ?? "");
   const [activa, setActiva] = useState(contratista?.activa ?? true);
+  const [capacitacionHabilitadaManual, setCapacitacionHabilitadaManual] = useState(
+    contratista?.capacitacion_habilitada_manual ?? false
+  );
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -626,6 +629,7 @@ function FormularioContratista({
       responsable_sst_nombre: responsableNombre,
       responsable_sst_telefono: responsableTelefono,
       activa,
+      capacitacion_habilitada_manual: capacitacionHabilitadaManual,
     };
     try {
       if (contratista) {
@@ -695,6 +699,23 @@ function FormularioContratista({
                 className="h-4 w-4 rounded border-corp-border accent-corp-blue"
               />
               Activa
+            </label>
+          )}
+          {contratista && (
+            <label className="flex items-start gap-2 text-sm text-corp-navy">
+              <input
+                type="checkbox"
+                checked={capacitacionHabilitadaManual}
+                onChange={(e) => setCapacitacionHabilitadaManual(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-corp-border accent-corp-blue"
+              />
+              <span>
+                Habilitar capacitación manualmente
+                <span className="block text-xs font-normal text-corp-muted">
+                  La inducción previa a ingreso normalmente solo se habilita cuando esta empresa tiene una
+                  Declaración de Método aprobada. Marca esto para habilitarla de todas formas.
+                </span>
+              </span>
             </label>
           )}
 

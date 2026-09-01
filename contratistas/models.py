@@ -22,6 +22,15 @@ class EmpresaContratista(models.Model):
     responsable_sst_nombre = models.CharField("responsable SST/SISO", max_length=150, blank=True)
     responsable_sst_telefono = models.CharField("teléfono responsable SST", max_length=30, blank=True)
     activa = models.BooleanField(default=True)
+    capacitacion_habilitada_manual = models.BooleanField(
+        "habilitar capacitación manualmente",
+        default=False,
+        help_text=(
+            "La inducción previa a ingreso normalmente solo se habilita cuando esta empresa tiene una "
+            "Declaración de Método aprobada. Marca esto para habilitarla de todas formas (ej. trabajos "
+            "que no requieren declaración de método)."
+        ),
+    )
     creada_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -31,6 +40,15 @@ class EmpresaContratista(models.Model):
 
     def __str__(self):
         return self.nombre
+
+    @property
+    def capacitacion_habilitada(self):
+        """La inducción previa a ingreso queda disponible cuando esta empresa
+        ya tiene una Declaración de Método aprobada (el trabajo está
+        autorizado) o cuando un Administrador la habilitó manualmente."""
+        if self.capacitacion_habilitada_manual:
+            return True
+        return self.declaraciones_metodo.filter(estado=DeclaracionMetodo.Estado.APROBADA).exists()
 
 
 def soporte_autorizacion_upload_to(instance, filename):
@@ -718,3 +736,98 @@ class TrabajadorAutorizacionIngreso(models.Model):
 
     def __str__(self):
         return f"{self.trabajador} — {'Incluido' if self.incluido else 'Excluido'}"
+
+
+class ConfiguracionCapacitacion(models.Model):
+    """Fila única (singleton), igual que ConfiguracionAlertas — el video y el
+    puntaje mínimo de la inducción previa a ingreso, editables desde el
+    dashboard sin tocar código."""
+
+    titulo_curso = models.CharField(max_length=150, default="Inducción SST")
+    video_url = models.URLField(
+        "URL del video de inducción",
+        max_length=500,
+        blank=True,
+        help_text="Video alojado externamente (ej. Cloudinary) — se reproduce directo desde ahí.",
+    )
+    puntaje_minimo_aprobacion = models.PositiveIntegerField(
+        "puntaje mínimo para aprobar (%)", default=80
+    )
+    actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
+
+    class Meta:
+        verbose_name = "configuración de capacitación"
+        verbose_name_plural = "configuración de capacitación"
+
+    def __str__(self):
+        return "Configuración de capacitación"
+
+    @classmethod
+    def obtener(cls):
+        objeto, _ = cls.objects.get_or_create(pk=1)
+        return objeto
+
+
+class PreguntaCapacitacion(models.Model):
+    """Catálogo editable de preguntas de la evaluación de inducción — mismo
+    patrón que CursoSafetyAcademy/PermisoTrabajo. `respuesta_correcta` es el
+    índice (0-based) dentro de `opciones` y nunca se expone al frontend
+    antes de calificar, para no repetir el hueco de seguridad del Apps
+    Script original (mandaba la respuesta correcta al navegador)."""
+
+    texto = models.TextField("pregunta")
+    opciones = models.JSONField(default=list, help_text="Lista de textos de opción, en el orden a mostrar.")
+    respuesta_correcta = models.PositiveIntegerField("índice de la opción correcta")
+    activa = models.BooleanField(default=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "pregunta de capacitación"
+        verbose_name_plural = "preguntas de capacitación"
+        ordering = ["orden", "id"]
+
+    def __str__(self):
+        return self.texto[:80]
+
+
+class RegistroCapacitacion(models.Model):
+    """Un intento de inducción previa a ingreso — registro del participante,
+    respuestas dadas y resultado. Si el documento coincide con un Trabajador
+    ya radicado en la misma empresa, queda vinculado y, al aprobar, se marca
+    automáticamente el curso 'induccion_sst' en Trabajador.cursos_safety_academy."""
+
+    class Estado(models.TextChoices):
+        EN_CURSO = "en_curso", "En curso"
+        APROBADO = "aprobado", "Aprobado"
+        NO_APROBADO = "no_aprobado", "No aprobado"
+
+    contratista = models.ForeignKey(
+        EmpresaContratista, on_delete=models.CASCADE, related_name="registros_capacitacion"
+    )
+    trabajador = models.ForeignKey(
+        Trabajador,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="registros_capacitacion",
+        help_text="Se vincula solo si el documento ingresado coincide con un trabajador ya radicado.",
+    )
+    nombres = models.CharField(max_length=200)
+    correo = models.EmailField(blank=True)
+    documento = models.CharField("documento de identidad", max_length=30, blank=True)
+    respuestas = models.JSONField(default=list, blank=True, help_text="Índices de opción elegidos, en orden.")
+    calificacion = models.PositiveIntegerField(null=True, blank=True)
+    estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.EN_CURSO)
+    iniciado_en = models.DateTimeField(auto_now_add=True)
+    finalizado_en = models.DateTimeField(null=True, blank=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+
+    class Meta:
+        verbose_name = "registro de capacitación"
+        verbose_name_plural = "registros de capacitación"
+        ordering = ["-iniciado_en"]
+
+    def __str__(self):
+        return f"{self.nombres} — {self.contratista.nombre} ({self.get_estado_display()})"

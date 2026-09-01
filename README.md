@@ -231,14 +231,41 @@ frontend en Vercel — pero viven en el mismo repositorio.
     contratista y del interventor) — replicado a partir del formato Excel
     real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA — INCLUSIONES/
     EXCLUSIONES" de Bavaria.
+  - **Capacitación previa a ingreso** (sección "Capacitación" en el sidebar;
+    `contratistas.ConfiguracionCapacitacion`/`PreguntaCapacitacion`/
+    `RegistroCapacitacion`): reimplementación dentro del portal del "FDT
+    Evalúa visitantes" que el cliente tenía en Google Apps Script — registro
+    del participante → video de inducción (URL editable, catálogo
+    `ConfiguracionCapacitacion.obtener()`, singleton igual que
+    `ConfiguracionAlertas`) → evaluación de 10 preguntas (catálogo editable
+    `PreguntaCapacitacion`, sembrado con el contenido original de FDT en la
+    migración de datos `0021_seed_capacitacion_fdt`) → certificado si
+    aprueba. A diferencia del Apps Script original, la calificación se
+    calcula enteramente en el servidor (`calificar_capacitacion`) — el
+    índice de la respuesta correcta nunca viaja al navegador
+    (`PreguntaCapacitacionPublicaSerializer` la omite), ni antes ni durante
+    la evaluación. Solo queda habilitada por empresa contratista
+    (`EmpresaContratista.capacitacion_habilitada`, propiedad calculada) —
+    nunca por trabajador — cuando esa empresa tiene al menos una Declaración
+    de Método `aprobada`, o cuando un Administrador marca la casilla
+    `capacitacion_habilitada_manual` en su ficha (para trabajos que no
+    requieren declaración de método). Si el documento del participante
+    coincide con un `Trabajador` ya radicado en la misma empresa, al aprobar
+    se marca automáticamente `cursos_safety_academy["induccion_sst"]` con la
+    fecha de hoy — el mismo campo que ya alimenta "cursos pendientes" en
+    Contratistas, sin que nadie tenga que anotarlo a mano. El reporte
+    (`GET /api/contratistas/capacitacion/registros/`) lista todos los
+    intentos con su resultado; personal interno ve todas las empresas, el
+    portal de contratistas solo los suyos.
   - **Portal de contratistas** (tercer rol `PerfilUsuario.Rol.CONTRATISTA`,
     mismo dashboard y mismo login — no es una app aparte): una cuenta por
     empresa contratista (`PerfilUsuario.contratista`, FK a
     `EmpresaContratista`), con el sidebar reducido a Contratistas (de solo
     lectura, scopeada a su empresa), Declaración de Método (lectura y
-    escritura completas) y Autorización de Ingreso (de solo lectura); todo
-    lo demás (indicadores comparativos, cámaras, sistema, usuarios, etc.)
-    requiere ser personal interno
+    escritura completas), Autorización de Ingreso (de solo lectura) y
+    Capacitación (puede registrar e iniciar capacitaciones de su empresa y
+    ver su propio reporte); todo lo demás (indicadores comparativos,
+    cámaras, sistema, usuarios, etc.) requiere ser personal interno
     (`core.permissions.EsPersonalInterno`/`EsPersonalInternoOSoloLectura`).
     Implementa el flujo que pidió el cliente: el contratista sube su
     Declaración de Método y la deja en estado "Enviada" → se notifica por
@@ -407,6 +434,11 @@ eliminar) requiere rol Administrador.
 | `POST /api/contratistas/radicaciones/<id>/aprobar/`, `POST .../rechazar/` | Decisión del interventor sobre una radicación (`observaciones` opcional) |
 | `GET/POST /api/contratistas/declaraciones/`, `GET/PATCH/DELETE /api/contratistas/declaraciones/<id>/` | `DeclaracionMetodo` con sus `actividades` anidadas (se reemplazan todas en cada guardado) |
 | `POST /api/contratistas/declaraciones/<id>/firmar/` | Agrega/reemplaza la firma de un rol (`rol`, `nombre_firmante`) |
+| `GET/PATCH /api/contratistas/capacitacion/configuracion/` | Título/video/puntaje mínimo de la inducción — lectura abierta, escritura solo Administrador |
+| `GET /api/contratistas/capacitacion/preguntas/` | Las 10 preguntas activas, sin `respuesta_correcta` |
+| `GET /api/contratistas/capacitacion/registros/` | Reporte de capacitaciones hechas; filtro `?contratista=` |
+| `POST /api/contratistas/capacitacion/iniciar/` | Arranca un intento — 403 si la empresa no tiene la capacitación habilitada |
+| `POST /api/contratistas/capacitacion/<id>/calificar/` | Califica en el servidor (`respuestas`); marca `induccion_sst` en el trabajador si aprueba y hay coincidencia por documento |
 
 ## Frontend — correr en local
 
@@ -430,8 +462,8 @@ creado ahí.
   Usuarios, solo para Administrador. Ninguna tiene URL propia; son secciones
   dentro de `/dashboard` manejadas por estado. Un usuario con rol
   Contratista ve un sidebar aparte, reducido a Contratistas (solo lectura),
-  Declaración de Método (lectura y escritura) y Autorización de Ingreso
-  (solo lectura) — ver "Portal de contratistas" más arriba.
+  Declaración de Método (lectura y escritura), Autorización de Ingreso
+  (solo lectura) y Capacitación — ver "Portal de contratistas" más arriba.
 - **Roles**: el primer usuario (`createsuperuser`) es Administrador y ve la
   sección "Usuarios" en el sidebar; desde ahí crea al resto del equipo con
   su rol (Administrador, Operador o Contratista) — no hay pantalla de

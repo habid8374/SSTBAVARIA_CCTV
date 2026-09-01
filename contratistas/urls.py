@@ -74,4 +74,13 @@ urlpatterns = [
         views.autorizacion_ingreso_pdf,
         name="autorizaciones_ingreso_pdf",
     ),
+    path(
+        "capacitacion/configuracion/",
+        views.ConfiguracionCapacitacionDetalle.as_view(),
+        name="capacitacion_configuracion",
+    ),
+    path("capacitacion/preguntas/", views.preguntas_capacitacion, name="capacitacion_preguntas"),
+    path("capacitacion/registros/", views.RegistroCapacitacionLista.as_view(), name="capacitacion_registros"),
+    path("capacitacion/iniciar/", views.iniciar_capacitacion, name="capacitacion_iniciar"),
+    path("capacitacion/<int:pk>/calificar/", views.calificar_capacitacion, name="capacitacion_calificar"),
 ]

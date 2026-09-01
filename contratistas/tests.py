@@ -17,8 +17,10 @@ from .models import (
     FirmaMetodo,
     Funcionario,
     NotificacionInterna,
+    PreguntaCapacitacion,
     RadicacionSeguridadSocial,
     RegistroAuditoria,
+    RegistroCapacitacion,
     Trabajador,
     nivel_riesgo,
 )
@@ -2267,3 +2269,202 @@ class PortalContratistaTests(ApiTestsBase):
             **self._auth(self.portal_user),
         )
         self.assertEqual(response.status_code, 201, response.data)
+
+
+class CapacitacionTests(ApiTestsBase):
+    """Inducción previa a ingreso (reemplaza el 'FDT Evalúa visitantes' en
+    Apps Script): habilitación por empresa, preguntas sin respuesta
+    correcta, calificación en el servidor y vínculo automático al
+    trabajador cuando aprueba."""
+
+    def setUp(self):
+        super().setUp()
+        self.portal_user = Usuario.objects.create_user("portal_scepsa", "portal@scepsa.com", "clave12345")
+        self.portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        self.portal_user.perfil.contratista = self.contratista
+        self.portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+    def _respuestas_correctas(self):
+        preguntas = list(PreguntaCapacitacion.objects.filter(activa=True).order_by("orden", "id"))
+        return [p.respuesta_correcta for p in preguntas]
+
+    def _respuestas_incorrectas(self):
+        preguntas = list(PreguntaCapacitacion.objects.filter(activa=True).order_by("orden", "id"))
+        return [(p.respuesta_correcta + 1) % len(p.opciones) for p in preguntas]
+
+    def test_preguntas_sembradas_desde_apps_script(self):
+        response = self.client.get(reverse("contratistas:capacitacion_preguntas"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 10)
+
+    def test_preguntas_no_exponen_la_respuesta_correcta(self):
+        response = self.client.get(reverse("contratistas:capacitacion_preguntas"), **self._auth(self.operador))
+        for pregunta in response.data:
+            self.assertNotIn("respuesta_correcta", pregunta)
+
+    def test_iniciar_sin_declaracion_aprobada_ni_habilitacion_manual_es_403(self):
+        response = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": "Juan Pérez", "documento": "80432071"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_habilitacion_manual_permite_iniciar(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        response = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": "Juan Pérez", "documento": "1"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["estado"], "en_curso")
+
+    def test_declaracion_aprobada_habilita_la_capacitacion(self):
+        DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Mantenimiento de pórtico",
+            estado=DeclaracionMetodo.Estado.APROBADA,
+        )
+        response = self.client.get(
+            reverse("contratistas:empresas_detalle", args=[self.contratista.pk]), **self._auth(self.operador)
+        )
+        self.assertTrue(response.data["capacitacion_habilitada"])
+
+        response = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": "Juan Pérez"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_portal_contratista_no_puede_iniciar_a_nombre_de_otra_empresa(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        otro = EmpresaContratista.objects.create(empresa=self.empresa, nombre="OTRA SAS")
+        otro.capacitacion_habilitada_manual = True
+        otro.save(update_fields=["capacitacion_habilitada_manual"])
+
+        response = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": otro.pk, "nombres": "Juan Pérez"},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        # El id enviado se ignora — el portal siempre queda forzado a su propia empresa.
+        self.assertEqual(response.data["contratista"], self.contratista.pk)
+
+    def test_flujo_completo_aprueba_y_marca_induccion_en_el_trabajador(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {
+                "contratista": self.contratista.pk,
+                "nombres": self.trabajador.nombres,
+                "documento": self.trabajador.documento,
+            },
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(inicio.status_code, 201, inicio.data)
+        self.assertEqual(inicio.data["trabajador"], self.trabajador.pk)
+        registro_id = inicio.data["id"]
+
+        respuesta = self.client.post(
+            reverse("contratistas:capacitacion_calificar", args=[registro_id]),
+            {"respuestas": self._respuestas_correctas()},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual(respuesta.data["estado"], "aprobado")
+        self.assertEqual(respuesta.data["calificacion"], 100)
+        self.assertEqual(respuesta.data["correctas"], respuesta.data["total"])
+
+        self.trabajador.refresh_from_db()
+        self.assertIn("induccion_sst", self.trabajador.cursos_safety_academy)
+
+    def test_reprueba_no_marca_induccion_en_el_trabajador(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": self.trabajador.nombres, "documento": self.trabajador.documento},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        registro_id = inicio.data["id"]
+
+        respuesta = self.client.post(
+            reverse("contratistas:capacitacion_calificar", args=[registro_id]),
+            {"respuestas": self._respuestas_incorrectas()},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual(respuesta.data["estado"], "no_aprobado")
+
+        self.trabajador.refresh_from_db()
+        self.assertNotIn("induccion_sst", self.trabajador.cursos_safety_academy)
+
+    def test_no_se_puede_calificar_dos_veces(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": "Juan Pérez"},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        registro_id = inicio.data["id"]
+        url = reverse("contratistas:capacitacion_calificar", args=[registro_id])
+        primera = self.client.post(
+            url, {"respuestas": self._respuestas_correctas()}, content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(primera.status_code, 200)
+        segunda = self.client.post(
+            url, {"respuestas": self._respuestas_correctas()}, content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(segunda.status_code, 400)
+
+    def test_documento_sin_coincidencia_no_vincula_trabajador(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": "Visitante Nuevo", "documento": "999999"},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertIsNone(inicio.data["trabajador"])
+
+    def test_reporte_de_registros_solo_muestra_la_propia_empresa(self):
+        RegistroCapacitacion.objects.create(contratista=self.contratista, nombres="A")
+        otro = EmpresaContratista.objects.create(empresa=self.empresa, nombre="OTRA SAS")
+        RegistroCapacitacion.objects.create(contratista=otro, nombres="B")
+
+        response = self.client.get(
+            reverse("contratistas:capacitacion_registros"), **self._auth(self.portal_user)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["nombres"], "A")
+
+    def test_calificar_requiere_autenticacion(self):
+        response = self.client.post(
+            reverse("contratistas:capacitacion_calificar", args=[1]),
+            {"respuestas": [0]},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 401)

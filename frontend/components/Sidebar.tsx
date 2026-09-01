@@ -6,6 +6,7 @@ import {
   IconAutorizacionIngreso,
   IconAyuda,
   IconCamara,
+  IconCapacitacion,
   IconChevronLeft,
   IconContratista,
   IconDeclaracionMetodo,
@@ -28,6 +29,7 @@ export type SeccionId =
   | "contratistas"
   | "declaracion-metodo"
   | "autorizacion-ingreso"
+  | "capacitacion"
   | "funcionarios"
   | "indicadores-contratistas"
   | "sistema"
@@ -53,6 +55,7 @@ const ITEMS: Item[] = [
   { id: "contratistas", label: "Contratistas", icon: IconContratista },
   { id: "declaracion-metodo", label: "Declaración de Método", icon: IconDeclaracionMetodo },
   { id: "autorizacion-ingreso", label: "Autorización de Ingreso", icon: IconAutorizacionIngreso },
+  { id: "capacitacion", label: "Capacitación", icon: IconCapacitacion },
   { id: "funcionarios", label: "Funcionarios firmantes", icon: IconUsuarios, soloPersonalInterno: true },
   { id: "indicadores-contratistas", label: "Indicadores", icon: IconIndicadores, soloPersonalInterno: true },
   { id: "sistema", label: "Sistema", icon: IconSistema, adminOnly: true },

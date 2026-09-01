@@ -23,6 +23,7 @@ from .models import (
     ActividadMetodo,
     AutorizacionIngreso,
     ConfiguracionAlertas,
+    ConfiguracionCapacitacion,
     CursoSafetyAcademy,
     DeclaracionMetodo,
     EmpresaContratista,
@@ -31,8 +32,10 @@ from .models import (
     Funcionario,
     NotificacionInterna,
     PermisoTrabajo,
+    PreguntaCapacitacion,
     RadicacionSeguridadSocial,
     RegistroAuditoria,
+    RegistroCapacitacion,
     Trabajador,
     calcular_hash_declaracion,
     nivel_riesgo,
@@ -45,8 +48,10 @@ from .notificaciones import (
 )
 from .serializers import (
     AutorizacionIngresoSerializer,
+    CalificarCapacitacionSerializer,
     CatalogosSerializer,
     ConfiguracionAlertasSerializer,
+    ConfiguracionCapacitacionSerializer,
     CursoSafetyAcademySerializer,
     DecisionRadicacionSerializer,
     DeclaracionMetodoSerializer,
@@ -58,8 +63,11 @@ from .serializers import (
     NotaAlertaSerializer,
     NotificacionInternaSerializer,
     PermisoTrabajoSerializer,
+    PreguntaCapacitacionPublicaSerializer,
     RadicacionSeguridadSocialSerializer,
     RegistroAuditoriaSerializer,
+    RegistroCapacitacionIniciarSerializer,
+    RegistroCapacitacionSerializer,
     TrabajadorSerializer,
 )
 
@@ -943,3 +951,134 @@ def autorizacion_ingreso_pdf(request, pk):
     if resultado.err:
         return Response({"detail": "No se pudo generar el PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return respuesta
+
+
+# --- Capacitación previa a ingreso ---
+# Reimplementación del "FDT Evalúa visitantes" (Google Apps Script) que
+# usaba el cliente: registro del participante, video de inducción,
+# evaluación de 10 preguntas calificada en el servidor (nunca se manda la
+# respuesta correcta al navegador) y certificado si aprueba. Solo queda
+# habilitada por empresa contratista cuando ya tiene una Declaración de
+# Método aprobada, o cuando un Administrador la habilita manualmente — ver
+# EmpresaContratista.capacitacion_habilitada.
+
+
+class ConfiguracionCapacitacionDetalle(generics.RetrieveUpdateAPIView):
+    """Fila única — título, video y puntaje mínimo de la inducción,
+    editables por un Administrador en vez de fijos en el código. La lectura
+    queda abierta a cualquier autenticado (incluido el portal de
+    contratistas): son justo quienes hacen el curso y necesitan el video."""
+
+    serializer_class = ConfiguracionCapacitacionSerializer
+    permission_classes = [EsAdministradorOSoloLectura]
+
+    def get_object(self):
+        return ConfiguracionCapacitacion.obtener()
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def preguntas_capacitacion(request):
+    """Preguntas activas de la evaluación, sin la respuesta correcta."""
+    preguntas = PreguntaCapacitacion.objects.filter(activa=True)
+    return Response(PreguntaCapacitacionPublicaSerializer(preguntas, many=True).data)
+
+
+class RegistroCapacitacionLista(generics.ListAPIView):
+    """Reporte de quién ha hecho la inducción, con qué resultado — personal
+    interno ve todas las empresas; el portal de contratistas solo la suya."""
+
+    serializer_class = RegistroCapacitacionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = RegistroCapacitacion.objects.select_related("contratista", "trabajador")
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(contratista_id=contratista_id)
+        else:
+            filtro = self.request.query_params.get("contratista")
+            if filtro:
+                qs = qs.filter(contratista_id=filtro)
+        return qs
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def iniciar_capacitacion(request):
+    """Arranca un intento: valida que la empresa tenga la capacitación
+    habilitada y crea el registro en curso. Si el documento coincide con un
+    trabajador ya radicado en la misma empresa, queda vinculado desde ya."""
+    contratista_id = _contratista_de(request)
+    if contratista_id is None:
+        contratista_id = request.data.get("contratista")
+        if not contratista_id:
+            return Response(
+                {"detail": "Hace falta indicar la empresa contratista."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+    empresa = get_object_or_404(EmpresaContratista, pk=contratista_id)
+    if not empresa.capacitacion_habilitada:
+        return Response(
+            {"detail": "La capacitación todavía no está habilitada para esta empresa."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    entrada = RegistroCapacitacionIniciarSerializer(data={**request.data, "contratista": empresa.pk})
+    entrada.is_valid(raise_exception=True)
+
+    documento = (entrada.validated_data.get("documento") or "").strip()
+    trabajador = None
+    if documento:
+        trabajador = Trabajador.objects.filter(contratista=empresa, documento=documento).first()
+
+    registro = entrada.save(trabajador=trabajador, creado_por=request.user)
+    return Response(RegistroCapacitacionSerializer(registro).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def calificar_capacitacion(request, pk):
+    """Califica la evaluación en el servidor y, si aprueba y quedó vinculada
+    a un trabajador, marca 'induccion_sst' como completada en su ficha."""
+    qs = RegistroCapacitacion.objects.select_related("trabajador")
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    registro = get_object_or_404(qs, pk=pk)
+
+    if registro.estado != RegistroCapacitacion.Estado.EN_CURSO:
+        return Response({"detail": "Esta evaluación ya fue calificada."}, status=status.HTTP_400_BAD_REQUEST)
+
+    entrada = CalificarCapacitacionSerializer(data=request.data)
+    entrada.is_valid(raise_exception=True)
+    respuestas = entrada.validated_data["respuestas"]
+
+    preguntas = list(PreguntaCapacitacion.objects.filter(activa=True))
+    correctas = sum(
+        1
+        for pregunta, respuesta in zip(preguntas, respuestas)
+        if respuesta == pregunta.respuesta_correcta
+    )
+    total = len(preguntas)
+    calificacion = round((correctas / total) * 100) if total else 0
+    minimo = ConfiguracionCapacitacion.obtener().puntaje_minimo_aprobacion
+    aprobado = calificacion >= minimo
+
+    registro.respuestas = respuestas
+    registro.calificacion = calificacion
+    registro.estado = RegistroCapacitacion.Estado.APROBADO if aprobado else RegistroCapacitacion.Estado.NO_APROBADO
+    registro.finalizado_en = timezone.now()
+    registro.save(update_fields=["respuestas", "calificacion", "estado", "finalizado_en"])
+
+    if aprobado and registro.trabajador:
+        trabajador = registro.trabajador
+        cursos = dict(trabajador.cursos_safety_academy or {})
+        cursos["induccion_sst"] = timezone.localdate().isoformat()
+        trabajador.cursos_safety_academy = cursos
+        trabajador.save(update_fields=["cursos_safety_academy"])
+
+    datos = RegistroCapacitacionSerializer(registro).data
+    datos["correctas"] = correctas
+    datos["total"] = total
+    return Response(datos)

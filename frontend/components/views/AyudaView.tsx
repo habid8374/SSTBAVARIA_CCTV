@@ -29,8 +29,8 @@ const TEMAS: Tema[] = [
         <Sub>El menú de la izquierda</Sub>
         <P>Cada ítem del menú es una sección independiente — no hay direcciones web sueltas que recordar. Un
           usuario con rol Contratista solo ve Contratistas (su propia empresa, de solo lectura), Declaración
-          de Método, Autorización de Ingreso (de solo lectura) y Ayuda — el resto de ítems son para el
-          personal interno de SST/interventoría:</P>
+          de Método, Autorización de Ingreso (de solo lectura), Capacitación y Ayuda — el resto de ítems son
+          para el personal interno de SST/interventoría:</P>
         <Ul>
           <li><strong>Tablero</strong>: resumen general (KPIs y gráfico).</li>
           <li><strong>Cámaras</strong>: alta y estado de cada cámara.</li>
@@ -41,6 +41,8 @@ const TEMAS: Tema[] = [
           <li><strong>Declaración de Método</strong>: formulario de riesgo (método Kinney) por trabajo.</li>
           <li><strong>Autorización de Ingreso</strong>: quién queda autorizado a entrar a planta, cuándo y en
             qué área — con inclusiones y exclusiones de trabajadores.</li>
+          <li><strong>Capacitación</strong>: inducción de seguridad previa a ingreso (video + evaluación +
+            certificado) para visitantes y trabajadores de contratistas.</li>
           <li><strong>Funcionarios firmantes</strong> (personal interno): padrón de quién puede firmar cada
             rol de la Declaración de Método.</li>
           <li><strong>Indicadores</strong> (personal interno): panel comparativo entre todas las empresas
@@ -75,6 +77,9 @@ const TEMAS: Tema[] = [
             radicaciones de seguridad social) — de solo lectura, no puede editar ni cargar radicaciones.</li>
           <li><strong>Autorización de Ingreso</strong>: ve sus autorizaciones de ingreso vigentes y puede
             descargar el PDF — de solo lectura.</li>
+          <li><strong>Capacitación</strong>: puede registrar y hacer la inducción de sus visitantes/trabajadores
+            (si su empresa la tiene habilitada) y ver el reporte de las suyas — ver el tema
+            &quot;Capacitación&quot;.</li>
           <li><strong>Ayuda</strong>: este manual.</li>
         </Ul>
         <P>
@@ -465,6 +470,58 @@ const TEMAS: Tema[] = [
           contrato) y la de excluidos (con motivo), y las líneas en blanco para firma y sello de la empresa
           contratista y del interventor — listo para imprimir y archivar junto con los demás soportes.
         </P>
+      </>
+    ),
+  },
+  {
+    id: "capacitacion",
+    titulo: "Capacitación",
+    contenido: (
+      <>
+        <P>
+          Inducción de seguridad previa a ingreso — reemplaza la herramienta externa que se usaba en Apps
+          Script. Un participante (visitante o trabajador de un contratista) se registra, ve el video de
+          capacitación completo y responde una evaluación de 10 preguntas; si aprueba, recibe un certificado
+          imprimible. Todo el flujo vive dentro del portal, sin necesidad de una app aparte.
+        </P>
+        <Sub>Cuándo queda habilitada</Sub>
+        <P>
+          Por empresa contratista, no por trabajador: la capacitación solo se puede iniciar cuando esa empresa
+          tiene al menos una <strong>Declaración de Método aprobada</strong> (el trabajo ya está autorizado),
+          o cuando un <strong>Administrador la habilita manualmente</strong> desde la ficha de la empresa en
+          Contratistas (casilla &quot;Habilitar capacitación manualmente&quot;, para los casos donde no aplica
+          declaración de método). Si ninguna de las dos aplica, el botón &quot;Iniciar curso&quot; devuelve un
+          aviso en vez de arrancar.
+        </P>
+        <Sub>El flujo</Sub>
+        <Ol>
+          <li><strong>Registro</strong>: nombre, correo y documento (los dos últimos opcionales). El personal
+            interno además elige a nombre de qué empresa contratista es; el portal de contratistas queda
+            siempre fijado a la suya.</li>
+          <li><strong>Video</strong>: hay que verlo completo — el botón &quot;Continuar a evaluación&quot;
+            permanece deshabilitado hasta que termina.</li>
+          <li><strong>Evaluación</strong>: 10 preguntas de opción múltiple. La calificación se calcula en el
+            servidor — el navegador nunca recibe cuál es la respuesta correcta, ni antes ni durante la
+            evaluación.</li>
+          <li><strong>Resultado</strong>: con 80% o más (configurable) queda <strong>Aprobado</strong> y se
+            muestra un certificado imprimible; por debajo, <strong>No aprobado</strong>, con la opción de
+            volver a intentar (cuenta como un registro nuevo).</li>
+        </Ol>
+        <Nota>
+          Si el documento ingresado coincide con un trabajador ya radicado en esa misma empresa (sección
+          Contratistas), al aprobar queda marcado automáticamente el curso &quot;Inducción SST&quot; en su
+          ficha — el mismo que ya se sigue en cursos Safety Academy — sin que nadie tenga que anotarlo a mano.
+        </Nota>
+        <Sub>Reporte</Sub>
+        <P>
+          La tabla de la sección lista todos los registros hechos, con nombre, documento, trabajador vinculado
+          (si aplica), calificación, estado y fecha. El personal interno ve todas las empresas; el portal de
+          contratistas ve solo los suyos.
+        </P>
+        <Nota tipo="aviso">
+          El video y las 10 preguntas de la evaluación se pueden editar desde el admin de Django (Sistema →
+          Configuración de capacitación / Preguntas de capacitación) sin tocar código.
+        </Nota>
       </>
     ),
   },
