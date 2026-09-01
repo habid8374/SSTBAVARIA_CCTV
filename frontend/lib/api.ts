@@ -1022,6 +1022,8 @@ export type ActividadMetodo = {
   permisos_requeridos: string[];
   epp_requerido: string[];
   tarea_sif: boolean;
+  altura_trabajo_metros: number | null;
+  profundidad_excavacion_metros: number | null;
 };
 
 export type NuevaActividadMetodo = Omit<

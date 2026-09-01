@@ -239,6 +239,8 @@ function actividadVacia(orden: number): ActividadForm {
     permisos_requeridos: [],
     epp_requerido: [],
     tarea_sif: false,
+    altura_trabajo_metros: null,
+    profundidad_excavacion_metros: null,
   };
 }
 
@@ -313,7 +315,7 @@ function FormularioDeclaracion({
     return () => {
       cancelado = true;
     };
-  }, [token, esContratista, declaracion?.id]);
+  }, [token, esContratista, declaracion?.id, declaracion?.actualizada_en]);
 
   function usarComoMotivoRechazo(alerta: AlertaAutomatica) {
     setObservaciones((actual) => (actual.trim() ? `${actual.trim()}\n${alerta.motivo_sugerido}` : alerta.motivo_sugerido));
@@ -409,6 +411,8 @@ function FormularioDeclaracion({
         permisos_requeridos: a.permisos_requeridos,
         epp_requerido: a.epp_requerido,
         tarea_sif: a.tarea_sif,
+        altura_trabajo_metros: a.altura_trabajo_metros,
+        profundidad_excavacion_metros: a.profundidad_excavacion_metros,
       })),
     };
     try {
@@ -714,6 +718,43 @@ function FormularioDeclaracion({
                         onChange={(e) => actualizarActividad(indice, { medidas_mitigacion: e.target.value })}
                         className={TEXTAREA}
                       />
+                    </Campo>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Campo label="Altura de trabajo (m) — opcional">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={0}
+                        value={actividad.altura_trabajo_metros ?? ""}
+                        onChange={(e) =>
+                          actualizarActividad(indice, {
+                            altura_trabajo_metros: e.target.value === "" ? null : Number(e.target.value),
+                          })
+                        }
+                        className={INPUT}
+                      />
+                      <p className="mt-1 text-xs text-corp-muted">
+                        Si la diligencias, habilita alertas automáticas de las SOP de trabajo en altura (1.8 m, 4 m).
+                      </p>
+                    </Campo>
+                    <Campo label="Profundidad de excavación (m) — opcional">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={0}
+                        value={actividad.profundidad_excavacion_metros ?? ""}
+                        onChange={(e) =>
+                          actualizarActividad(indice, {
+                            profundidad_excavacion_metros: e.target.value === "" ? null : Number(e.target.value),
+                          })
+                        }
+                        className={INPUT}
+                      />
+                      <p className="mt-1 text-xs text-corp-muted">
+                        Si la diligencias, habilita alertas automáticas del SOP de excavaciones (1.2 m, 1.3 m, 5 m).
+                      </p>
                     </Campo>
                   </div>
 

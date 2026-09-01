@@ -235,6 +235,8 @@ class ActividadMetodoSerializer(serializers.ModelSerializer):
             "permisos_requeridos",
             "epp_requerido",
             "tarea_sif",
+            "altura_trabajo_metros",
+            "profundidad_excavacion_metros",
         ]
         read_only_fields = ["id"]
 

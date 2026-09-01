@@ -53,16 +53,22 @@ frontend en Vercel — pero viven en el mismo repositorio.
     `GET /api/contratistas/declaraciones/<id>/alertas/`, solo
     `EsPersonalInterno`): al revisar una declaración, un motor de reglas
     basado en los SOP "Safety to Sustain" del cliente (trabajos en altura,
-    excavaciones, sistemas anticaída) genera advertencias sobre datos que
-    el formulario ya captura — permiso de altura sin EPP contra caídas,
-    excavación sin medidas de mitigación detalladas, riesgo que sigue alto
-    tras mitigar, tarea SIF sin firma de Seguridad de Planta, texto que
-    sugiere trabajo en altura sin el permiso marcado. Cada alerta cita su
-    fuente y trae un motivo de rechazo sugerido, con un botón en el
-    formulario que solo copia ese texto al campo Observaciones. **Regla
-    dura: el motor nunca decide por sí solo** — no cambia el estado de la
-    declaración, no bloquea aprobar/rechazar, y el texto sugerido se puede
-    editar o descartar libremente; la aprobación o el rechazo siguen
+    excavaciones, sistemas anticaída) genera advertencias.
+    **Fase A**, sobre datos que el formulario ya captura — permiso de
+    altura sin EPP contra caídas, excavación sin medidas de mitigación
+    detalladas, riesgo que sigue alto tras mitigar, tarea SIF sin firma de
+    Seguridad de Planta, texto que sugiere trabajo en altura sin el permiso
+    marcado. **Fase B**, sobre dos campos numéricos opcionales por
+    actividad (`altura_trabajo_metros`, `profundidad_excavacion_metros`
+    — solo disparan alerta si el contratista los diligencia): más de 1.8 m
+    sin permiso de altura, más de 4 m (exige aprobación previa de Zone
+    Safety), excavación mayor a 1.2 m (exige salida de emergencia), mayor
+    a 1.3 m (exige retén exterior) y mayor a 5 m (exige andamiaje). Cada
+    alerta cita su fuente y trae un motivo de rechazo sugerido, con un
+    botón en el formulario que solo copia ese texto al campo Observaciones.
+    **Regla dura: el motor nunca decide por sí solo** — no cambia el estado
+    de la declaración, no bloquea aprobar/rechazar, y el texto sugerido se
+    puede editar o descartar libremente; la aprobación o el rechazo siguen
     siendo 100% una decisión humana.
   - **Firma electrónica de la Declaración de Método**: cada firma queda
     ligada a la cuenta autenticada que la ejecutó (`FirmaMetodo.firmante_usuario`,

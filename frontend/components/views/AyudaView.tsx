@@ -272,6 +272,9 @@ const TEMAS: Tema[] = [
           <li>Permisos de trabajo requeridos por actividad (altura, caliente, espacio confinado, etc.).</li>
           <li>Equipo de protección personal (EPP) requerido por actividad (casco, gafas, arnés, etc.) — se
             marca igual que los permisos de trabajo, con casillas por actividad.</li>
+          <li>Altura de trabajo y profundidad de excavación por actividad (metros) — campos opcionales, sin
+            obligación de diligenciarlos, que habilitan alertas automáticas más precisas cuando se llenan
+            (ver el tema &quot;Alertas automáticas&quot; más abajo).</li>
           <li>Firmas electrónicas por rol (supervisor del contratista, delegado ABI, seguridad de planta,
             etc.) y estado general del documento (borrador / enviada / aprobada / rechazada).</li>
         </Ul>
@@ -319,6 +322,14 @@ const TEMAS: Tema[] = [
           <strong>el sistema nunca aprueba ni rechaza por sí solo</strong>: las alertas son un apoyo para
           decidir, no reemplazan el criterio de quien revisa, y no bloquean aprobar aunque haya alertas
           pendientes. El rol Contratista no ve este panel — es solo para quien revisa.
+        </P>
+        <P>
+          Si en una actividad se diligencian los campos opcionales de altura de trabajo o profundidad de
+          excavación (en metros), se habilitan alertas adicionales con los umbrales exactos de las SOP: más
+          de 1.8 m sin el permiso de altura marcado, más de 4 m (exige aprobación previa de Zone Safety),
+          más de 1.2 m de excavación (exige salida de emergencia), más de 1.3 m (exige retén exterior) y más
+          de 5 m (exige andamiaje). Si esos campos quedan vacíos, esas alertas puntuales simplemente no
+          aplican — no se asume nada en su ausencia.
         </P>
         <Sub>El ciclo enviar → revisar → aprobar/rechazar → subsanar</Sub>
         <P>

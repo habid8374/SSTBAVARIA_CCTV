@@ -1128,6 +1128,93 @@ class AlertasAutomaticasTests(ApiTestsBase):
         alertas = generar_alertas(declaracion)
         self.assertIn("texto_sugiere_altura_sin_permiso", [a["codigo"] for a in alertas])
 
+    def test_altura_sobre_1_8m_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Subir al techo", altura_trabajo_metros=2.5
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("altura_sobre_1_8m_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_altura_bajo_1_8m_no_genera_esa_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Trabajo controlado", altura_trabajo_metros=1.2
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("altura_sobre_1_8m_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_altura_sobre_4m_requiere_zbs(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Trabajo en techo alto",
+            altura_trabajo_metros=4.5,
+            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("altura_sobre_4m_requiere_zbs", [a["codigo"] for a in alertas])
+
+    def test_altura_sin_diligenciar_no_genera_alertas_numericas(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(declaracion=declaracion, orden=0, secuencia="Trabajo en bodega")
+        alertas = generar_alertas(declaracion)
+        codigos = [a["codigo"] for a in alertas]
+        self.assertNotIn("altura_sobre_1_8m_sin_permiso", codigos)
+        self.assertNotIn("altura_sobre_4m_requiere_zbs", codigos)
+
+    def test_excavacion_sobre_1_2m_requiere_salida_emergencia(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Zanja", profundidad_excavacion_metros=1.5
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("excavacion_sobre_1_2m_salida_emergencia", [a["codigo"] for a in alertas])
+
+    def test_excavacion_sobre_1_3m_requiere_reten_exterior(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Zanja profunda", profundidad_excavacion_metros=2.0
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("excavacion_sobre_1_3m_reten_exterior", [a["codigo"] for a in alertas])
+
+    def test_excavacion_sobre_5m_requiere_andamio(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Excavación profunda", profundidad_excavacion_metros=6.0
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("excavacion_sobre_5m_requiere_andamio", [a["codigo"] for a in alertas])
+
+    def test_excavacion_superficial_no_genera_alertas_numericas(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Zanja pequeña", profundidad_excavacion_metros=0.5
+        )
+        alertas = generar_alertas(declaracion)
+        codigos = [a["codigo"] for a in alertas]
+        self.assertNotIn("excavacion_sobre_1_2m_salida_emergencia", codigos)
+        self.assertNotIn("excavacion_sobre_1_3m_reten_exterior", codigos)
+        self.assertNotIn("excavacion_sobre_5m_requiere_andamio", codigos)
+
     def test_actividad_sin_problemas_no_genera_alertas(self):
         from .alertas_automaticas import generar_alertas
 

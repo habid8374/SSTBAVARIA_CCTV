@@ -247,6 +247,18 @@ class ActividadMetodo(models.Model):
     permisos_requeridos = models.JSONField(default=list, blank=True)
     epp_requerido = models.JSONField("EPP requerido", default=list, blank=True)
     tarea_sif = models.BooleanField("tarea SIF", default=False)
+    altura_trabajo_metros = models.FloatField(
+        "altura de trabajo (m)",
+        null=True,
+        blank=True,
+        help_text="Opcional — si se diligencia, habilita alertas automáticas por los umbrales de las SOP de trabajo en altura (1.8 m, 4 m).",
+    )
+    profundidad_excavacion_metros = models.FloatField(
+        "profundidad de excavación (m)",
+        null=True,
+        blank=True,
+        help_text="Opcional — si se diligencia, habilita alertas automáticas por los umbrales del SOP de excavaciones (1.2 m, 1.3 m, 5 m).",
+    )
 
     class Meta:
         verbose_name = "actividad de declaración de método"
@@ -298,6 +310,8 @@ def calcular_hash_declaracion(declaracion):
             "permisos_requeridos": a.permisos_requeridos,
             "epp_requerido": a.epp_requerido,
             "tarea_sif": a.tarea_sif,
+            "altura_trabajo_metros": a.altura_trabajo_metros,
+            "profundidad_excavacion_metros": a.profundidad_excavacion_metros,
         }
         for a in declaracion.actividades.order_by("orden")
     ]
