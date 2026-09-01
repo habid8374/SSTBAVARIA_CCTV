@@ -55,6 +55,24 @@ frontend en Vercel — pero viven en el mismo repositorio.
     los metadatos propios de SST Bavaria — deliberadamente sin replicar el
     código de control documental interno de AB InBev, para no dar a
     entender que el archivo es un documento emitido oficialmente por ellos).
+  - **Importar Declaración de Método desde Excel** (botón "Importar desde
+    Excel" en el formulario, antes de guardar por primera vez;
+    `contratistas/importar_declaracion_excel.py`,
+    `POST /api/contratistas/declaraciones/importar-excel/`, `openpyxl`,
+    `IsAuthenticated` — contratista o personal interno): lee el libro de
+    Excel real que ya usa el cliente para diligenciar declaraciones a mano
+    (mismas 5 hojas del export, porque ese formato se construyó copiando
+    este) y devuelve los datos ya parseados — datos generales, secuencia de
+    actividades (una fila del formulario por cada fila de riesgo bajo una
+    misma actividad combinada) y permisos/EPP marcados, emparejados por
+    texto normalizado (sin tildes/mayúsculas/paréntesis) contra los
+    catálogos configurables — para precargar el formulario del frontend.
+    Solo lee datos: nunca crea ni guarda nada por su cuenta, no decide la
+    empresa contratista (la sigue eligiendo quien sube el archivo, en el
+    propio desplegable) y no importa firmas (una firma solo se puede crear
+    firmando de verdad, ligada a la cuenta autenticada). Lo que no se pueda
+    reconocer automáticamente se reporta en `avisos` para revisión manual
+    antes de guardar.
   - **Alertas automáticas** (`contratistas/alertas_automaticas.py`,
     `GET /api/contratistas/declaraciones/<id>/alertas/`, solo
     `EsPersonalInterno`): al revisar una declaración, un motor de reglas

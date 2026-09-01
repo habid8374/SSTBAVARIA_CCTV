@@ -1615,6 +1615,131 @@ class DeclaracionMetodoTests(ApiTestsBase):
         self.assertIn("estado", response.data)
 
 
+def _construir_excel_declaracion_prueba():
+    """Arma en memoria un Excel mínimo con el mismo formato real del
+    cliente (celdas del encabezado combinadas con texto tipo
+    "ETIQUETA: valor", tabla de actividades desde la fila 14, hoja de
+    Firmas/Permisos/EPP con columnas etiqueta/marca) — lo justo para que
+    contratistas.importar_declaracion_excel.parsear_excel_declaracion lo
+    reconozca, sin depender de los archivos reales del cliente."""
+    import io
+
+    from openpyxl import Workbook
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Declaración de Método"
+    hoja["B3"] = "Planta Prueba"
+    hoja["A6"] = (
+        "NOMBRE Y DATOS DEL CONTACTO DEL CONTRATISTA:\n"
+        "EMPRESA: Test SAS\n"
+        "GERENTE DE PROYECTO: Juan Perez\n"
+        "TELÉFONO: 3001234567\n"
+        "NÚMERO DE PEDIDO: 12345"
+    )
+    hoja["C7"] = "FECHA DE ELABORACIÓN: 15/03/2026\n\nDURACIÓN (EN DÍAS): 5"
+    hoja["H7"] = "DESCRIBA EL TRABAJO A REALIZAR: Trabajo de prueba"
+    hoja["A14"] = "1. Actividad de prueba"
+    hoja["B14"] = "Técnica de prueba"
+    hoja["C14"] = "Riesgo de prueba"
+    hoja["D14"], hoja["E14"], hoja["F14"] = 3, 3, 3
+    hoja["H14"] = "Medidas de prueba"
+    hoja["I14"], hoja["J14"], hoja["K14"] = 1, 1, 1
+    hoja["M14"] = "Trabajos en Altura > 1.8 m"
+    hoja["N14"] = "SI"
+
+    hoja_fpe = libro.create_sheet("Firmas,Permisos, EPP")
+    hoja_fpe["I4"] = "Trabajos en Altura > 1.8 m"
+    hoja_fpe["K4"] = "X"
+    hoja_fpe["L4"] = "Casco de seguridad"
+    hoja_fpe["N4"] = "X"
+
+    buffer = io.BytesIO()
+    libro.save(buffer)
+    buffer.seek(0)
+    return buffer.read()
+
+
+class ImportarExcelDeclaracionTests(ApiTestsBase):
+    def _archivo(self, contenido=None):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(
+            "declaracion.xlsx",
+            contenido if contenido is not None else _construir_excel_declaracion_prueba(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def test_requiere_autenticacion(self):
+        response = self.client.post(
+            reverse("contratistas:declaraciones_importar_excel"), {"archivo": self._archivo()}
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_parsea_encabezado_y_actividades(self):
+        response = self.client.post(
+            reverse("contratistas:declaraciones_importar_excel"),
+            {"archivo": self._archivo()},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["planta_area"], "Planta Prueba")
+        self.assertEqual(response.data["numero_pedido"], "12345")
+        self.assertEqual(response.data["gerente_proyecto"], "Juan Perez")
+        self.assertEqual(response.data["contacto_telefono"], "3001234567")
+        self.assertEqual(response.data["fecha_elaboracion"], "2026-03-15")
+        self.assertEqual(response.data["duracion_dias"], 5)
+        self.assertEqual(response.data["descripcion_trabajo"], "Trabajo de prueba")
+        self.assertEqual(len(response.data["actividades"]), 1)
+        actividad = response.data["actividades"][0]
+        self.assertEqual(actividad["secuencia"], "1. Actividad de prueba")
+        self.assertEqual(actividad["descripcion_riesgo"], "Riesgo de prueba")
+        self.assertEqual(actividad["permisos_requeridos"], ["Trabajos en Altura > 1.8 m"])
+        self.assertEqual(actividad["epp_requerido"], ["Casco de seguridad"])
+        self.assertTrue(actividad["tarea_sif"])
+        self.assertEqual(response.data["avisos"], [])
+
+    def test_portal_contratista_tambien_puede_importar(self):
+        portal_user = Usuario.objects.create_user("portal_import_test", "portal_import@x.com", "clave12345")
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = self.contratista
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+        response = self.client.post(
+            reverse("contratistas:declaraciones_importar_excel"),
+            {"archivo": self._archivo()},
+            **self._auth(portal_user),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_hoja_faltante_devuelve_400(self):
+        from openpyxl import Workbook
+        import io
+
+        libro = Workbook()
+        libro.active.title = "Otra hoja"
+        buffer = io.BytesIO()
+        libro.save(buffer)
+        buffer.seek(0)
+        response = self.client.post(
+            reverse("contratistas:declaraciones_importar_excel"),
+            {"archivo": self._archivo(buffer.read())},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Declaración de Método", response.data["detail"])
+
+    def test_extension_invalida_devuelve_400(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("declaracion.txt", b"no es un excel", content_type="text/plain")
+        response = self.client.post(
+            reverse("contratistas:declaraciones_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+
+
 class AutorizacionIngresoTests(ApiTestsBase):
     def setUp(self):
         super().setUp()

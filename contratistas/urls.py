@@ -39,6 +39,11 @@ urlpatterns = [
     path("radicaciones/<int:pk>/aprobar/", views.aprobar_radicacion, name="radicaciones_aprobar"),
     path("radicaciones/<int:pk>/rechazar/", views.rechazar_radicacion, name="radicaciones_rechazar"),
     path("declaraciones/", views.DeclaracionMetodoListaDashboard.as_view(), name="declaraciones_lista"),
+    path(
+        "declaraciones/importar-excel/",
+        views.declaracion_importar_excel,
+        name="declaraciones_importar_excel",
+    ),
     path("declaraciones/<int:pk>/", views.DeclaracionMetodoDetalle.as_view(), name="declaraciones_detalle"),
     path("declaraciones/<int:pk>/firmar/", views.firmar_declaracion, name="declaraciones_firmar"),
     path("declaraciones/<int:pk>/pdf/", views.declaracion_pdf, name="declaraciones_pdf"),

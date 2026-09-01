@@ -287,6 +287,22 @@ const TEMAS: Tema[] = [
           <li>Firmas electrónicas por rol (supervisor del contratista, delegado ABI, seguridad de planta,
             etc.) y estado general del documento (borrador / enviada / aprobada / rechazada).</li>
         </Ul>
+        <Sub>Importar desde Excel — para no retipear una declaración que ya existe</Sub>
+        <P>
+          Al crear una declaración nueva (antes de guardarla por primera vez) aparece un botón{" "}
+          <strong>&quot;Importar desde Excel&quot;</strong> para subir el libro de Excel que ya usa el cliente
+          para diligenciar declaraciones de método a mano. El sistema lee el archivo y precarga
+          automáticamente los datos generales, la secuencia de actividades y sus riesgos, los permisos de
+          trabajo y el EPP marcados. Después de importar, <strong>toda la información queda editable</strong>{" "}
+          — se revisa y se ajusta lo que haga falta, igual que si se hubiera escrito a mano, y{" "}
+          <strong>no se guarda nada hasta hacer clic en &quot;Crear declaración&quot;</strong>.
+        </P>
+        <P>
+          Por diseño, el Excel <strong>nunca</strong> define la empresa contratista (se sigue eligiendo del
+          desplegable de siempre) ni crea firmas — una firma solo se puede crear firmando de verdad desde la
+          cuenta autenticada. Si el sistema no reconoce algún permiso o EPP marcado en el Excel (por ejemplo,
+          porque el catálogo cambió), lo indica con un aviso ⚠ para agregarlo a mano.
+        </P>
         <Sub>Firmas electrónicas — no son solo un nombre escrito</Sub>
         <P>
           Al firmar, además del nombre de la persona hay que marcar una casilla de consentimiento explícito

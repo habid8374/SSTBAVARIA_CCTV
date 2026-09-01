@@ -9,6 +9,7 @@ import {
   descargarDeclaracionExcel,
   descargarDeclaracionPdf,
   firmarDeclaracion,
+  importarDeclaracionExcel,
   listarAlertasDeclaracion,
   listarContratistas,
   listarDeclaraciones,
@@ -296,6 +297,8 @@ function FormularioDeclaracion({
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [descargandoPdf, setDescargandoPdf] = useState(false);
   const [descargandoExcel, setDescargandoExcel] = useState(false);
+  const [importandoExcel, setImportandoExcel] = useState(false);
+  const [avisosImportacion, setAvisosImportacion] = useState<string[]>([]);
   const [alertas, setAlertas] = useState<AlertaAutomatica[]>([]);
 
   useEffect(() => {
@@ -342,6 +345,41 @@ function FormularioDeclaracion({
       setError("No se pudo descargar el Excel.");
     } finally {
       setDescargandoExcel(false);
+    }
+  }
+
+  async function importarExcel(archivo: File) {
+    setError(null);
+    setMensaje(null);
+    setAvisosImportacion([]);
+    setImportandoExcel(true);
+    try {
+      const datos = await importarDeclaracionExcel(token, archivo);
+      setPlantaArea(datos.planta_area);
+      setNumeroPedido(datos.numero_pedido);
+      setGerenteProyecto(datos.gerente_proyecto);
+      setContactoTelefono(datos.contacto_telefono);
+      if (datos.fecha_elaboracion) setFechaElaboracion(datos.fecha_elaboracion);
+      setDuracionDias(String(datos.duracion_dias || 1));
+      setDescripcionTrabajo(datos.descripcion_trabajo);
+      setActividades(
+        datos.actividades.length
+          ? datos.actividades.map((a) => ({
+              ...a,
+              altura_trabajo_metros: a.altura_trabajo_metros ?? null,
+              profundidad_excavacion_metros: a.profundidad_excavacion_metros ?? null,
+              clave: clave(),
+            }))
+          : [actividadVacia(0)]
+      );
+      setAvisosImportacion(datos.avisos);
+      setMensaje(
+        "Se importaron los datos del Excel — revísalos y ajusta lo que haga falta antes de guardar. Todavía no se ha guardado nada ni se firmó nada automáticamente."
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo importar el Excel.");
+    } finally {
+      setImportandoExcel(false);
     }
   }
 
@@ -492,6 +530,36 @@ function FormularioDeclaracion({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {!declaracion && (
+        <div className="mt-4 rounded-2xl border border-dashed border-corp-blue bg-corp-blue-light/30 p-5">
+          <h3 className="text-base font-semibold text-corp-navy">Importar desde Excel (opcional)</h3>
+          <p className="mt-1 text-sm text-corp-muted">
+            Si ya tienes la Declaración de Método diligenciada en el Excel del cliente, súbela aquí para
+            precargar este formulario y no tener que retipearla. Después de importar, revisa y ajusta los datos
+            que hagan falta — nada se guarda ni se firma automáticamente, tú decides cuándo guardar.
+          </p>
+          <input
+            type="file"
+            accept=".xlsx"
+            disabled={importandoExcel}
+            onChange={(e) => {
+              const archivo = e.target.files?.[0];
+              if (archivo) importarExcel(archivo);
+              e.target.value = "";
+            }}
+            className="mt-3 block text-sm text-corp-navy file:mr-3 file:rounded-lg file:border-0 file:bg-corp-blue file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-corp-navy disabled:opacity-60"
+          />
+          {importandoExcel && <p className="mt-2 text-sm text-corp-muted">Leyendo el archivo…</p>}
+          {avisosImportacion.length > 0 && (
+            <ul className="mt-3 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {avisosImportacion.map((aviso, i) => (
+                <li key={i}>⚠ {aviso}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

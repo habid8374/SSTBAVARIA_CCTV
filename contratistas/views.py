@@ -800,6 +800,37 @@ def declaracion_excel(request, pk):
     return respuesta
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def declaracion_importar_excel(request):
+    """Lee un Excel de Declaración de Método en el formato real del cliente
+    (mismas 5 hojas del export) y devuelve los datos ya parseados para
+    precargar el formulario — no crea ni guarda nada. Quien sube el
+    archivo sigue revisando y guardando desde el formulario normal, igual
+    que si lo hubiera escrito a mano."""
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    from core.validators import validar_tamano_archivo
+
+    from .importar_declaracion_excel import ErrorImportacionExcel, parsear_excel_declaracion
+
+    archivo = request.FILES.get("archivo")
+    if not archivo:
+        return Response({"detail": "Hace falta adjuntar un archivo."}, status=status.HTTP_400_BAD_REQUEST)
+    if not archivo.name.lower().endswith(".xlsx"):
+        return Response({"detail": "El archivo debe ser un .xlsx."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        validar_tamano_archivo(archivo)
+    except DjangoValidationError as exc:
+        return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        resultado = parsear_excel_declaracion(archivo)
+    except ErrorImportacionExcel as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(resultado)
+
+
 @api_view(["GET"])
 @permission_classes([EsPersonalInterno])
 def declaracion_alertas(request, pk):

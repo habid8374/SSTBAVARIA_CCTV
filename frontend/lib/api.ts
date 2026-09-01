@@ -1161,6 +1161,28 @@ export type NuevaDeclaracion = {
   actividades?: Partial<NuevaActividadMetodo>[];
 };
 
+export type DeclaracionImportadaExcel = {
+  planta_area: string;
+  numero_pedido: string;
+  gerente_proyecto: string;
+  contacto_telefono: string;
+  fecha_elaboracion: string | null;
+  duracion_dias: number;
+  descripcion_trabajo: string;
+  actividades: NuevaActividadMetodo[];
+  avisos: string[];
+};
+
+export function importarDeclaracionExcel(token: string, archivo: File): Promise<DeclaracionImportadaExcel> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  return request<DeclaracionImportadaExcel>("/api/contratistas/declaraciones/importar-excel/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: formData,
+  });
+}
+
 export function listarDeclaraciones(
   token: string,
   filtros: { contratista?: number; estado?: EstadoDeclaracion } = {}
