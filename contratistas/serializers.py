@@ -12,6 +12,7 @@ from .models import (
     EmpresaContratista,
     FirmaMetodo,
     Funcionario,
+    NotificacionInterna,
     PermisoTrabajo,
     RadicacionSeguridadSocial,
     RegistroAuditoria,
@@ -482,3 +483,12 @@ class RegistroAuditoriaSerializer(serializers.ModelSerializer):
             "cambios",
             "fecha",
         ]
+
+
+class NotificacionInternaSerializer(serializers.ModelSerializer):
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+
+    class Meta:
+        model = NotificacionInterna
+        fields = ["id", "tipo", "tipo_display", "mensaje", "modelo", "objeto_id", "leida", "creada_en"]
+        read_only_fields = fields

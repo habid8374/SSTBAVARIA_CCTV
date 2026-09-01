@@ -28,6 +28,7 @@ from .models import (
     EmpresaContratista,
     FirmaMetodo,
     Funcionario,
+    NotificacionInterna,
     PermisoTrabajo,
     RadicacionSeguridadSocial,
     RegistroAuditoria,
@@ -52,6 +53,7 @@ from .serializers import (
     EmpresaContratistaSerializer,
     FirmaMetodoSerializer,
     FuncionarioSerializer,
+    NotificacionInternaSerializer,
     PermisoTrabajoSerializer,
     RadicacionSeguridadSocialSerializer,
     RegistroAuditoriaSerializer,
@@ -576,7 +578,9 @@ class DeclaracionMetodoDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPI
         if declaracion.estado in (DeclaracionMetodo.Estado.APROBADA, DeclaracionMetodo.Estado.RECHAZADA):
             notificar_decision_declaracion(declaracion)
         elif declaracion.estado == DeclaracionMetodo.Estado.ENVIADA:
-            notificar_declaracion_pendiente(declaracion)
+            notificar_declaracion_pendiente(
+                declaracion, es_subsanacion=estado_anterior == DeclaracionMetodo.Estado.RECHAZADA
+            )
 
 
 # --- Autorización de ingreso (inclusiones/exclusiones) ---
@@ -659,6 +663,38 @@ class RegistroAuditoriaLista(generics.ListAPIView):
         if objeto_id:
             qs = qs.filter(objeto_id=objeto_id)
         return qs[:500]
+
+
+class NotificacionInternaLista(generics.ListAPIView):
+    """Bandeja compartida del personal de SST/interventoría: declaraciones y
+    radicaciones nuevas o corregidas y reenviadas, esperando revisión. Solo
+    lectura desde acá — se marcan leídas con los endpoints de abajo."""
+
+    serializer_class = NotificacionInternaSerializer
+    permission_classes = [EsPersonalInterno]
+
+    def get_queryset(self):
+        qs = NotificacionInterna.objects.all()
+        solo_no_leidas = self.request.query_params.get("leida")
+        if solo_no_leidas is not None:
+            qs = qs.filter(leida=solo_no_leidas.lower() in ("1", "true"))
+        return qs[:200]
+
+
+@api_view(["POST"])
+@permission_classes([EsPersonalInterno])
+def marcar_notificacion_leida(request, pk):
+    notificacion = get_object_or_404(NotificacionInterna, pk=pk)
+    notificacion.leida = True
+    notificacion.save(update_fields=["leida"])
+    return Response(NotificacionInternaSerializer(notificacion).data)
+
+
+@api_view(["POST"])
+@permission_classes([EsPersonalInterno])
+def marcar_todas_notificaciones_leidas(request):
+    NotificacionInterna.objects.filter(leida=False).update(leida=True)
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["GET"])

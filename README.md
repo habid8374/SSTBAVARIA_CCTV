@@ -74,15 +74,25 @@ frontend en Vercel — pero viven en el mismo repositorio.
     un KPI en amarillo en Indicadores) cuando un trabajador activo no
     tiene completado algún curso obligatorio — es un aviso, no bloquea el
     registro ni la radicación.
-  - **Aviso de pendiente por revisar**: si se configura un
-    `ConfiguracionAlertas.correo_revisor` (misma pestaña), se envía un
-    correo a ese destinatario apenas algo queda pendiente de revisión —
-    al radicar seguridad social (`RadicacionListaDashboard.perform_create`)
-    y al pasar una declaración de método a "Enviada"
-    (`DeclaracionMetodoDetalle.perform_update`) — sin esperar a que alguien
-    entre al sistema a notar que hay algo nuevo. Es independiente del
-    aviso de aprobado/rechazado, que sigue yendo siempre al contacto de la
-    empresa contratista.
+  - **Aviso de pendiente por revisar** (dos canales independientes, ambos
+    disparados desde `contratistas/notificaciones.py`): al radicar
+    seguridad social (`RadicacionListaDashboard.perform_create`) y al pasar
+    una declaración de método a "Enviada"
+    (`DeclaracionMetodoDetalle.perform_update`/`perform_create`) se dispara
+    (1) una `NotificacionInterna` — la bandeja propia del dashboard (ícono
+    de campana en el header, contador de no leídas, `GET
+    /api/contratistas/notificaciones-internas/`), que no depende de
+    ninguna configuración, y (2) si hay un
+    `ConfiguracionAlertas.correo_revisor` configurado (Sistema → Reglas de
+    contratistas), un correo a ese destinatario. Una declaración
+    corregida y reenviada tras un rechazo (`rechazada` → `enviada`) se
+    distingue explícitamente de una declaración nueva —
+    `NotificacionInterna.Tipo.DECLARACION_SUBSANADA` vs.
+    `DECLARACION_PENDIENTE`, con su propio asunto de correo — para que
+    quien revisa sepa de un vistazo si ya la había visto antes. Es
+    independiente del aviso de aprobado/rechazado, que sigue yendo siempre
+    al contacto de la empresa contratista (sin bandeja interna — ese aviso
+    es para el contratista, no para el personal interno).
   - **Auditoría/trazabilidad** (pestaña "Auditoría" en Sistema, solo
     Administrador; `contratistas.RegistroAuditoria`): cada creación, edición
     o eliminación de los 5 modelos críticos de cumplimiento (empresas

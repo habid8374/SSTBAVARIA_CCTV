@@ -307,14 +307,18 @@ const TEMAS: Tema[] = [
         <Ol>
           <li>El contratista crea la declaración desde su portal y la deja en estado <strong>Enviada</strong>{" "}
             (o la guarda primero como <strong>Borrador</strong> mientras la termina).</li>
-          <li>Al quedar Enviada, se le notifica por correo al personal de SST/interventoría que hay una
-            declaración por revisar.</li>
+          <li>Al quedar Enviada, se avisa al personal de SST/interventoría por dos canales: la campanita de
+            notificaciones del dashboard (siempre) y un correo al <Mono>correo_revisor</Mono> configurado en
+            Sistema → Reglas de contratistas (si está configurado) — ver el tema &quot;Notificaciones
+            internas&quot;.</li>
           <li>El personal interno la revisa y decide: <strong>Aprobada</strong> (exige al menos una firma
             vigente, como se explica arriba) o <strong>Rechazada</strong> — el sistema exige escribir el
             motivo del rechazo en &quot;Observaciones&quot;, no se puede rechazar sin explicar por qué.</li>
           <li>El contratista ve el motivo del rechazo apenas abre la declaración (aviso en rojo arriba del
             formulario), corrige lo que haga falta y vuelve a poner el estado en Enviada — así las veces que
-            haga falta hasta que quede Aprobada.</li>
+            haga falta hasta que quede Aprobada. Cada corrección reenviada avisa otra vez, distinguida de una
+            declaración nueva (&quot;corregida y reenviada&quot; en vez de &quot;pendiente de revisión&quot;),
+            para que quien revisa sepa de un vistazo si ya la había visto.</li>
         </Ol>
         <Nota>
           Solo el personal de SST/interventoría puede poner una declaración en Aprobada o Rechazada — un
@@ -492,6 +496,40 @@ const TEMAS: Tema[] = [
         </P>
         <Nota>No puedes desactivarte ni eliminarte a ti mismo — esos botones aparecen deshabilitados en tu
           propia fila.</Nota>
+      </>
+    ),
+  },
+  {
+    id: "notificaciones-internas",
+    titulo: "Notificaciones internas",
+    contenido: (
+      <>
+        <P>
+          El ícono de campana en la parte de arriba del panel (junto al título de cada sección) es una
+          bandeja propia, dentro del dashboard, para el personal de SST/interventoría — no depende de revisar
+          el correo ni de que Brevo esté configurado. Muestra un contador de cuántas cosas hay pendientes por
+          revisar.
+        </P>
+        <Sub>Qué avisa</Sub>
+        <Ul>
+          <li><strong>Declaración pendiente de revisión</strong>: una declaración de método nueva quedó en
+            estado Enviada.</li>
+          <li><strong>Declaración corregida y reenviada</strong>: un contratista subsanó una declaración que
+            se le había rechazado y la volvió a enviar — distinto del caso anterior, para que sea obvio de un
+            vistazo que ya se había revisado antes.</li>
+          <li><strong>Radicación pendiente de revisión</strong>: se radicó seguridad social de un
+            trabajador.</li>
+        </Ul>
+        <P>
+          Al hacer clic en una notificación, se marca como leída y te lleva directo a la sección
+          correspondiente (Declaración de Método o Contratistas) para revisarla. El botón &quot;Marcar todas
+          leídas&quot; vacía el contador de un solo golpe.
+        </P>
+        <Nota>
+          Es un segundo canal, no un reemplazo del correo: los mismos eventos también avisan por correo al{" "}
+          <Mono>correo_revisor</Mono> configurado en Sistema → Reglas de contratistas, si está configurado.
+          La bandeja de la campana funciona siempre, tenga correo configurado o no.
+        </Nota>
       </>
     ),
   },

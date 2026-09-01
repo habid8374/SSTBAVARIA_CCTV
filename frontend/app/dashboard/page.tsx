@@ -79,6 +79,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell
+      token={token}
       nombre={usuario.nombre}
       rol={usuario.rol}
       seccionActiva={seccion}

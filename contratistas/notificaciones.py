@@ -1,8 +1,12 @@
-"""Aviso por correo al contratista cuando se aprueba/rechaza una radicación
-de seguridad social o una declaración de método — reutiliza el envío de
-Brevo ya centralizado en camaras_ia.notificaciones (misma configuración,
-mismo remitente; no se duplica nada acá). Un correo que falla nunca rompe
-la acción de aprobar/rechazar en sí — solo queda en el log del servidor.
+"""Aviso al contratista (por correo) y al personal de SST/interventoría (por
+correo y por la bandeja propia de la app) cuando pasa algo en una radicación
+de seguridad social o una declaración de método. El correo reutiliza el
+envío de Brevo ya centralizado en camaras_ia.notificaciones (misma
+configuración, mismo remitente; no se duplica nada acá) — si falla, nunca
+rompe la acción en sí, solo queda en el log del servidor. La notificación
+interna (NotificacionInterna) es la bandeja compartida del dashboard: no
+depende de Brevo ni de revisar el correo, para que no se pierda un aviso de
+"esto hay que revisarlo" entre el resto del inbox.
 """
 
 import logging
@@ -10,6 +14,17 @@ import logging
 from camaras_ia.notificaciones import ErrorEnvioCorreo, enviar_correo_brevo
 
 logger = logging.getLogger("contratistas.notificaciones")
+
+
+def _crear_notificacion_interna(tipo, mensaje, instancia):
+    from .models import NotificacionInterna
+
+    NotificacionInterna.objects.create(
+        tipo=tipo,
+        mensaje=mensaje,
+        modelo=instancia.__class__.__name__,
+        objeto_id=instancia.pk,
+    )
 
 
 def notificar_decision_radicacion(radicacion):
@@ -31,38 +46,56 @@ def notificar_decision_radicacion(radicacion):
 
 
 def notificar_radicacion_pendiente(radicacion):
-    """Avisa al correo configurado en ConfiguracionAlertas (Sistema → Reglas
-    de contratistas) que una radicación nueva quedó pendiente de revisión —
-    a diferencia de notificar_decision_radicacion, este correo se dispara al
-    entrar la radicación, no al decidirla."""
-    from .models import ConfiguracionAlertas
+    """Avisa que una radicación nueva quedó pendiente de revisión — a
+    diferencia de notificar_decision_radicacion, esto se dispara al entrar
+    la radicación, no al decidirla. Dos canales, independientes entre sí:
+    correo al `correo_revisor` (si está configurado) y una notificación en
+    la bandeja propia de la app (siempre, no depende del correo)."""
+    from .models import ConfiguracionAlertas, NotificacionInterna
+
+    mensaje = (
+        f"Se radicó seguridad social de {radicacion.trabajador} "
+        f"({radicacion.mes} {radicacion.anio}) y quedó pendiente de revisión."
+    )
+    _crear_notificacion_interna(NotificacionInterna.Tipo.RADICACION_PENDIENTE, mensaje, radicacion)
 
     destinatario = ConfiguracionAlertas.obtener().correo_revisor
     if not destinatario:
         return
-
     asunto = f"Nueva radicación pendiente de revisión — {radicacion.trabajador}"
-    contenido_html = (
-        f"<p>Se radicó seguridad social de <strong>{radicacion.trabajador}</strong> "
-        f"({radicacion.mes} {radicacion.anio}) y quedó <strong>pendiente de revisión</strong>.</p>"
-    )
+    contenido_html = f"<p>{mensaje}</p>"
     _enviar(destinatario, asunto, contenido_html, contexto=f"radicación pendiente #{radicacion.pk}")
 
 
-def notificar_declaracion_pendiente(declaracion):
+def notificar_declaracion_pendiente(declaracion, es_subsanacion=False):
     """Igual que notificar_radicacion_pendiente, pero para una declaración
-    de método que se envió a revisión (transición borrador → enviada)."""
-    from .models import ConfiguracionAlertas
+    de método que se envió a revisión — ya sea la primera vez (borrador →
+    enviada) o una corrección reenviada tras un rechazo (rechazada →
+    enviada, es_subsanacion=True). El asunto del correo y el tipo de la
+    notificación interna distinguen un caso del otro, para que quien revisa
+    sepa de un vistazo si es algo nuevo o algo que ya había rechazado."""
+    from .models import ConfiguracionAlertas, NotificacionInterna
+
+    if es_subsanacion:
+        tipo = NotificacionInterna.Tipo.DECLARACION_SUBSANADA
+        verbo = "fue corregida y reenviada a revisión"
+        asunto_prefijo = "Declaración corregida y reenviada"
+    else:
+        tipo = NotificacionInterna.Tipo.DECLARACION_PENDIENTE
+        verbo = "quedó pendiente de revisión"
+        asunto_prefijo = "Nueva declaración de método pendiente de revisión"
+
+    mensaje = (
+        f"La declaración de método «{declaracion.descripcion_trabajo}» de "
+        f"{declaracion.contratista.nombre} {verbo}."
+    )
+    _crear_notificacion_interna(tipo, mensaje, declaracion)
 
     destinatario = ConfiguracionAlertas.obtener().correo_revisor
     if not destinatario:
         return
-
-    asunto = f"Nueva declaración de método pendiente de revisión — {declaracion.contratista.nombre}"
-    contenido_html = (
-        f"<p>La declaración de método &laquo;{declaracion.descripcion_trabajo}&raquo; de "
-        f"<strong>{declaracion.contratista.nombre}</strong> quedó <strong>pendiente de revisión</strong>.</p>"
-    )
+    asunto = f"{asunto_prefijo} — {declaracion.contratista.nombre}"
+    contenido_html = f"<p>{mensaje}</p>"
     _enviar(destinatario, asunto, contenido_html, contexto=f"declaración pendiente #{declaracion.pk}")
 
 

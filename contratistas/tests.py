@@ -16,6 +16,7 @@ from .models import (
     EmpresaContratista,
     FirmaMetodo,
     Funcionario,
+    NotificacionInterna,
     RadicacionSeguridadSocial,
     RegistroAuditoria,
     Trabajador,
@@ -444,6 +445,121 @@ class NotificacionPendienteTests(ApiTestsBase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         mock_notificar_pendiente.assert_not_called()
+
+
+class NotificacionInternaTests(ApiTestsBase):
+    """La bandeja propia del dashboard no depende de que correo_revisor esté
+    configurado ni de que Brevo funcione — es un segundo canal, siempre
+    activo, para que el personal interno vea qué le falta por revisar."""
+
+    def test_radicar_crea_notificacion_pendiente_aunque_no_haya_correo_revisor(self):
+        response = self.client.post(
+            reverse("contratistas:radicaciones_lista"),
+            {"trabajador": self.trabajador.pk, "anio": 2026, "mes": "AGOSTO"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        notificacion = NotificacionInterna.objects.latest("creada_en")
+        self.assertEqual(notificacion.tipo, NotificacionInterna.Tipo.RADICACION_PENDIENTE)
+        self.assertFalse(notificacion.leida)
+
+    def test_enviar_declaracion_nueva_crea_notificacion_pendiente(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "enviada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        notificacion = NotificacionInterna.objects.latest("creada_en")
+        self.assertEqual(notificacion.tipo, NotificacionInterna.Tipo.DECLARACION_PENDIENTE)
+        self.assertEqual(notificacion.objeto_id, declaracion.pk)
+
+    def test_reenviar_declaracion_rechazada_crea_notificacion_de_subsanacion(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+            estado=DeclaracionMetodo.Estado.RECHAZADA,
+            observaciones="Falta el permiso de trabajo en altura.",
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "enviada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        notificacion = NotificacionInterna.objects.latest("creada_en")
+        self.assertEqual(notificacion.tipo, NotificacionInterna.Tipo.DECLARACION_SUBSANADA)
+
+    def test_aprobar_no_crea_notificacion_de_pendiente(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
+        self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertFalse(
+            NotificacionInterna.objects.filter(
+                tipo__in=[NotificacionInterna.Tipo.DECLARACION_PENDIENTE, NotificacionInterna.Tipo.DECLARACION_SUBSANADA]
+            ).exists()
+        )
+
+    def test_lista_requiere_personal_interno(self):
+        portal_user = Usuario.objects.create_user("portal", "portal@x.com", "clave12345")
+        from core.models import PerfilUsuario
+
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = self.contratista
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+        response = self.client.get(
+            reverse("contratistas:notificaciones_internas_lista"), **self._auth(portal_user)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_marcar_notificacion_leida(self):
+        notificacion = NotificacionInterna.objects.create(
+            tipo=NotificacionInterna.Tipo.RADICACION_PENDIENTE,
+            mensaje="Algo pendiente",
+            modelo="RadicacionSeguridadSocial",
+            objeto_id=1,
+        )
+        response = self.client.post(
+            reverse("contratistas:notificaciones_internas_marcar_leida", args=[notificacion.pk]),
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        notificacion.refresh_from_db()
+        self.assertTrue(notificacion.leida)
+
+    def test_marcar_todas_leidas(self):
+        NotificacionInterna.objects.create(
+            tipo=NotificacionInterna.Tipo.RADICACION_PENDIENTE, mensaje="A", modelo="X", objeto_id=1
+        )
+        NotificacionInterna.objects.create(
+            tipo=NotificacionInterna.Tipo.DECLARACION_PENDIENTE, mensaje="B", modelo="Y", objeto_id=2
+        )
+        response = self.client.post(
+            reverse("contratistas:notificaciones_internas_marcar_todas_leidas"), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(NotificacionInterna.objects.filter(leida=False).count(), 0)
 
 
 class EmpresaContratistaTests(ApiTestsBase):

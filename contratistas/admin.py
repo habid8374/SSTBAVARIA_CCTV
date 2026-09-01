@@ -9,6 +9,7 @@ from .models import (
     EmpresaContratista,
     FirmaMetodo,
     Funcionario,
+    NotificacionInterna,
     PermisoTrabajo,
     RadicacionSeguridadSocial,
     RegistroAuditoria,
@@ -134,3 +135,10 @@ class RegistroAuditoriaAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(NotificacionInterna)
+class NotificacionInternaAdmin(admin.ModelAdmin):
+    list_display = ("creada_en", "tipo", "mensaje", "leida")
+    list_filter = ("tipo", "leida")
+    search_fields = ("mensaje",)

@@ -500,6 +500,35 @@ class RegistroAuditoria(models.Model):
         return f"{self.get_accion_display()} — {self.modelo} #{self.objeto_id}"
 
 
+class NotificacionInterna(models.Model):
+    """Bandeja propia dentro de la app (además del correo por Brevo, que
+    puede perderse entre el resto del inbox) para que el personal de
+    SST/interventoría vea de un vistazo qué tiene pendiente por revisar:
+    declaraciones y radicaciones nuevas o corregidas y reenviadas. Es una
+    bandeja compartida (como los eventos de cámaras) — no hay estado de
+    lectura por usuario."""
+
+    class Tipo(models.TextChoices):
+        DECLARACION_PENDIENTE = "declaracion_pendiente", "Declaración pendiente de revisión"
+        DECLARACION_SUBSANADA = "declaracion_subsanada", "Declaración corregida y reenviada"
+        RADICACION_PENDIENTE = "radicacion_pendiente", "Radicación pendiente de revisión"
+
+    tipo = models.CharField(max_length=30, choices=Tipo.choices)
+    mensaje = models.CharField(max_length=255)
+    modelo = models.CharField(max_length=50)
+    objeto_id = models.PositiveIntegerField()
+    leida = models.BooleanField(default=False)
+    creada_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "notificación interna"
+        verbose_name_plural = "notificaciones internas"
+        ordering = ["-creada_en"]
+
+    def __str__(self):
+        return self.mensaje
+
+
 class AutorizacionIngreso(models.Model):
     """Autorización de ingreso de personal contratista a la planta —
     formato real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA": vigencia,

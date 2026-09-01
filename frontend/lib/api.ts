@@ -609,6 +609,49 @@ export function listarAuditoria(
   });
 }
 
+export type TipoNotificacionInterna =
+  | "declaracion_pendiente"
+  | "declaracion_subsanada"
+  | "radicacion_pendiente";
+
+export type NotificacionInterna = {
+  id: number;
+  tipo: TipoNotificacionInterna;
+  tipo_display: string;
+  mensaje: string;
+  modelo: string;
+  objeto_id: number;
+  leida: boolean;
+  creada_en: string;
+};
+
+export function listarNotificacionesInternas(
+  token: string,
+  filtros?: { leida?: boolean }
+): Promise<NotificacionInterna[]> {
+  const parametros = new URLSearchParams();
+  if (filtros?.leida !== undefined) parametros.set("leida", filtros.leida ? "1" : "0");
+  const query = parametros.toString();
+  return request<NotificacionInterna[]>(
+    `/api/contratistas/notificaciones-internas/${query ? `?${query}` : ""}`,
+    { headers: authHeaders(token) }
+  );
+}
+
+export function marcarNotificacionLeida(token: string, id: number): Promise<NotificacionInterna> {
+  return request<NotificacionInterna>(`/api/contratistas/notificaciones-internas/${id}/marcar-leida/`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+}
+
+export function marcarTodasNotificacionesLeidas(token: string): Promise<void> {
+  return request<void>("/api/contratistas/notificaciones-internas/marcar-todas-leidas/", {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+}
+
 export type EmpresaContratista = {
   id: number;
   nombre: string;
