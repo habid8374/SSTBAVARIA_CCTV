@@ -14,9 +14,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const TITULO = "SST Bavaria — Cámaras IA";
+const DESCRIPCION = "Plataforma de videovigilancia con IA y cumplimiento SST para contratistas.";
+
 export const metadata: Metadata = {
-  title: "SST Bavaria CCTV — Panel de Cámaras IA",
-  description: "Panel de administración del módulo de videovigilancia con IA.",
+  metadataBase: new URL("https://www.sst-cctv.com"),
+  title: TITULO,
+  description: DESCRIPCION,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -26,6 +30,21 @@ export const metadata: Metadata = {
   icons: {
     icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  openGraph: {
+    title: TITULO,
+    description: DESCRIPCION,
+    url: "/",
+    siteName: "SST Bavaria",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: TITULO }],
+    locale: "es_CO",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITULO,
+    description: DESCRIPCION,
+    images: ["/og-image.png"],
   },
 };
 
