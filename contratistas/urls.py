@@ -43,6 +43,7 @@ urlpatterns = [
     path("declaraciones/<int:pk>/firmar/", views.firmar_declaracion, name="declaraciones_firmar"),
     path("declaraciones/<int:pk>/pdf/", views.declaracion_pdf, name="declaraciones_pdf"),
     path("declaraciones/<int:pk>/excel/", views.declaracion_excel, name="declaraciones_excel"),
+    path("declaraciones/<int:pk>/alertas/", views.declaracion_alertas, name="declaraciones_alertas"),
     path(
         "autorizaciones-ingreso/",
         views.AutorizacionIngresoListaDashboard.as_view(),

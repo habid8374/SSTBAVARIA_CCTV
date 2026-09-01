@@ -49,6 +49,21 @@ frontend en Vercel — pero viven en el mismo repositorio.
     los metadatos propios de SST Bavaria — deliberadamente sin replicar el
     código de control documental interno de AB InBev, para no dar a
     entender que el archivo es un documento emitido oficialmente por ellos).
+  - **Alertas automáticas** (`contratistas/alertas_automaticas.py`,
+    `GET /api/contratistas/declaraciones/<id>/alertas/`, solo
+    `EsPersonalInterno`): al revisar una declaración, un motor de reglas
+    basado en los SOP "Safety to Sustain" del cliente (trabajos en altura,
+    excavaciones, sistemas anticaída) genera advertencias sobre datos que
+    el formulario ya captura — permiso de altura sin EPP contra caídas,
+    excavación sin medidas de mitigación detalladas, riesgo que sigue alto
+    tras mitigar, tarea SIF sin firma de Seguridad de Planta, texto que
+    sugiere trabajo en altura sin el permiso marcado. Cada alerta cita su
+    fuente y trae un motivo de rechazo sugerido, con un botón en el
+    formulario que solo copia ese texto al campo Observaciones. **Regla
+    dura: el motor nunca decide por sí solo** — no cambia el estado de la
+    declaración, no bloquea aprobar/rechazar, y el texto sugerido se puede
+    editar o descartar libremente; la aprobación o el rechazo siguen
+    siendo 100% una decisión humana.
   - **Firma electrónica de la Declaración de Método**: cada firma queda
     ligada a la cuenta autenticada que la ejecutó (`FirmaMetodo.firmante_usuario`,
     tomado de `request.user` — nunca del cliente) más un consentimiento

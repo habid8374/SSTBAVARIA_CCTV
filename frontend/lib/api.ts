@@ -1206,6 +1206,22 @@ export function descargarDeclaracionExcel(token: string, id: number): Promise<vo
   return descargarArchivo(token, `/api/contratistas/declaraciones/${id}/excel/`, `declaracion-metodo-${id}.xlsx`);
 }
 
+export type AlertaAutomatica = {
+  codigo: string;
+  actividad_id: number;
+  actividad_orden: number;
+  titulo: string;
+  mensaje: string;
+  motivo_sugerido: string;
+  fuente: string;
+};
+
+export function listarAlertasDeclaracion(token: string, id: number): Promise<AlertaAutomatica[]> {
+  return request<AlertaAutomatica[]>(`/api/contratistas/declaraciones/${id}/alertas/`, {
+    headers: authHeaders(token),
+  });
+}
+
 export type TrabajadorAutorizacionIngreso = {
   id: number;
   trabajador: number;

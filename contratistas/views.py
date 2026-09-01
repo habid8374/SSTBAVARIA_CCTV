@@ -787,6 +787,24 @@ def declaracion_excel(request, pk):
 
 
 @api_view(["GET"])
+@permission_classes([EsPersonalInterno])
+def declaracion_alertas(request, pk):
+    """Alertas automáticas de la declaración — solo para quien la revisa.
+    No decide nada por sí solo: son advertencias informativas con un motivo
+    de rechazo sugerido, para que el revisor las tenga en cuenta al aprobar
+    o rechazar. Ver contratistas/alertas_automaticas.py."""
+    from .alertas_automaticas import generar_alertas
+
+    qs = DeclaracionMetodo.objects.prefetch_related("actividades", "firmas")
+    contratista_id = _contratista_de(request)
+    if contratista_id is not None:
+        qs = qs.filter(contratista_id=contratista_id)
+    declaracion = get_object_or_404(qs, pk=pk)
+
+    return Response(generar_alertas(declaracion))
+
+
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def autorizacion_ingreso_pdf(request, pk):
     """Documento imprimible con el mismo formato del "AUTORIZACION DE INGRESO

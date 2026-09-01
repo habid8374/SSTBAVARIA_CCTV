@@ -307,6 +307,19 @@ const TEMAS: Tema[] = [
           Método, Firmas/Permisos/EPP, Catálogo de Peligros, Evaluación según Kinney y Control del
           Documento) — útil cuando quien recibe el archivo espera ese formato exacto en vez de un PDF.
         </P>
+        <Sub>Alertas automáticas — solo son un aviso, nunca deciden</Sub>
+        <P>
+          Al abrir una declaración para revisarla, el personal de SST/interventoría ve un panel amarillo
+          con alertas automáticas cuando alguna actividad no cumple con reglas tomadas de los procedimientos
+          de seguridad del cliente (SOP &quot;Safety to Sustain&quot;) — por ejemplo, un permiso de trabajo
+          en altura marcado sin el EPP contra caídas correspondiente, una excavación sin medidas de
+          mitigación detalladas, un riesgo que sigue alto después de mitigar, o una tarea SIF sin firma de
+          Seguridad de Planta. Cada alerta cita de qué procedimiento sale y trae un botón <strong>&quot;Usar
+          como motivo de rechazo&quot;</strong> que solo copia un texto sugerido al campo Observaciones —{" "}
+          <strong>el sistema nunca aprueba ni rechaza por sí solo</strong>: las alertas son un apoyo para
+          decidir, no reemplazan el criterio de quien revisa, y no bloquean aprobar aunque haya alertas
+          pendientes. El rol Contratista no ve este panel — es solo para quien revisa.
+        </P>
         <Sub>El ciclo enviar → revisar → aprobar/rechazar → subsanar</Sub>
         <P>
           Este es el único formulario en el que el rol Contratista puede escribir (el resto de la app es de

@@ -1015,6 +1015,162 @@ class RadicacionSeguridadSocialTests(ApiTestsBase):
         self.assertEqual(respuesta_admin.status_code, 204)
 
 
+class AlertasAutomaticasTests(ApiTestsBase):
+    """Motor de alertas automáticas — nunca decide por sí solo, solo genera
+    advertencias informativas con un motivo sugerido. Ver
+    contratistas/alertas_automaticas.py."""
+
+    def _declaracion(self):
+        return DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+
+    def test_altura_sin_epp_caida_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Subir al techo",
+            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+            epp_requerido=["Casco de seguridad"],
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("altura_sin_epp_caida", [a["codigo"] for a in alertas])
+
+    def test_altura_con_epp_caida_no_genera_esa_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Subir al techo",
+            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+            epp_requerido=["Otros: Equipo contra caídas (Arnés de seguridad, línea retráctil, doble gancho)"],
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("altura_sin_epp_caida", [a["codigo"] for a in alertas])
+
+    def test_excavacion_sin_medidas_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Zanja para tubería",
+            permisos_requeridos=["Excavaciones o Demolición"],
+            medidas_mitigacion="",
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("excavacion_sin_medidas", [a["codigo"] for a in alertas])
+
+    def test_riesgo_alto_con_mitigacion_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Trabajo riesgoso",
+            probabilidad_con=10,
+            frecuencia_con=6,
+            impacto_con=15,
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("riesgo_alto_con_mitigacion", [a["codigo"] for a in alertas])
+
+    def test_riesgo_bajo_con_mitigacion_no_genera_esa_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Trabajo controlado",
+            probabilidad_con=1,
+            frecuencia_con=1,
+            impacto_con=1,
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("riesgo_alto_con_mitigacion", [a["codigo"] for a in alertas])
+
+    def test_sif_sin_firma_seguridad_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(declaracion=declaracion, orden=0, secuencia="Trabajo SIF", tarea_sif=True)
+        alertas = generar_alertas(declaracion)
+        self.assertIn("sif_sin_firma_seguridad", [a["codigo"] for a in alertas])
+
+    def test_sif_con_firma_seguridad_vigente_no_genera_esa_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(declaracion=declaracion, orden=0, secuencia="Trabajo SIF", tarea_sif=True)
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="seguridad_planta", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("sif_sin_firma_seguridad", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_altura_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Trabajo en el techo de la nave"
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_altura_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_actividad_sin_problemas_no_genera_alertas(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Limpieza de piso en bodega",
+            probabilidad_con=1,
+            frecuencia_con=1,
+            impacto_con=1,
+        )
+        self.assertEqual(generar_alertas(declaracion), [])
+
+    def test_endpoint_requiere_personal_interno(self):
+        declaracion = self._declaracion()
+        url = reverse("contratistas:declaraciones_alertas", args=[declaracion.pk])
+
+        portal_user = Usuario.objects.create_user("portal_epp_test", "portal_epp@x.com", "clave12345")
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = self.contratista
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+        response = self.client.get(url, **self._auth(portal_user))
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.get(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+
+    def test_endpoint_devuelve_alertas_de_la_declaracion(self):
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="Subir al techo",
+            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+        )
+        url = reverse("contratistas:declaraciones_alertas", args=[declaracion.pk])
+        response = self.client.get(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("altura_sin_epp_caida", [a["codigo"] for a in response.data])
+
+
 class DeclaracionMetodoTests(ApiTestsBase):
     def test_crear_con_actividades_anidadas(self):
         payload = {

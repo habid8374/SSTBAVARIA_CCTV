@@ -9,10 +9,12 @@ import {
   descargarDeclaracionExcel,
   descargarDeclaracionPdf,
   firmarDeclaracion,
+  listarAlertasDeclaracion,
   listarContratistas,
   listarDeclaraciones,
   listarFuncionarios,
   obtenerCatalogosContratistas,
+  type AlertaAutomatica,
   type Catalogos,
   type DeclaracionMetodo,
   type EmpresaContratista,
@@ -292,6 +294,30 @@ function FormularioDeclaracion({
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [descargandoPdf, setDescargandoPdf] = useState(false);
   const [descargandoExcel, setDescargandoExcel] = useState(false);
+  const [alertas, setAlertas] = useState<AlertaAutomatica[]>([]);
+
+  useEffect(() => {
+    const id = declaracion?.id;
+    let cancelado = false;
+    const cargar = async () => {
+      if (esContratista || !id) return [];
+      try {
+        return await listarAlertasDeclaracion(token, id);
+      } catch {
+        return [];
+      }
+    };
+    cargar().then((datos) => {
+      if (!cancelado) setAlertas(datos);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [token, esContratista, declaracion?.id]);
+
+  function usarComoMotivoRechazo(alerta: AlertaAutomatica) {
+    setObservaciones((actual) => (actual.trim() ? `${actual.trim()}\n${alerta.motivo_sugerido}` : alerta.motivo_sugerido));
+  }
 
   async function descargarPdf() {
     if (!declaracion) return;
@@ -438,6 +464,30 @@ function FormularioDeclaracion({
           {esContratista && (
             <p className="mt-1">Corrige lo que haga falta y cambia el estado a “Enviada” para volver a mandarla a revisión.</p>
           )}
+        </div>
+      )}
+
+      {!esContratista && alertas.length > 0 && (
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">
+            Alertas automáticas ({alertas.length}) — revísalas antes de decidir, no reemplazan tu criterio.
+          </p>
+          <ul className="mt-2 space-y-3">
+            {alertas.map((alerta, indice) => (
+              <li key={`${alerta.codigo}-${indice}`} className="rounded-md border border-amber-200 bg-white/60 p-3">
+                <p className="font-medium">{alerta.titulo}</p>
+                <p className="mt-1 text-amber-800">{alerta.mensaje}</p>
+                <p className="mt-1 text-xs text-amber-700">Fuente: {alerta.fuente}</p>
+                <button
+                  type="button"
+                  onClick={() => usarComoMotivoRechazo(alerta)}
+                  className="mt-2 rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
+                >
+                  Usar como motivo de rechazo
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
