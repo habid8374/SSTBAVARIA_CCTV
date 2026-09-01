@@ -59,8 +59,8 @@ export default function AuditoriaView({ token }: { token: string }) {
 
       {error && <p className="text-sm text-red-700">{error}</p>}
 
-      <div className="overflow-hidden rounded-xl border border-corp-border bg-white shadow-sm">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-corp-border bg-white shadow-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-corp-blue-light text-left text-xs font-semibold uppercase tracking-wide text-corp-navy">
             <tr>
               <th className="px-4 py-2">Fecha</th>
