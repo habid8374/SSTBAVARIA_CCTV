@@ -357,7 +357,7 @@ class BackupDbCommandTests(TestCase):
 VAPID_DE_PRUEBA = {
     "VAPID_PUBLIC_KEY": "clave-publica-de-prueba",
     "VAPID_PRIVATE_KEY": "clave-privada-de-prueba",
-    "VAPID_CLAIMS_EMAIL": "alertas@sstbavaria.com",
+    "VAPID_CLAIMS_EMAIL": "alertas@sst-cctv.com",
 }
 
 

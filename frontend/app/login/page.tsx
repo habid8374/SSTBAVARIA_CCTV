@@ -63,7 +63,7 @@ export default function LoginPage() {
                   required
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="usuario@sstbavaria.com"
+                  placeholder="usuario@sst-cctv.com"
                   className="w-full rounded-lg border border-corp-border py-2.5 pl-10 pr-3 text-sm text-corp-navy outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
                 />
               </div>

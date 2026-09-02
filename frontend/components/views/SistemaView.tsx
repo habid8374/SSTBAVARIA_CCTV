@@ -151,7 +151,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
             type="email"
             value={remitenteEmail}
             onChange={(event) => setRemitenteEmail(event.target.value)}
-            placeholder="alertas@sstbavaria.com"
+            placeholder="alertas@sst-cctv.com"
             className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
           />
         </Campo>

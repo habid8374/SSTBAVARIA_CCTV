@@ -175,7 +175,7 @@ USE_TZ = True
 # simplemente falla y queda registrado en el evento (notificacion_detalle),
 # no rompe el flujo de recibir_evento_camara.
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
-BREVO_REMITENTE_EMAIL = os.environ.get("BREVO_REMITENTE_EMAIL", "alertas@sstbavaria.com")
+BREVO_REMITENTE_EMAIL = os.environ.get("BREVO_REMITENTE_EMAIL", "alertas@sst-cctv.com")
 BREVO_REMITENTE_NOMBRE = os.environ.get("BREVO_REMITENTE_NOMBRE", "SST Bavaria — Cámaras IA")
 
 
@@ -186,7 +186,7 @@ BREVO_REMITENTE_NOMBRE = os.environ.get("BREVO_REMITENTE_NOMBRE", "SST Bavaria �
 # `python manage.py generar_claves_vapid`.
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
-VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "alertas@sstbavaria.com")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "alertas@sst-cctv.com")
 
 
 # Static files (CSS, JavaScript, Images)
