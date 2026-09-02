@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from contratistas.models import EmpresaContratista
 
-from .models import PerfilUsuario
+from .models import PerfilUsuario, SuscripcionPush
 
 Usuario = get_user_model()
 
@@ -100,3 +100,18 @@ class UsuarioCrearSerializer(serializers.ModelSerializer):
         user.perfil.contratista = contratista
         user.perfil.save(update_fields=["rol", "contratista"])
         return user
+
+
+class SuscripcionPushSerializer(serializers.Serializer):
+    """Lo que manda el navegador al suscribirse (PushSubscription.toJSON()) —
+    no es un ModelSerializer porque `usuario` se asigna en la vista, nunca
+    lo elige el cliente."""
+
+    endpoint = serializers.URLField(max_length=500)
+    keys = serializers.DictField(child=serializers.CharField())
+
+    def validate_keys(self, keys):
+        faltantes = {"p256dh", "auth"} - set(keys)
+        if faltantes:
+            raise serializers.ValidationError(f"Faltan las llaves: {', '.join(sorted(faltantes))}.")
+        return keys

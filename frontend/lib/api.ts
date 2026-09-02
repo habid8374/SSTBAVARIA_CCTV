@@ -124,6 +124,28 @@ export function obtenerResumen(token: string): Promise<Resumen> {
   });
 }
 
+export function obtenerClavePublicaPush(token: string): Promise<{ clave_publica: string }> {
+  return request<{ clave_publica: string }>("/api/auth/push/vapid-public-key/", {
+    headers: { Authorization: `Token ${token}` },
+  });
+}
+
+export function suscribirPush(token: string, suscripcion: PushSubscriptionJSON): Promise<void> {
+  return request<void>("/api/auth/push/suscribir/", {
+    method: "POST",
+    headers: { Authorization: `Token ${token}` },
+    body: JSON.stringify(suscripcion),
+  });
+}
+
+export function desuscribirPush(token: string, endpoint: string): Promise<void> {
+  return request<void>("/api/auth/push/desuscribir/", {
+    method: "DELETE",
+    headers: { Authorization: `Token ${token}` },
+    body: JSON.stringify({ endpoint }),
+  });
+}
+
 export function listarUsuarios(token: string): Promise<UsuarioGestionado[]> {
   return request<UsuarioGestionado[]>("/api/auth/usuarios/", {
     headers: { Authorization: `Token ${token}` },

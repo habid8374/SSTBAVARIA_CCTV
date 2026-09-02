@@ -204,6 +204,22 @@ class DispararAlertaCorreoTests(TestCase):
         self.assertEqual(self.evento.canal_notificacion, "whatsapp")
         self.assertTrue(self.evento.notificacion_detalle)
 
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_dispara_push_al_personal_interno(self, mock_urlopen, mock_push):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        disparar_alerta(self.evento, self.regla_correo)
+        mock_push.assert_called_once()
+        titulo, mensaje = mock_push.call_args[0][:2]
+        self.assertIn("cámaras", titulo.lower())
+        self.assertIn("Bodega", mensaje)
+        self.assertEqual(mock_push.call_args.kwargs.get("url"), "/dashboard?ir=alertas")
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    def test_dispara_push_tambien_en_canal_whatsapp(self, mock_push):
+        disparar_alerta(self.evento, self.regla_whatsapp)
+        mock_push.assert_called_once()
+
 
 class RecibirEventoCamaraViewTests(TestCase):
     def setUp(self):

@@ -697,10 +697,27 @@ const TEMAS: Tema[] = [
           &quot;Marcar todas leídas&quot;, solo aparece si hay al menos una leída) borra de un golpe todas las
           que ya se revisaron — pide confirmación antes, y nunca toca las que siguen sin leer.
         </P>
+        <Sub>Notificaciones push en el celular (con la app cerrada)</Sub>
+        <P>
+          Al pie de la campanita hay un enlace &quot;🔔 Activar notificaciones en este dispositivo&quot; —
+          instala la app en el celular (o ábrela en el navegador) y tócalo una vez; el navegador pide permiso
+          y desde ahí llega un aviso tipo WhatsApp — con la pantalla apagada o la app cerrada — cada vez que
+          hay una declaración/radicación pendiente <strong>o</strong> una alerta de cámara. Tocar el aviso
+          abre la app directo en la sección correspondiente.
+        </P>
+        <Ul>
+          <li>Es <strong>por dispositivo</strong>, no una casilla general: cada quien la activa en su propio
+            celular/computador; no hay que repetirlo por cada notificación.</li>
+          <li>Para desactivarla, el mismo enlace cambia a &quot;🔕 Desactivar notificaciones en este
+            dispositivo&quot;.</li>
+          <li>El enlace no aparece si el navegador no soporta Web Push, o si el servidor todavía no tiene las
+            llaves VAPID configuradas (ver README, sección &quot;Notificaciones push&quot;).</li>
+        </Ul>
         <Nota>
-          Es un segundo canal, no un reemplazo del correo: los mismos eventos también avisan por correo al{" "}
-          <Mono>correo_revisor</Mono> configurado en Sistema → Reglas de contratistas, si está configurado.
-          La bandeja de la campana funciona siempre, tenga correo configurado o no.
+          Es un canal aparte, no un reemplazo del correo ni de la campana: los mismos eventos también avisan
+          por correo al <Mono>correo_revisor</Mono> configurado en Sistema → Reglas de contratistas (si está
+          configurado) y siempre quedan en la bandeja de la campana. La bandeja de la campana funciona
+          siempre, tenga correo o push configurados o no.
         </Nota>
       </>
     ),

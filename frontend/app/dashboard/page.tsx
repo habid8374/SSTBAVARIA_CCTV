@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import AppShell from "@/components/AppShell";
 import type { SeccionId } from "@/components/Sidebar";
@@ -40,10 +40,23 @@ const TITULOS: Record<SeccionId, string> = {
 };
 
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [token, setToken] = useState<string | null>(null);
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [seccion, setSeccion] = useState<SeccionId>("tablero");
+
+  // "?ir=<seccion>" — a dónde abrir al tocar una notificación push (con la
+  // app cerrada), igual que hace clic en la campanita adentro de la app.
+  const irInicial = searchParams.get("ir");
 
   useEffect(() => {
     const sesion = leerSesion();
@@ -57,7 +70,9 @@ export default function DashboardPage() {
         guardarSesion({ token: sesion.token, nombre: data.nombre, rol: data.rol });
         setToken(sesion.token);
         setUsuario(data);
-        if (data.rol === "contratista") {
+        if (irInicial && irInicial in TITULOS) {
+          setSeccion(irInicial as SeccionId);
+        } else if (data.rol === "contratista") {
           setSeccion("declaracion-metodo");
         }
       })
@@ -65,7 +80,7 @@ export default function DashboardPage() {
         borrarSesion();
         router.replace("/login");
       });
-  }, [router]);
+  }, [router, irInicial]);
 
   const handleLogout = useCallback(() => {
     if (token) {

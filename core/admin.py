@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import Empresa, PerfilUsuario
+from .models import Empresa, PerfilUsuario, SuscripcionPush
 
 Usuario = get_user_model()
 
@@ -42,3 +42,10 @@ class UsuarioAdmin(DjangoUserAdmin):
 
 admin.site.unregister(Usuario)
 admin.site.register(Usuario, UsuarioAdmin)
+
+
+@admin.register(SuscripcionPush)
+class SuscripcionPushAdmin(admin.ModelAdmin):
+    list_display = ("usuario", "endpoint", "creada_en")
+    list_filter = ("usuario",)
+    readonly_fields = ("endpoint", "p256dh", "auth", "creada_en")

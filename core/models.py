@@ -60,6 +60,30 @@ class PerfilUsuario(models.Model):
         return self.rol in (self.Rol.ADMINISTRADOR, self.Rol.OPERADOR)
 
 
+class SuscripcionPush(models.Model):
+    """Suscripción de Web Push de un dispositivo/navegador — para mandar
+    notificaciones al celular con la app cerrada (tipo WhatsApp), sin
+    depender de tener el dashboard abierto. Un mismo usuario puede tener
+    varias (celular, laptop, etc.); `endpoint` identifica el dispositivo de
+    forma única porque cada navegador genera el suyo al suscribirse."""
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="suscripciones_push"
+    )
+    endpoint = models.URLField(max_length=500, unique=True)
+    p256dh = models.CharField(max_length=200)
+    auth = models.CharField(max_length=100)
+    creada_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "suscripción push"
+        verbose_name_plural = "suscripciones push"
+        ordering = ["-creada_en"]
+
+    def __str__(self):
+        return f"{self.usuario.username} — {self.endpoint[:60]}"
+
+
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def crear_perfil_usuario(sender, instance, created, **kwargs):
     """Todo usuario nuevo recibe un perfil automáticamente: Administrador si

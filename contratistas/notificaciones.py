@@ -17,6 +17,8 @@ logger = logging.getLogger("contratistas.notificaciones")
 
 
 def _crear_notificacion_interna(tipo, mensaje, instancia):
+    from core.push import enviar_push_a_personal_interno
+
     from .models import NotificacionInterna
 
     NotificacionInterna.objects.create(
@@ -25,6 +27,8 @@ def _crear_notificacion_interna(tipo, mensaje, instancia):
         modelo=instancia.__class__.__name__,
         objeto_id=instancia.pk,
     )
+    seccion = "contratistas" if tipo == NotificacionInterna.Tipo.RADICACION_PENDIENTE else "declaracion-metodo"
+    enviar_push_a_personal_interno("SST Bavaria — pendiente por revisar", mensaje, url=f"/dashboard?ir={seccion}")
 
 
 def notificar_decision_radicacion(radicacion):

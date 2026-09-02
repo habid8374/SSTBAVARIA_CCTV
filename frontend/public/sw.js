@@ -1,4 +1,4 @@
-const CACHE_NAME = "sstbavaria-cctv-v1";
+const CACHE_NAME = "sstbavaria-cctv-v2";
 const APP_SHELL = [
   "/login",
   "/manifest.json",
@@ -22,6 +22,46 @@ self.addEventListener("activate", (event) => {
       .keys()
       .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
+  );
+});
+
+// Notificación push (Web Push + VAPID) — se muestra aunque la app esté
+// cerrada; el payload lo arma core/push.py con {titulo, cuerpo, url}.
+self.addEventListener("push", (event) => {
+  let datos = { titulo: "SST Bavaria — Cámaras IA", cuerpo: "Tienes algo pendiente por revisar.", url: "/dashboard" };
+  try {
+    if (event.data) datos = { ...datos, ...event.data.json() };
+  } catch {
+    // payload no era JSON — se usa el texto plano como cuerpo
+    if (event.data) datos.cuerpo = event.data.text();
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(datos.titulo, {
+      body: datos.cuerpo,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: datos.url },
+    })
+  );
+});
+
+// Al tocar la notificación: si ya hay una pestaña de la app abierta, la
+// enfoca y la manda a la sección correspondiente; si no, abre una nueva.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : "/dashboard";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((listaClientes) => {
+      for (const cliente of listaClientes) {
+        if ("focus" in cliente) {
+          cliente.navigate(url);
+          return cliente.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
   );
 });
 

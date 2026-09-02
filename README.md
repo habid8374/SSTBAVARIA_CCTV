@@ -203,7 +203,11 @@ frontend en Vercel — pero viven en el mismo repositorio.
     individualmente (`DELETE .../notificaciones-internas/<id>/`) o de una
     sola vez todas las ya leídas (`DELETE
     .../notificaciones-internas/eliminar-leidas/` — nunca toca las no
-    leídas).
+    leídas). Un tercer canal, opcional (ver "Notificaciones push" más abajo):
+    Web Push al celular con la app cerrada, disparado desde el mismo lugar
+    en `_crear_notificacion_interna` y también desde `disparar_alerta` de
+    cámaras (`camaras_ia/services.py`) — cada quien lo activa desde su
+    propio dispositivo en la campanita.
   - **Auditoría/trazabilidad** (pestaña "Auditoría" en Sistema, solo
     Administrador; `contratistas.RegistroAuditoria`): cada creación, edición
     o eliminación de los 5 modelos críticos de cumplimiento (empresas
@@ -376,6 +380,9 @@ elegir además la `EmpresaContratista` a la que representa
 - **`GET/POST /api/auth/usuarios/`** y **`GET/PATCH/DELETE /api/auth/usuarios/<id>/`** —
   gestión de usuarios. Solo Administradores; un usuario no puede desactivarse
   ni eliminarse a sí mismo.
+- **`GET /api/auth/push/vapid-public-key/`**, **`POST /api/auth/push/suscribir/`**,
+  **`DELETE /api/auth/push/desuscribir/`** — notificaciones push (Web Push) al
+  celular con la app cerrada. Ver "Notificaciones push (Web Push)" más abajo.
 
 Todos (salvo login) requieren el header `Authorization: Token <token>`.
 
@@ -648,6 +655,46 @@ queda como servidor web escuchando):
 5. Deploy. Railway va a correr el comando todos los días a esa hora — se
    puede probar de inmediato con el botón "Trigger" del servicio en vez
    de esperar al horario programado.
+
+### Notificaciones push (Web Push) al celular
+
+La PWA instalada puede avisar con la app cerrada — como WhatsApp, un banner
+en el celular en vez de tener que abrir el dashboard para enterarse. Es Web
+Push estándar con VAPID (`core/push.py`), sin ningún servicio de terceros de
+por medio.
+
+- **Qué la dispara**: los mismos eventos que ya generan una
+  `NotificacionInterna` (declaración pendiente/subsanada, radicación
+  pendiente — `contratistas/notificaciones.py`) y una alerta de cámara
+  disparada (`camaras_ia/services.py: disparar_alerta`, cualquier canal).
+- **A quién le llega**: solo al personal de SST/interventoría
+  (Administrador/Operador) — nunca al portal de contratistas, mismo público
+  que ya ve la campanita (`core.push.enviar_push_a_personal_interno`).
+- **Cómo se activa**: cada quien la prende desde su propio celular/navegador,
+  con el enlace "🔔 Activar notificaciones en este dispositivo" al pie de la
+  campanita — es por dispositivo, no una casilla global; sin las 3 variables
+  `VAPID_*` configuradas en el servidor ese enlace no aparece.
+- **Sin configurar**: igual que Brevo sin API key, el envío simplemente no
+  hace nada — nunca rompe el flujo que lo dispara.
+
+Variables de entorno (Railway y `.env` local):
+
+| Variable | Qué es |
+|---|---|
+| `VAPID_PUBLIC_KEY` | Llave pública — el navegador la usa para suscribirse |
+| `VAPID_PRIVATE_KEY` | Llave privada — firma cada envío, nunca sale del backend |
+| `VAPID_CLAIMS_EMAIL` | Correo de contacto que exige el estándar VAPID (no es una llave) |
+
+Generar un par de llaves nuevo:
+
+```bash
+python manage.py generar_claves_vapid
+```
+
+Imprime `VAPID_PUBLIC_KEY=...` y `VAPID_PRIVATE_KEY=...` listos para copiar
+a las variables de entorno. Se genera una sola vez por despliegue — cambiar
+las llaves invalida todas las suscripciones que ya tenía guardadas la gente
+(`core.SuscripcionPush`), que tendrían que volver a activarla.
 
 ### Nota sobre `disparar_alerta`
 

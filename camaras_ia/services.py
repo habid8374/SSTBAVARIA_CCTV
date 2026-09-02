@@ -95,6 +95,8 @@ def disparar_alerta(evento, regla):
         regla.destinatario,
     )
 
+    _enviar_push_alerta(evento)
+
     evento.canal_notificacion = regla.canal_notificacion
     if regla.canal_notificacion == "correo":  # ReglaAlerta.Canal.CORREO
         _enviar_notificacion_correo(evento, regla)
@@ -102,6 +104,20 @@ def disparar_alerta(evento, regla):
         evento.notificacion_enviada = False
         evento.notificacion_detalle = "Canal WhatsApp — integración de envío pendiente."
         evento.save(update_fields=["canal_notificacion", "notificacion_enviada", "notificacion_detalle"])
+
+
+def _enviar_push_alerta(evento):
+    """Push al celular del personal interno — independiente del canal
+    correo/whatsapp de la regla, para que se entere aunque no tenga la app
+    abierta. Nunca rompe disparar_alerta si falla (ver core.push)."""
+    from core.push import enviar_push_a_personal_interno
+
+    zona_nombre = evento.zona.nombre if evento.zona else "zona restringida"
+    enviar_push_a_personal_interno(
+        "Alerta SST Bavaria — cámaras",
+        f"Se detectó una persona en {zona_nombre} (cámara {evento.camara.nombre}) fuera del horario permitido.",
+        url="/dashboard?ir=alertas",
+    )
 
 
 def _enviar_notificacion_correo(evento, regla):

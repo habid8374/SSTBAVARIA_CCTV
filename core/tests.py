@@ -1,20 +1,21 @@
 import gzip
 import json
 import os
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from contratistas.models import EmpresaContratista
-from core.models import Empresa
 
-from .models import PerfilUsuario
+from .models import Empresa, PerfilUsuario, SuscripcionPush
+from .push import enviar_push_a_personal_interno, enviar_push_a_usuario
 from .validators import MAX_UPLOAD_MB, validar_tamano_archivo
 
 Usuario = get_user_model()
@@ -351,4 +352,188 @@ class BackupDbCommandTests(TestCase):
 
         self.assertFalse(default_storage.exists(ruta_vieja))
         self.assertTrue(default_storage.exists(ruta_nueva))
-        self._archivos_creados = [r for r in self._archivos_creados if r != ruta_vieja]
+
+
+VAPID_DE_PRUEBA = {
+    "VAPID_PUBLIC_KEY": "clave-publica-de-prueba",
+    "VAPID_PRIVATE_KEY": "clave-privada-de-prueba",
+    "VAPID_CLAIMS_EMAIL": "alertas@sstbavaria.com",
+}
+
+
+class PushSuscripcionEndpointsTests(TestCase):
+    """Suscribir/desuscribir un dispositivo — ver core/push.py y la
+    campanita de notificaciones (frontend) para el flujo completo."""
+
+    def setUp(self):
+        cache.clear()
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.otro = Usuario.objects.create_user("otro1", "otro@x.com", "clave12345")
+
+    def _token(self, user):
+        response = self.client.post(
+            reverse("core:login"), {"username": user.username, "password": "clave12345"}, content_type="application/json"
+        )
+        return response.data["token"]
+
+    @override_settings(**VAPID_DE_PRUEBA)
+    def test_vapid_public_key_devuelve_lo_configurado(self):
+        response = self.client.get(
+            reverse("core:push_vapid_public_key"), HTTP_AUTHORIZATION=f"Token {self._token(self.operador)}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["clave_publica"], "clave-publica-de-prueba")
+
+    def test_vapid_public_key_requiere_autenticacion(self):
+        response = self.client.get(reverse("core:push_vapid_public_key"))
+        self.assertEqual(response.status_code, 401)
+
+    def test_suscribir_crea_suscripcion(self):
+        response = self.client.post(
+            reverse("core:push_suscribir"),
+            {"endpoint": "https://fcm.googleapis.com/fcm/send/abc123", "keys": {"p256dh": "clave1", "auth": "clave2"}},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.operador)}",
+        )
+        self.assertEqual(response.status_code, 204, response.data)
+        suscripcion = SuscripcionPush.objects.get(endpoint="https://fcm.googleapis.com/fcm/send/abc123")
+        self.assertEqual(suscripcion.usuario, self.operador)
+        self.assertEqual(suscripcion.p256dh, "clave1")
+
+    def test_suscribir_falta_llave_devuelve_400(self):
+        response = self.client.post(
+            reverse("core:push_suscribir"),
+            {"endpoint": "https://fcm.googleapis.com/fcm/send/abc123", "keys": {"p256dh": "clave1"}},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.operador)}",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_suscribir_el_mismo_endpoint_dos_veces_actualiza_en_vez_de_duplicar(self):
+        url = reverse("core:push_suscribir")
+        headers = {"HTTP_AUTHORIZATION": f"Token {self._token(self.operador)}"}
+        self.client.post(
+            url,
+            {"endpoint": "https://fcm.googleapis.com/fcm/send/abc123", "keys": {"p256dh": "vieja", "auth": "x"}},
+            content_type="application/json",
+            **headers,
+        )
+        self.client.post(
+            url,
+            {"endpoint": "https://fcm.googleapis.com/fcm/send/abc123", "keys": {"p256dh": "nueva", "auth": "y"}},
+            content_type="application/json",
+            **headers,
+        )
+        self.assertEqual(SuscripcionPush.objects.count(), 1)
+        self.assertEqual(SuscripcionPush.objects.get().p256dh, "nueva")
+
+    def test_desuscribir_borra_la_suscripcion(self):
+        SuscripcionPush.objects.create(
+            usuario=self.operador, endpoint="https://fcm.googleapis.com/fcm/send/abc123", p256dh="a", auth="b"
+        )
+        response = self.client.delete(
+            reverse("core:push_desuscribir"),
+            {"endpoint": "https://fcm.googleapis.com/fcm/send/abc123"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.operador)}",
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(SuscripcionPush.objects.exists())
+
+    def test_desuscribir_no_borra_la_de_otro_usuario(self):
+        SuscripcionPush.objects.create(
+            usuario=self.otro, endpoint="https://fcm.googleapis.com/fcm/send/abc123", p256dh="a", auth="b"
+        )
+        response = self.client.delete(
+            reverse("core:push_desuscribir"),
+            {"endpoint": "https://fcm.googleapis.com/fcm/send/abc123"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.operador)}",
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertTrue(SuscripcionPush.objects.exists())
+
+
+class PushHelperTests(TestCase):
+    """core.push — el envío en sí (ver PushSuscripcionEndpointsTests para
+    los endpoints que alimentan la tabla de suscripciones)."""
+
+    def setUp(self):
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        SuscripcionPush.objects.create(
+            usuario=self.admin, endpoint="https://fcm.googleapis.com/fcm/send/admin1", p256dh="a", auth="b"
+        )
+
+    @patch("pywebpush.webpush")
+    def test_sin_vapid_configurado_no_hace_nada(self, mock_webpush):
+        enviar_push_a_usuario(self.admin, "Título", "Cuerpo")
+        mock_webpush.assert_not_called()
+
+    @override_settings(**VAPID_DE_PRUEBA)
+    @patch("pywebpush.webpush")
+    def test_envia_a_cada_suscripcion_del_usuario(self, mock_webpush):
+        enviar_push_a_usuario(self.admin, "Título", "Cuerpo")
+        mock_webpush.assert_called_once()
+        _, kwargs = mock_webpush.call_args
+        self.assertEqual(kwargs["subscription_info"]["endpoint"], "https://fcm.googleapis.com/fcm/send/admin1")
+        datos = json.loads(kwargs["data"])
+        self.assertEqual(datos["titulo"], "Título")
+
+    @override_settings(**VAPID_DE_PRUEBA)
+    @patch("pywebpush.webpush")
+    def test_suscripcion_expirada_se_borra_sola(self, mock_webpush):
+        from pywebpush import WebPushException
+
+        class _Respuesta:
+            status_code = 410
+
+        mock_webpush.side_effect = WebPushException("gone", response=_Respuesta())
+        enviar_push_a_usuario(self.admin, "Título", "Cuerpo")
+        self.assertFalse(SuscripcionPush.objects.filter(usuario=self.admin).exists())
+
+    @override_settings(**VAPID_DE_PRUEBA)
+    @patch("pywebpush.webpush")
+    def test_error_no_recuperable_no_borra_la_suscripcion(self, mock_webpush):
+        from pywebpush import WebPushException
+
+        class _Respuesta:
+            status_code = 500
+
+        mock_webpush.side_effect = WebPushException("falló", response=_Respuesta())
+        enviar_push_a_usuario(self.admin, "Título", "Cuerpo")
+        self.assertTrue(SuscripcionPush.objects.filter(usuario=self.admin).exists())
+
+    @override_settings(**VAPID_DE_PRUEBA)
+    @patch("pywebpush.webpush")
+    def test_a_personal_interno_omite_al_portal_de_contratistas(self, mock_webpush):
+        contratista_empresa = EmpresaContratista.objects.create(
+            empresa=Empresa.objects.create(nombre="Bavaria"), nombre="SCEPSA"
+        )
+        portal_user = Usuario.objects.create_user("portal1", "portal@x.com", "clave12345")
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = contratista_empresa
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+        SuscripcionPush.objects.create(
+            usuario=portal_user, endpoint="https://fcm.googleapis.com/fcm/send/portal1", p256dh="a", auth="b"
+        )
+
+        enviar_push_a_personal_interno("Título", "Cuerpo")
+
+        endpoints_llamados = {
+            llamada.kwargs["subscription_info"]["endpoint"] for llamada in mock_webpush.call_args_list
+        }
+        self.assertIn("https://fcm.googleapis.com/fcm/send/admin1", endpoints_llamados)
+        self.assertNotIn("https://fcm.googleapis.com/fcm/send/portal1", endpoints_llamados)
+
+
+class GenerarClavesVapidCommandTests(TestCase):
+    def test_imprime_un_par_de_llaves_valido(self):
+        from io import StringIO
+
+        salida = StringIO()
+        call_command("generar_claves_vapid", stdout=salida)
+        lineas = salida.getvalue().strip().splitlines()
+        self.assertEqual(len(lineas), 2)
+        self.assertTrue(lineas[0].startswith("VAPID_PUBLIC_KEY="))
+        self.assertTrue(lineas[1].startswith("VAPID_PRIVATE_KEY="))

@@ -179,6 +179,16 @@ BREVO_REMITENTE_EMAIL = os.environ.get("BREVO_REMITENTE_EMAIL", "alertas@sstbava
 BREVO_REMITENTE_NOMBRE = os.environ.get("BREVO_REMITENTE_NOMBRE", "SST Bavaria — Cámaras IA")
 
 
+# Notificaciones push al navegador/celular (Web Push + VAPID) — ver
+# core/push.py. Sin las 3 variables configuradas, el envío simplemente no
+# hace nada (igual que Brevo sin API key): nunca rompe el flujo que la
+# dispara. Generar un par de llaves nuevo con
+# `python manage.py generar_claves_vapid`.
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "alertas@sstbavaria.com")
+
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 

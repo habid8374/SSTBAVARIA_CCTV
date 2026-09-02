@@ -9,8 +9,9 @@ from rest_framework.response import Response
 
 from camaras_ia.models import Camara, EventoDetectado
 
+from .models import SuscripcionPush
 from .permissions import EsAdministrador
-from .serializers import UsuarioCrearSerializer, UsuarioSerializer
+from .serializers import SuscripcionPushSerializer, UsuarioCrearSerializer, UsuarioSerializer
 from .throttling import LoginRateThrottle
 
 Usuario = get_user_model()
@@ -110,3 +111,44 @@ class UsuarioDetalle(generics.RetrieveUpdateDestroyAPIView):
         if instance == self.request.user:
             raise PermissionDenied("No puedes eliminar tu propia cuenta.")
         instance.delete()
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def push_vapid_public_key(request):
+    """La llave pública VAPID que el navegador necesita para suscribirse
+    (PushManager.subscribe({applicationServerKey})). Vacía si el servidor
+    todavía no tiene el par de llaves configurado."""
+    from django.conf import settings
+
+    return Response({"clave_publica": settings.VAPID_PUBLIC_KEY})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def push_suscribir(request):
+    """Guarda (o actualiza, si el navegador reusó el mismo endpoint) la
+    suscripción de este dispositivo para el usuario logueado."""
+    entrada = SuscripcionPushSerializer(data=request.data)
+    entrada.is_valid(raise_exception=True)
+    datos = entrada.validated_data
+    SuscripcionPush.objects.update_or_create(
+        endpoint=datos["endpoint"],
+        defaults={
+            "usuario": request.user,
+            "p256dh": datos["keys"]["p256dh"],
+            "auth": datos["keys"]["auth"],
+        },
+    )
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def push_desuscribir(request):
+    """Borra la suscripción de este dispositivo — ej. al desactivar las
+    notificaciones desde la campanita. Solo la propia, nunca la de otro
+    usuario, aunque alguien mande un endpoint ajeno a mano."""
+    endpoint = request.data.get("endpoint", "")
+    SuscripcionPush.objects.filter(usuario=request.user, endpoint=endpoint).delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)

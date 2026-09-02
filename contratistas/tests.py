@@ -639,6 +639,33 @@ class NotificacionInternaTests(ApiTestsBase):
         self.assertEqual(response.status_code, 403)
         self.assertTrue(NotificacionInterna.objects.filter(pk=notificacion.pk).exists())
 
+    @patch("core.push.enviar_push_a_personal_interno")
+    def test_radicar_dispara_push_al_personal_interno(self, mock_push):
+        response = self.client.post(
+            reverse("contratistas:radicaciones_lista"),
+            {"trabajador": self.trabajador.pk, "anio": 2026, "mes": "AGOSTO"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        mock_push.assert_called_once()
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    def test_enviar_declaracion_dispara_push_al_personal_interno(self, mock_push):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "enviada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_push.assert_called_once()
+
     def test_eliminar_leidas_solo_borra_las_leidas(self):
         leida = NotificacionInterna.objects.create(
             tipo=NotificacionInterna.Tipo.RADICACION_PENDIENTE, mensaje="Leída", modelo="X", objeto_id=1, leida=True

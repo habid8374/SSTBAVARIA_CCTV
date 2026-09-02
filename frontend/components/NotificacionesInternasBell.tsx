@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import {
+  desuscribirPush,
   eliminarNotificacionInterna,
   eliminarNotificacionesInternasLeidas,
   listarNotificacionesInternas,
   marcarNotificacionLeida,
   marcarTodasNotificacionesLeidas,
+  obtenerClavePublicaPush,
+  suscribirPush,
   type NotificacionInterna,
 } from "@/lib/api";
 import { useDialog } from "./DialogProvider";
@@ -18,6 +21,15 @@ const POLL_MS = 45_000;
 
 function seccionParaNotificacion(notificacion: NotificacionInterna): SeccionId {
   return notificacion.tipo === "radicacion_pendiente" ? "contratistas" : "declaracion-metodo";
+}
+
+/** El navegador manda la clave pública VAPID en base64url; PushManager.subscribe
+ * la necesita como Uint8Array — es la única conversión que hace falta. */
+function base64UrlAUint8Array(base64Url: string): Uint8Array {
+  const relleno = "=".repeat((4 - (base64Url.length % 4)) % 4);
+  const base64 = (base64Url + relleno).replace(/-/g, "+").replace(/_/g, "/");
+  const binario = window.atob(base64);
+  return Uint8Array.from([...binario].map((caracter) => caracter.charCodeAt(0)));
 }
 
 function tiempoRelativo(fecha: string): string {
@@ -39,6 +51,9 @@ export default function NotificacionesInternasBell({
 }) {
   const [notificaciones, setNotificaciones] = useState<NotificacionInterna[]>([]);
   const [abierto, setAbierto] = useState(false);
+  const [soportaPush, setSoportaPush] = useState(false);
+  const [suscritoPush, setSuscritoPush] = useState(false);
+  const [cargandoPush, setCargandoPush] = useState(false);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const { confirmar } = useDialog();
 
@@ -53,6 +68,56 @@ export default function NotificacionesInternasBell({
     const id = window.setInterval(cargar, POLL_MS);
     return () => window.clearInterval(id);
   }, [cargar]);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
+    // Se detecta una sola vez al montar si el navegador soporta Web Push.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSoportaPush(true);
+    navigator.serviceWorker.ready
+      .then((registro) => registro.pushManager.getSubscription())
+      .then((suscripcion) => setSuscritoPush(!!suscripcion))
+      .catch(() => {});
+  }, []);
+
+  async function activarPush() {
+    setCargandoPush(true);
+    try {
+      const permiso = await Notification.requestPermission();
+      if (permiso !== "granted") return;
+      const { clave_publica } = await obtenerClavePublicaPush(token);
+      if (!clave_publica) return;
+      const registro = await navigator.serviceWorker.ready;
+      const suscripcion = await registro.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64UrlAUint8Array(clave_publica) as BufferSource,
+      });
+      await suscribirPush(token, suscripcion.toJSON());
+      setSuscritoPush(true);
+    } catch {
+      // sin permiso, sin llave configurada, o el navegador no lo soportó
+      // de verdad pese a los checks de arriba — se deja como estaba
+    } finally {
+      setCargandoPush(false);
+    }
+  }
+
+  async function desactivarPush() {
+    setCargandoPush(true);
+    try {
+      const registro = await navigator.serviceWorker.ready;
+      const suscripcion = await registro.pushManager.getSubscription();
+      if (suscripcion) {
+        await desuscribirPush(token, suscripcion.endpoint);
+        await suscripcion.unsubscribe();
+      }
+      setSuscritoPush(false);
+    } catch {
+      // se deja como estaba
+    } finally {
+      setCargandoPush(false);
+    }
+  }
 
   useEffect(() => {
     if (!abierto) return;
@@ -198,6 +263,22 @@ export default function NotificacionesInternasBell({
               </div>
             ))}
           </div>
+          {soportaPush && (
+            <div className="border-t border-corp-border px-4 py-2.5">
+              <button
+                type="button"
+                onClick={suscritoPush ? desactivarPush : activarPush}
+                disabled={cargandoPush}
+                className="text-xs font-medium text-corp-blue hover:underline disabled:opacity-60"
+              >
+                {cargandoPush
+                  ? "Un momento…"
+                  : suscritoPush
+                    ? "🔕 Desactivar notificaciones en este dispositivo"
+                    : "🔔 Activar notificaciones en este dispositivo"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
