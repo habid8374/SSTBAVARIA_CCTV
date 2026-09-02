@@ -60,11 +60,13 @@ siempre que el PC ya tenga Python instalado (una sola vez, ver abajo).
 
 1. En el dashboard: sección **Sistema → Equipo local** → **"+ Nuevo
    equipo"** → ponerle un nombre (ej. "Cámaras Planta Tocancipá").
-2. En esa misma fila, botón **"Descargar .env"**.
-3. Llevar la carpeta `equipo_local` (esta carpeta, del proyecto) al PC de la
-   planta — bajándola del repositorio o copiándola por USB/red desde otro
-   PC — y poner ahí adentro el `.env` que se descargó en el paso 2 (junto a
-   `instalar.bat`/`instalar.sh`, sin abrirlo ni editar nada).
+2. Botón **"Descargar equipo_local (.zip)"** (arriba de la tabla, no hace
+   falta acceso al repositorio de código) y, en la fila del equipo recién
+   creado, botón **"Descargar .env"**.
+3. En el PC de la planta, descomprimir el `.zip` (clic derecho → "Extraer
+   todo" en Windows) en cualquier ubicación cómoda, y poner ahí adentro el
+   `.env` descargado (junto a `instalar.bat`/`instalar.sh`, sin abrirlo ni
+   editar nada).
 4. **Windows**: doble clic en **`instalar.bat`**. Va a pedir permiso de
    Administrador (normal, aceptar) y, si es la primera vez, puede tardar
    varios minutos instalando — no hay que hacer nada más, ni cerrar la

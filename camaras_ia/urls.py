@@ -32,4 +32,9 @@ urlpatterns = [
     ),
     path("dashboard/equipos-locales/", views.EquipoLocalListaCrear.as_view(), name="equipos_locales_lista"),
     path("dashboard/equipos-locales/<int:pk>/", views.EquipoLocalDetalle.as_view(), name="equipos_locales_detalle"),
+    path(
+        "dashboard/equipos-locales/descargar-zip/",
+        views.descargar_equipo_local_zip,
+        name="equipos_locales_descargar_zip",
+    ),
 ]

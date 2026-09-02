@@ -9,6 +9,7 @@ import {
   actualizarConfiguracionNotificaciones,
   actualizarEquipoLocal,
   crearEquipoLocal,
+  descargarEquipoLocalZip,
   eliminarEquipoLocal,
   listarEquiposLocales,
   obtenerConfiguracionNotificaciones,
@@ -192,6 +193,7 @@ function EquiposLocales({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
+  const [descargandoZip, setDescargandoZip] = useState(false);
   const { confirmar } = useDialog();
 
   function cargar() {
@@ -237,6 +239,17 @@ function EquiposLocales({ token }: { token: string }) {
     }
   }
 
+  async function descargarZip() {
+    setDescargandoZip(true);
+    try {
+      await descargarEquipoLocalZip(token);
+    } catch {
+      setError("No se pudo descargar el archivo del programa equipo_local.");
+    } finally {
+      setDescargandoZip(false);
+    }
+  }
+
   function descargarEnv(equipo: EquipoLocal) {
     // Genera el .env ya completo (URL del backend + api_key) para que en el
     // PC del equipo local solo haya que arrastrar el archivo a la carpeta
@@ -258,19 +271,30 @@ function EquiposLocales({ token }: { token: string }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
           Cada PC dedicado en sitio que corre <code>equipo_local</code> necesita un registro acá. Lo más
-          simple: botón <strong>&quot;Descargar .env&quot;</strong> → poner el archivo descargado en la
-          carpeta <code>equipo_local</code> del PC → doble clic en <code>instalar.bat</code> (Windows) o
+          simple: botón <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> → descomprimirlo en el PC
+          de la planta → botón <strong>&quot;Descargar .env&quot;</strong> de la fila del equipo → poner ese
+          archivo dentro de la carpeta descomprimida → doble clic en <code>instalar.bat</code> (Windows) o
           correr <code>./instalar.sh</code> (Linux/Mac) — ese instalador deja todo corriendo solo, sin
           necesidad de editar nada a mano ni saber de líneas de comando. También se puede copiar el{" "}
           <code>api_key</code> manualmente si se prefiere el modo manual.
         </p>
-        <button
-          type="button"
-          onClick={() => setMostrarFormulario(true)}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
-        >
-          + Nuevo equipo
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={descargarZip}
+            disabled={descargandoZip}
+            className="rounded-lg border border-corp-border bg-white px-4 py-2 text-sm font-semibold text-corp-navy transition hover:bg-corp-blue-light disabled:opacity-60"
+          >
+            {descargandoZip ? "Descargando…" : "Descargar equipo_local (.zip)"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMostrarFormulario(true)}
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          >
+            + Nuevo equipo
+          </button>
+        </div>
       </div>
 
       {error && (

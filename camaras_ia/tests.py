@@ -1,5 +1,7 @@
 import datetime
+import io
 import urllib.error
+import zipfile
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -616,3 +618,32 @@ class DashboardEndpointsTests(TestCase):
             reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.admin)
         )
         self.assertEqual(response.status_code, 204)
+
+    def test_operador_puede_descargar_el_zip_de_equipo_local(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip"), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        contenido = zipfile.ZipFile(io.BytesIO(response.content))
+        nombres = contenido.namelist()
+        self.assertIn("equipo_local/instalar.bat", nombres)
+        self.assertIn("equipo_local/instalar.sh", nombres)
+        self.assertIn("equipo_local/main.py", nombres)
+        self.assertTrue(all(not n.startswith("equipo_local/venv/") for n in nombres))
+        self.assertTrue(all("__pycache__" not in n for n in nombres))
+        self.assertTrue(all(not n.startswith("equipo_local/tests/") for n in nombres))
+        self.assertTrue(all(not n.startswith("equipo_local/grabaciones/") for n in nombres))
+
+    def test_anonimo_no_puede_descargar_el_zip_de_equipo_local(self):
+        response = self.client.get(reverse("camaras_ia:equipos_locales_descargar_zip"))
+        self.assertEqual(response.status_code, 401)
+
+    def test_zip_de_equipo_local_conserva_el_bit_ejecutable_de_instalar_sh(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip"), **self._auth(self.admin)
+        )
+        contenido = zipfile.ZipFile(io.BytesIO(response.content))
+        info = contenido.getinfo("equipo_local/instalar.sh")
+        modo = (info.external_attr >> 16) & 0o777
+        self.assertTrue(modo & 0o111)

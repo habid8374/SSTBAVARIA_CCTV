@@ -743,20 +743,73 @@ const TEMAS: Tema[] = [
           <li><strong>La nube</strong>: este dashboard + el backend en Railway, alcanzable desde cualquier
             lado por internet.</li>
         </Ol>
-        <Sub>Cómo se instala (un clic, sin conocimientos técnicos)</Sub>
+        <Sub>Manual paso a paso para instalar el equipo local</Sub>
+        <P>
+          Pensado para que lo pueda hacer alguien <strong>sin conocimientos técnicos</strong>, siguiendo estos
+          pasos en orden, en el PC dedicado que va a quedar prendido en la planta.
+        </P>
+        <Sub>Paso 1 — Instalar Python (una sola vez en ese PC)</Sub>
+        <P>Solo hace falta hacerlo la primera vez. Si ese PC ya tiene Python, se puede saltar este paso.</P>
         <Ol>
-          <li>En Sistema → Equipo local, crear el registro y descargar su <Mono>.env</Mono>.</li>
-          <li>Llevar la carpeta <Mono>equipo_local</Mono> del proyecto al PC de la planta, y poner adentro
-            el <Mono>.env</Mono> descargado.</li>
-          <li>Doble clic en <Mono>instalar.bat</Mono> (Windows) o correr <Mono>./instalar.sh</Mono>
-            (Linux/Mac) — instala todo, lo deja corriendo, y hace que arranque solo cada vez que se prenda
-            el PC. Nadie tiene que volver a tocarlo.</li>
+          <li>Abrir un navegador en ese PC y entrar a{" "}
+            <Mono>https://www.python.org/downloads/</Mono>.</li>
+          <li>Clic en el botón amarillo grande que dice <strong>&quot;Download Python 3.x.x&quot;</strong> (la
+            página ya detecta sola si el PC es Windows, Mac o Linux).</li>
+          <li>Abrir el archivo descargado para instalarlo.</li>
+          <li><strong>Muy importante (solo en Windows)</strong>: en la primera pantalla del instalador, abajo
+            del todo, hay una casilla que dice <strong>&quot;Add python.exe to PATH&quot;</strong> — hay que
+            marcarla <strong>antes</strong> de darle a &quot;Install Now&quot;. Si se instala sin marcarla, el
+            instalador de un clic (paso 4) no va a encontrar Python y hay que reinstalarlo marcándola.</li>
+          <li>Darle a <strong>&quot;Install Now&quot;</strong> y esperar a que termine — no hace falta tocar
+            nada más ni abrir Python después, el instalador de un clic lo usa solo.</li>
+        </Ol>
+        <Sub>Paso 2 — Descargar todo desde el dashboard</Sub>
+        <P>No hace falta acceso al código ni a GitHub — todo se descarga desde acá mismo:</P>
+        <Ol>
+          <li>Con un usuario Administrador, ir a <strong>Sistema → Equipo local</strong>.</li>
+          <li>Botón <strong>&quot;+ Nuevo equipo&quot;</strong> → ponerle un nombre que lo identifique (ej.
+            &quot;Cámaras Planta Tocancipá&quot;) → guardar.</li>
+          <li>Botón <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> (arriba de la tabla) — trae la
+            carpeta completa del programa, lista para copiar al PC de la planta.</li>
+          <li>En la fila de ese equipo recién creado, botón <strong>&quot;Descargar .env&quot;</strong> — un
+            archivo chiquito con la conexión de ese equipo en particular al sistema.</li>
+        </Ol>
+        <Sub>Paso 3 — Instalar y dejarlo corriendo</Sub>
+        <Ol>
+          <li>En el PC de la planta, descomprimir el <Mono>.zip</Mono> del paso anterior (clic derecho →
+            &quot;Extraer todo&quot; en Windows) en cualquier ubicación cómoda (ej. el Escritorio o
+            &quot;Documentos&quot;) — queda una carpeta <Mono>equipo_local</Mono>.</li>
+          <li>Mover el archivo <Mono>.env</Mono> descargado a <strong>dentro</strong> de esa carpeta, junto a
+            los demás archivos — sin abrirlo ni editar nada.</li>
+          <li><strong>Windows</strong>: doble clic en <Mono>instalar.bat</Mono> (está dentro de la carpeta{" "}
+            <Mono>equipo_local</Mono>). Windows va a preguntar &quot;¿Permitir que esta app haga cambios en tu
+            dispositivo?&quot; — clic en <strong>&quot;Sí&quot;</strong>, es normal y necesario (así el
+            programa puede dejarse arrancando solo con el PC).<br />
+            <strong>Linux/Mac</strong>: abrir una terminal parada en esa carpeta y correr{" "}
+            <Mono>./instalar.sh</Mono>.</li>
+          <li>Se abre una ventana negra con texto — no cerrarla. La primera vez puede tardar varios minutos
+            (está descargando e instalando cosas), es normal. Al final debe decir{" "}
+            <strong>&quot;LISTO&quot;</strong> con la dirección para ver las cámaras en vivo.</li>
         </Ol>
         <Nota>
-          El único requisito, de una sola vez en ese PC, es tener Python instalado — si falta, el instalador
-          lo avisa con el link para descargarlo. Todo lo demás (crear el entorno, instalar dependencias,
-          registrar el servicio) lo hace el instalador solo.
+          Con eso, el equipo local queda instalado, corriendo, y <strong>arrancando solo</strong> cada vez que
+          se prenda ese PC — nadie tiene que volver a abrir nada ni repetir estos pasos, salvo que se mueva la
+          carpeta a otro PC o se necesite reinstalar (en ese caso, se puede volver a correr el mismo instalador
+          sin problema).
         </Nota>
+        <Sub>Paso 4 — Verificar que quedó funcionando</Sub>
+        <Ul>
+          <li>En el dashboard, <strong>Sistema → Equipo local</strong>: el badge de ese equipo debe ponerse en
+            verde (&quot;Conectado&quot;) dentro de un par de minutos.</li>
+          <li>Abrir <Mono>http://sstbavaria-camaras.local:8090</Mono> desde un navegador en esa misma red —
+            debería verse la página del visor (aunque todavía sin cámaras, si aún no se registró ninguna).</li>
+        </Ul>
+        <Sub>Paso 5 — Registrar las cámaras y sus zonas</Sub>
+        <P>
+          Último paso, ya desde el dashboard (no en el PC): dar de alta cada cámara en la sección{" "}
+          <strong>Cámaras</strong> (IP, usuario/contraseña) y dibujar sus zonas restringidas en{" "}
+          <strong>Zonas y horarios</strong> — ver esos temas de esta Ayuda para el detalle.
+        </P>
         <Sub>Cómo se conectan las cámaras al equipo local</Sub>
         <P>No es cableado — es configuración, así:</P>
         <Ol>
