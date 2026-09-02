@@ -198,7 +198,12 @@ frontend en Vercel — pero viven en el mismo repositorio.
     quien revisa sepa de un vistazo si ya la había visto antes. Es
     independiente del aviso de aprobado/rechazado, que sigue yendo siempre
     al contacto de la empresa contratista (sin bandeja interna — ese aviso
-    es para el contratista, no para el personal interno).
+    es para el contratista, no para el personal interno). Para que la
+    bandeja no crezca indefinidamente, cada notificación se puede eliminar
+    individualmente (`DELETE .../notificaciones-internas/<id>/`) o de una
+    sola vez todas las ya leídas (`DELETE
+    .../notificaciones-internas/eliminar-leidas/` — nunca toca las no
+    leídas).
   - **Auditoría/trazabilidad** (pestaña "Auditoría" en Sistema, solo
     Administrador; `contratistas.RegistroAuditoria`): cada creación, edición
     o eliminación de los 5 modelos críticos de cumplimiento (empresas

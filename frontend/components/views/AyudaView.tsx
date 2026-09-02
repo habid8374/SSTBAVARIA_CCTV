@@ -690,6 +690,13 @@ const TEMAS: Tema[] = [
           correspondiente (Declaración de Método o Contratistas) para revisarla. El botón &quot;Marcar todas
           leídas&quot; vacía el contador de un solo golpe.
         </P>
+        <Sub>Eliminar notificaciones</Sub>
+        <P>
+          Para que la bandeja no se siga acumulando: al pasar el mouse sobre una notificación aparece una{" "}
+          <Mono>✕</Mono> para eliminarla individualmente. El botón &quot;Eliminar leídas&quot; (junto a
+          &quot;Marcar todas leídas&quot;, solo aparece si hay al menos una leída) borra de un golpe todas las
+          que ya se revisaron — pide confirmación antes, y nunca toca las que siguen sin leer.
+        </P>
         <Nota>
           Es un segundo canal, no un reemplazo del correo: los mismos eventos también avisan por correo al{" "}
           <Mono>correo_revisor</Mono> configurado en Sistema → Reglas de contratistas, si está configurado.

@@ -610,6 +610,49 @@ class NotificacionInternaTests(ApiTestsBase):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(NotificacionInterna.objects.filter(leida=False).count(), 0)
 
+    def test_eliminar_notificacion(self):
+        notificacion = NotificacionInterna.objects.create(
+            tipo=NotificacionInterna.Tipo.RADICACION_PENDIENTE, mensaje="Algo pendiente", modelo="X", objeto_id=1
+        )
+        response = self.client.delete(
+            reverse("contratistas:notificaciones_internas_eliminar", args=[notificacion.pk]),
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(NotificacionInterna.objects.filter(pk=notificacion.pk).exists())
+
+    def test_eliminar_notificacion_requiere_personal_interno(self):
+        portal_user = Usuario.objects.create_user("portal2", "portal2@x.com", "clave12345")
+        from core.models import PerfilUsuario
+
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = self.contratista
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+        notificacion = NotificacionInterna.objects.create(
+            tipo=NotificacionInterna.Tipo.RADICACION_PENDIENTE, mensaje="Algo pendiente", modelo="X", objeto_id=1
+        )
+        response = self.client.delete(
+            reverse("contratistas:notificaciones_internas_eliminar", args=[notificacion.pk]),
+            **self._auth(portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(NotificacionInterna.objects.filter(pk=notificacion.pk).exists())
+
+    def test_eliminar_leidas_solo_borra_las_leidas(self):
+        leida = NotificacionInterna.objects.create(
+            tipo=NotificacionInterna.Tipo.RADICACION_PENDIENTE, mensaje="Leída", modelo="X", objeto_id=1, leida=True
+        )
+        no_leida = NotificacionInterna.objects.create(
+            tipo=NotificacionInterna.Tipo.DECLARACION_PENDIENTE, mensaje="Sin leer", modelo="Y", objeto_id=2
+        )
+        response = self.client.delete(
+            reverse("contratistas:notificaciones_internas_eliminar_leidas"), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(NotificacionInterna.objects.filter(pk=leida.pk).exists())
+        self.assertTrue(NotificacionInterna.objects.filter(pk=no_leida.pk).exists())
+
 
 class EmpresaContratistaTests(ApiTestsBase):
     def test_lista(self):

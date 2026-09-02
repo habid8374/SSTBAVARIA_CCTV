@@ -29,6 +29,16 @@ urlpatterns = [
         views.marcar_todas_notificaciones_leidas,
         name="notificaciones_internas_marcar_todas_leidas",
     ),
+    path(
+        "notificaciones-internas/<int:pk>/",
+        views.eliminar_notificacion_interna,
+        name="notificaciones_internas_eliminar",
+    ),
+    path(
+        "notificaciones-internas/eliminar-leidas/",
+        views.eliminar_notificaciones_internas_leidas,
+        name="notificaciones_internas_eliminar_leidas",
+    ),
     path("empresas/", views.EmpresaContratistaListaDashboard.as_view(), name="empresas_lista"),
     path("empresas/<int:pk>/", views.EmpresaContratistaDetalle.as_view(), name="empresas_detalle"),
     path("trabajadores/", views.TrabajadorListaDashboard.as_view(), name="trabajadores_lista"),

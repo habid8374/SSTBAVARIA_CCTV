@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import {
+  eliminarNotificacionInterna,
+  eliminarNotificacionesInternasLeidas,
   listarNotificacionesInternas,
   marcarNotificacionLeida,
   marcarTodasNotificacionesLeidas,
   type NotificacionInterna,
 } from "@/lib/api";
+import { useDialog } from "./DialogProvider";
 import type { SeccionId } from "./Sidebar";
 import { IconCampana } from "./icons";
 
@@ -37,6 +40,7 @@ export default function NotificacionesInternasBell({
   const [notificaciones, setNotificaciones] = useState<NotificacionInterna[]>([]);
   const [abierto, setAbierto] = useState(false);
   const contenedorRef = useRef<HTMLDivElement>(null);
+  const { confirmar } = useDialog();
 
   const cargar = useCallback(() => {
     listarNotificacionesInternas(token)
@@ -87,6 +91,34 @@ export default function NotificacionesInternasBell({
     }
   }
 
+  async function eliminar(id: number, event: ReactMouseEvent) {
+    event.stopPropagation();
+    setNotificaciones((actual) => actual.filter((n) => n.id !== id));
+    try {
+      await eliminarNotificacionInterna(token, id);
+    } catch {
+      cargar();
+    }
+  }
+
+  async function eliminarLeidas() {
+    const ok = await confirmar({
+      titulo: "Eliminar notificaciones leídas",
+      mensaje: "¿Eliminar todas las notificaciones ya leídas? Las que sigan sin leer no se tocan.",
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    setNotificaciones((actual) => actual.filter((n) => !n.leida));
+    try {
+      await eliminarNotificacionesInternasLeidas(token);
+    } catch {
+      cargar();
+    }
+  }
+
+  const hayLeidas = notificaciones.some((n) => n.leida);
+
   return (
     <div ref={contenedorRef} className="relative">
       <button
@@ -105,17 +137,28 @@ export default function NotificacionesInternasBell({
 
       {abierto && (
         <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-corp-border bg-white shadow-xl">
-          <div className="flex items-center justify-between border-b border-corp-border px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3 border-b border-corp-border px-4 py-2.5">
             <h3 className="text-sm font-semibold text-corp-navy">Notificaciones</h3>
-            {noLeidas > 0 && (
-              <button
-                type="button"
-                onClick={marcarTodas}
-                className="text-xs font-semibold text-corp-blue hover:underline"
-              >
-                Marcar todas leídas
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {noLeidas > 0 && (
+                <button
+                  type="button"
+                  onClick={marcarTodas}
+                  className="text-xs font-semibold text-corp-blue hover:underline"
+                >
+                  Marcar todas leídas
+                </button>
+              )}
+              {hayLeidas && (
+                <button
+                  type="button"
+                  onClick={eliminarLeidas}
+                  className="text-xs font-semibold text-red-600 hover:underline"
+                >
+                  Eliminar leídas
+                </button>
+              )}
+            </div>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {notificaciones.length === 0 && (
@@ -124,15 +167,17 @@ export default function NotificacionesInternasBell({
               </p>
             )}
             {notificaciones.map((notificacion) => (
-              <button
+              <div
                 key={notificacion.id}
-                type="button"
-                onClick={() => abrir(notificacion)}
-                className={`block w-full border-b border-corp-border px-4 py-2.5 text-left text-sm last:border-0 hover:bg-corp-blue-light/40 ${
+                className={`group flex items-start gap-1 border-b border-corp-border text-sm last:border-0 hover:bg-corp-blue-light/40 ${
                   notificacion.leida ? "text-corp-muted" : "text-corp-navy"
                 }`}
               >
-                <div className="flex items-start gap-2">
+                <button
+                  type="button"
+                  onClick={() => abrir(notificacion)}
+                  className="flex flex-1 items-start gap-2 px-4 py-2.5 text-left"
+                >
                   {!notificacion.leida && (
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-corp-blue" />
                   )}
@@ -140,8 +185,17 @@ export default function NotificacionesInternasBell({
                     <p className={notificacion.leida ? "" : "font-medium"}>{notificacion.mensaje}</p>
                     <p className="mt-0.5 text-xs text-corp-muted">{tiempoRelativo(notificacion.creada_en)}</p>
                   </div>
-                </div>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => eliminar(notificacion.id, event)}
+                  title="Eliminar notificación"
+                  aria-label="Eliminar notificación"
+                  className="mr-2 mt-2 shrink-0 rounded p-1 text-corp-muted opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                >
+                  ✕
+                </button>
+              </div>
             ))}
           </div>
         </div>

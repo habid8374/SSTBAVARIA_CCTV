@@ -691,6 +691,20 @@ export function marcarTodasNotificacionesLeidas(token: string): Promise<void> {
   });
 }
 
+export function eliminarNotificacionInterna(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/notificaciones-internas/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
+export function eliminarNotificacionesInternasLeidas(token: string): Promise<void> {
+  return request<void>("/api/contratistas/notificaciones-internas/eliminar-leidas/", {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
 export type EmpresaContratista = {
   id: number;
   nombre: string;

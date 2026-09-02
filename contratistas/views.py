@@ -734,6 +734,23 @@ def marcar_todas_notificaciones_leidas(request):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@api_view(["DELETE"])
+@permission_classes([EsPersonalInterno])
+def eliminar_notificacion_interna(request, pk):
+    notificacion = get_object_or_404(NotificacionInterna, pk=pk)
+    notificacion.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["DELETE"])
+@permission_classes([EsPersonalInterno])
+def eliminar_notificaciones_internas_leidas(request):
+    """Limpia de un golpe las que ya se revisaron — para que la bandeja no
+    se siga acumulando indefinidamente. Las no leídas nunca se tocan acá."""
+    NotificacionInterna.objects.filter(leida=True).delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def declaracion_pdf(request, pk):
