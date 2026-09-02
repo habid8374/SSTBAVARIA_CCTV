@@ -1,14 +1,17 @@
 # Equipo local de Cámaras IA
 
 Programa Python independiente (no es parte de la app Django/Next.js) que
-corre en el PC del DVR/NVR en la planta: se conecta por RTSP a cada cámara,
+corre en **un PC dedicado en la planta** (no hace falta un DVR/NVR — sirve
+cualquier PC o mini-PC común que se deje prendido, conectado a la misma red
+que las cámaras IP, por cable o WiFi): se conecta por RTSP a cada cámara,
 detecta personas con un modelo liviano de IA (YOLOv8n) y, cuando alguien
 aparece dentro de una zona restringida, reporta el evento al backend —que
 decide si hay una regla de horario vigente y dispara la alerta (correo, hoy;
 WhatsApp, cuando se conecte un proveedor).
 
 Corre como **servicio en segundo plano**: arranca solo con el PC, sin
-ventana ni intervención manual, igual que un NVR/DVR real.
+ventana ni intervención manual — una vez instalado, nadie tiene que volver a
+tocarlo.
 
 ## Cómo funciona
 
@@ -50,7 +53,58 @@ ventana ni intervención manual, igual que un NVR/DVR real.
 - Disco libre para las grabaciones — ver [Grabaciones y visor en
   vivo](#grabaciones-y-visor-en-vivo) para el cálculo de espacio.
 
-## Instalación
+## Instalación con un clic (recomendado)
+
+Pensado para que lo pueda hacer alguien **sin conocimientos técnicos**,
+siempre que el PC ya tenga Python instalado (una sola vez, ver abajo).
+
+1. En el dashboard: sección **Sistema → Equipo local** → **"+ Nuevo
+   equipo"** → ponerle un nombre (ej. "Cámaras Planta Tocancipá").
+2. En esa misma fila, botón **"Descargar .env"**.
+3. Llevar la carpeta `equipo_local` (esta carpeta, del proyecto) al PC de la
+   planta — bajándola del repositorio o copiándola por USB/red desde otro
+   PC — y poner ahí adentro el `.env` que se descargó en el paso 2 (junto a
+   `instalar.bat`/`instalar.sh`, sin abrirlo ni editar nada).
+4. **Windows**: doble clic en **`instalar.bat`**. Va a pedir permiso de
+   Administrador (normal, aceptar) y, si es la primera vez, puede tardar
+   varios minutos instalando — no hay que hacer nada más, ni cerrar la
+   ventana hasta que diga "LISTO".
+   **Linux/Mac**: abrir una terminal parado en esta carpeta y correr
+   `./instalar.sh`.
+5. Con eso queda instalado, corriendo, **y arrancando solo cada vez que se
+   prenda el PC** — nadie tiene que volver a tocarlo ni abrir nada
+   manualmente. Si alguna vez se necesita reinstalar (ej. después de mover
+   la carpeta o cambiar el `.env`), correr el mismo instalador otra vez es
+   seguro, no duplica nada.
+
+**Único requisito, de una sola vez en ese PC**: tener Python 3.10+
+instalado. Si no lo tiene, el instalador lo avisa con un link de descarga —
+en el instalador de Python hay que marcar la casilla *"Add python.exe to
+PATH"* antes de darle a Instalar, y después volver a correr `instalar.bat`.
+
+Sigue faltando un paso, que es del dashboard y no de este instalador: dar de
+alta cada cámara y dibujar sus zonas restringidas — ver [Configurar las
+cámaras y zonas](#configurar-las-cámaras-y-zonas-dashboard) abajo.
+
+## Configurar las cámaras y zonas (dashboard)
+
+1. Cada cámara desde el dashboard (sección **Cámaras**): IP, usuario/
+   contraseña ONVIF (se reutilizan como credenciales RTSP), y opcionalmente
+   una **URL RTSP** explícita si la cámara no es Dahua o no sigue el patrón
+   estándar (`rtsp://usuario:pass@ip:554/cam/realmonitor?channel=1&subtype=1`,
+   que es lo que se usa por defecto si el campo queda vacío — ver
+   `Camara.rtsp_url_efectiva` en el backend, y la nota sobre la Dahua Picoo
+   A2 en `CLAUDE_CAMARAS.md`).
+2. Subir el **snapshot de referencia** y dibujar las **zonas restringidas**
+   de cada cámara desde el dashboard (sección Cámaras → Zonas y horarios) —
+   sin esto el equipo local no tiene contra qué comparar las detecciones.
+
+## Instalación manual / diagnóstico (avanzado)
+
+Para quien prefiera hacerlo paso a paso a mano (o si el instalador de un
+clic falla y hace falta ver qué pasa).
+
+### Instalar dependencias
 
 ```bash
 cd equipo_local
@@ -70,37 +124,18 @@ pip install -r requirements.txt
 > evitar el peso extra de los bindings de GUI en un servidor sin pantalla,
 > reinstalar después con `pip install --force-reinstall opencv-python-headless`.
 
-## Configuración
+### Conseguir el `.env` a mano
 
-1. Crear el registro de este equipo — dos formas, misma tabla:
-   - **Dashboard** (recomendado): sección **Sistema → Equipo local** →
-     "+ Nuevo equipo", solo el nombre (ej. "NVR Planta Tocancipá").
-   - **Admin de Django**: `/admin/camaras_ia/equipolocal/add/`, mismo
-     resultado.
-2. Conseguir el `.env` — dos formas:
-   - **Más simple (recomendado)**: en la misma tabla, botón **"Descargar
-     .env"** → descarga un archivo `.env` ya completo (con `API_BASE_URL` y
-     `API_KEY` adentro). Solo hay que moverlo/arrastrarlo a esta carpeta
-     (`equipo_local/`) — no hace falta abrirlo ni editar nada a mano.
-   - **Manual**: copiar `.env.example` a `.env` en esta misma carpeta y
-     completar `API_BASE_URL` (URL del backend en Railway, sin `/` final) y
-     `API_KEY` (botón "Copiar" de la misma tabla).
+Copiar `.env.example` a `.env` en esta misma carpeta y completar
+`API_BASE_URL` (URL del backend en Railway, sin `/` final) y `API_KEY`
+(botón "Copiar" en Sistema → Equipo local del dashboard, o crear el
+registro directo en `/admin/camaras_ia/equipolocal/add/`).
 
-   El resto de variables (intervalos, cooldown, confianza mínima, modelo,
-   grabación, visor web, nivel de log) tienen defaults razonables — ver
-   `config.py` y `.env.example` si hace falta ajustarlas.
-3. Configurar cada cámara desde el dashboard (sección **Cámaras**): IP,
-   usuario/contraseña ONVIF (se reutilizan como credenciales RTSP), y opcio-
-   nalmente una **URL RTSP** explícita si la cámara no es Dahua o no sigue
-   el patrón estándar (`rtsp://usuario:pass@ip:554/cam/realmonitor?channel=1&subtype=1`,
-   que es lo que se usa por defecto si el campo queda vacío — ver
-   `Camara.rtsp_url_efectiva` en el backend, y la nota sobre la Dahua Picoo
-   A2 en `CLAUDE_CAMARAS.md`).
-4. Subir el **snapshot de referencia** y dibujar las **zonas restringidas**
-   de cada cámara desde el dashboard (sección Cámaras → Zonas y horarios) —
-   sin esto el equipo local no tiene contra qué comparar las detecciones.
+El resto de variables (intervalos, cooldown, confianza mínima, modelo,
+grabación, visor web, nivel de log) tienen defaults razonables — ver
+`config.py` y `.env.example` si hace falta ajustarlas.
 
-## Probar en primer plano (antes de instalarlo como servicio)
+### Probar en primer plano (antes de instalarlo como servicio)
 
 ```bash
 python -m equipo_local.main
@@ -112,9 +147,9 @@ cada cámara y, al caminar alguien por una zona restringida, el reporte del
 evento — y aparecer casi al instante en la bandeja de Alertas del dashboard.
 `Ctrl+C` para detenerlo limpio.
 
-## Instalar como servicio (arranca solo con el PC)
+### Instalar como servicio a mano (arranca solo con el PC)
 
-### Linux (systemd)
+#### Linux (systemd)
 
 ```bash
 sudo mkdir -p /opt/sstbavaria-camaras
@@ -129,12 +164,13 @@ sudo systemctl status equipo-local-camaras
 journalctl -u equipo-local-camaras -f   # logs en vivo
 ```
 
-Ajustar las rutas y el `User=` del `.service` si se instala en otro lugar.
+Ajustar las rutas y el `User=` del `.service` si se instala en otro lugar
+(`instalar.sh` ya hace este ajuste solo).
 
-### Windows (Tarea Programada)
+#### Windows (Tarea Programada)
 
-1. Instalar y configurar como en "Instalación"/"Configuración" arriba,
-   parado dentro de la carpeta `equipo_local`.
+1. Instalar y configurar como en "Instalar dependencias"/"Conseguir el
+   `.env` a mano" arriba, parado dentro de la carpeta `equipo_local`.
 2. Abrir PowerShell **como Administrador** en esa carpeta y correr:
 
    ```powershell

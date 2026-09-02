@@ -257,10 +257,12 @@ function EquiposLocales({ token }: { token: string }) {
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
-          Cada PC/DVR en sitio que corre <code>equipo_local</code> necesita un registro acá. Lo más simple:
-          botón <strong>&quot;Descargar .env&quot;</strong> → arrastrar el archivo descargado a la carpeta{" "}
-          <code>equipo_local</code> del PC (sin editar nada a mano). También se puede copiar el{" "}
-          <code>api_key</code> manualmente si se prefiere.
+          Cada PC dedicado en sitio que corre <code>equipo_local</code> necesita un registro acá. Lo más
+          simple: botón <strong>&quot;Descargar .env&quot;</strong> → poner el archivo descargado en la
+          carpeta <code>equipo_local</code> del PC → doble clic en <code>instalar.bat</code> (Windows) o
+          correr <code>./instalar.sh</code> (Linux/Mac) — ese instalador deja todo corriendo solo, sin
+          necesidad de editar nada a mano ni saber de líneas de comando. También se puede copiar el{" "}
+          <code>api_key</code> manualmente si se prefiere el modo manual.
         </p>
         <button
           type="button"

@@ -599,12 +599,15 @@ const TEMAS: Tema[] = [
         </P>
         <Sub>Equipo local</Sub>
         <P>
-          Acá se registra cada PC/DVR físico que corre el programa <Mono>equipo_local</Mono> en sitio. Botón{" "}
+          Acá se registra cada PC físico dedicado que corre el programa <Mono>equipo_local</Mono> en sitio
+          (no hace falta un DVR/NVR, sirve cualquier PC/mini-PC común). Botón{" "}
           <strong>&quot;Descargar .env&quot;</strong>: descarga un archivo ya listo con la conexión al backend
-          y la clave de ese equipo — solo hay que arrastrarlo a la carpeta del programa en ese PC, sin editar
-          nada a mano. El badge <strong>Conectado</strong> se pone verde cuando ese equipo sincronizó hace
-          menos de 5 minutos. Ver el tema <strong>&quot;El equipo local&quot;</strong> más abajo para el flujo
-          completo de cómo se conecta a las cámaras y cómo ver el video en vivo.
+          y la clave de ese equipo — se pone en la carpeta del programa en ese PC y con eso, más doble clic en
+          el instalador de un clic (<Mono>instalar.bat</Mono> en Windows, <Mono>instalar.sh</Mono> en
+          Linux/Mac), queda todo instalado y corriendo solo, sin necesidad de editar nada a mano ni saber de
+          líneas de comando. El badge <strong>Conectado</strong> se pone verde cuando ese equipo sincronizó
+          hace menos de 5 minutos. Ver el tema <strong>&quot;El equipo local&quot;</strong> más abajo para el
+          flujo completo de cómo se conecta a las cámaras y cómo ver el video en vivo.
         </P>
         <Sub>Reglas de contratistas</Sub>
         <P>
@@ -735,11 +738,25 @@ const TEMAS: Tema[] = [
         <Sub>Los 3 actores</Sub>
         <Ol>
           <li><strong>Las cámaras</strong>: en la red de la planta, cada una con su IP.</li>
-          <li><strong>El equipo local</strong>: un PC en esa misma red, corriendo el programa que vigila
-            las cámaras — es el &quot;DVR/NVR&quot; del sistema.</li>
+          <li><strong>El equipo local</strong>: un PC dedicado en esa misma red (no hace falta DVR/NVR, sirve
+            cualquier PC/mini-PC común dejado prendido), corriendo el programa que vigila las cámaras.</li>
           <li><strong>La nube</strong>: este dashboard + el backend en Railway, alcanzable desde cualquier
             lado por internet.</li>
         </Ol>
+        <Sub>Cómo se instala (un clic, sin conocimientos técnicos)</Sub>
+        <Ol>
+          <li>En Sistema → Equipo local, crear el registro y descargar su <Mono>.env</Mono>.</li>
+          <li>Llevar la carpeta <Mono>equipo_local</Mono> del proyecto al PC de la planta, y poner adentro
+            el <Mono>.env</Mono> descargado.</li>
+          <li>Doble clic en <Mono>instalar.bat</Mono> (Windows) o correr <Mono>./instalar.sh</Mono>
+            (Linux/Mac) — instala todo, lo deja corriendo, y hace que arranque solo cada vez que se prenda
+            el PC. Nadie tiene que volver a tocarlo.</li>
+        </Ol>
+        <Nota>
+          El único requisito, de una sola vez en ese PC, es tener Python instalado — si falta, el instalador
+          lo avisa con el link para descargarlo. Todo lo demás (crear el entorno, instalar dependencias,
+          registrar el servicio) lo hace el instalador solo.
+        </Nota>
         <Sub>Cómo se conectan las cámaras al equipo local</Sub>
         <P>No es cableado — es configuración, así:</P>
         <Ol>

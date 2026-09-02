@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Ajusta el usuario y las rutas a como quede instalado en el PC del NVR/DVR.
+# Ajusta el usuario y las rutas a como quede instalado en el PC de la planta.
 User=camaras
 WorkingDirectory=/opt/sstbavaria-camaras
 EnvironmentFile=/opt/sstbavaria-camaras/.env

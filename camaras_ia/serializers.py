@@ -252,7 +252,7 @@ class ConfiguracionNotificacionesSerializer(serializers.ModelSerializer):
 
 
 class EquipoLocalSerializer(serializers.ModelSerializer):
-    """CRUD de equipos locales (mini-PC/DVR en sitio) desde el dashboard —
+    """CRUD de equipos locales (mini-PC en sitio) desde el dashboard —
     antes solo se podían crear desde el admin de Django. api_key se genera
     sola al crear el registro (ver models.generar_api_key) y se muestra acá
     para que el administrador la copie al .env del equipo local."""

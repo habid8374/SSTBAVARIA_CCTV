@@ -285,7 +285,7 @@ class ConfiguracionNotificacionesDetalle(generics.RetrieveUpdateAPIView):
 
 
 class EquipoLocalListaCrear(generics.ListCreateAPIView):
-    """Alta y listado de equipos locales (mini-PC/DVR en sitio) desde el
+    """Alta y listado de equipos locales (mini-PC en sitio) desde el
     dashboard — antes solo existía por el admin de Django."""
 
     queryset = EquipoLocal.objects.order_by("nombre")

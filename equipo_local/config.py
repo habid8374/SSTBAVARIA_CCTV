@@ -1,6 +1,6 @@
 """Configuración del equipo local, leída de variables de entorno.
 
-Se pensó para correr como servicio en el PC del DVR/NVR, así que todo se
+Se pensó para correr como servicio en el mini-PC dedicado de la planta, así que todo se
 configura por variable de entorno (systemd Environment=, o el .env que carga
 main.py con python-dotenv) — nada de credenciales en el código.
 """

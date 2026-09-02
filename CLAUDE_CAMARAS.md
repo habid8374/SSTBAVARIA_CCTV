@@ -205,7 +205,10 @@ credenciales de Brevo o equipos locales — todo eso es solo Administrador.
      programa Python independiente, no es una app Django): se conecta por
      RTSP a cada cámara (no ONVIF — ver más abajo por qué), detecta personas
      con YOLOv8n y reporta al backend de arriba. Corre como servicio en
-     segundo plano (systemd/Tarea Programada) en el PC del DVR/NVR. También
+     segundo plano (systemd/Tarea Programada) en un PC dedicado en sitio —no
+     hace falta DVR/NVR, sirve cualquier PC/mini-PC común— con un instalador
+     de un clic (`equipo_local/instalar.bat`/`instalar.sh`) pensado para
+     alguien sin conocimientos técnicos. También
      graba a disco lo que ve cada cámara (con retención automática y borrado
      manual por fecha) y expone un visor web propio en esa red local
      (`http://<ip-del-pc>:8090`, o `http://sstbavaria-camaras.local:8090`
