@@ -38,43 +38,75 @@ que no se mezclan:
 
 ## Cámara de referencia
 
-Confirmada en sitio: **Dahua Picoo A2** — serie Wi-Fi de consumo/prosumer,
-modelos `DH-P3AE-PV` (3MP) / `DH-P5AE-PV` (5MP), SKU internacional
-`SD2A500HB-GN-AW-PV-S2`. Investigado por Claude (fuentes en el foro
-IPCamTalk y el sitio de Dahua International, agosto 2026 — no es info
-oficial verificada en sitio, confirmar con hardware real):
+**Comprada y en uso: Dahua Picoo B1** — modelos `DH-P5B-PV` (5MP) /
+`DH-P3B-PV` (3MP), misma familia Wi-Fi de consumo/prosumer que la Picoo A2
+(evaluada antes, ver abajo, pero no la que se terminó comprando).
+Investigado por Claude (fuentes: foro IPCamTalk, datasheet oficial Dahua,
+septiembre 2026 — no es info verificada en sitio con hardware real, solo
+lectura de manuales/comunidad):
 
-- Wi-Fi + Ethernet, movimiento motorizado pan/tilt (lente fijo de 4mm, **no
-  es zoom óptico real** pese al nombre "PTZ" usado coloquialmente).
-- Detección de humano/vehículo con IA propia de la cámara ("Smart Dual
-  Light") — coincide con el plan ya documentado de "analítica propia de la
-  cámara o modelo local, según hardware final".
+- Wi-Fi 2.4GHz + Ethernet 10/100 (RJ-45), pan 0°-355° / tilt 0°-90°, sensor
+  1/3" 2880×1620 (5MP), IR nocturno hasta 30m + luz LED inteligente.
+- Detección de humano/vehículo con IA propia + **seguimiento automático**
+  (la cámara se mueve sola al detectar a alguien) y rutas de patrullaje
+  configurables — ver el riesgo importante más abajo.
 - **RTSP sí soportado**: puerto 554, formato estándar Dahua
-  `rtsp://usuario:password@IP:554/cam/realmonitor?channel=1&subtype=0`
-  (`subtype=0` = stream principal, `subtype=1` = substream liviano).
-- **ONVIF probablemente NO implementado en la serie Picoo** — consenso de
-  comunidad (no confirmado por Dahua oficialmente); los modelos gemelos de
-  la submarca Imou sí lo traen. Se configura principalmente por la app
-  móvil DMSS (QR + nube P2P), no por un panel web tipo ONVIF/NVR
-  empresarial.
+  `rtsp://usuario:password@IP:554/cam/realmonitor?channel=1&subtype=1`
+  — el mismo patrón que ya usa por defecto `Camara.rtsp_url_efectiva`, así
+  que en teoría no hace falta tocar código, solo registrar IP/credenciales.
+- **ONVIF sí soportado** (a diferencia de la Picoo A2, donde probablemente
+  no lo está) — no lo usa el equipo local hoy (toma RTSP directo), pero
+  deja la puerta abierta a simplificar más adelante si hiciera falta.
+- Sin interfaz web — se configura por la app móvil DMSS (conexión inicial a
+  WiFi, credenciales, ajustes), no por un panel tipo ONVIF/NVR empresarial.
 - **Impacto en Fase 2 (equipo local, `equipo_local/` en este repo)**: se
   construyó asumiendo que no hay ONVIF — toma el stream RTSP directo y
   corre la detección con un modelo propio (YOLOv8n) en el mini-PC del
   sitio, en vez de recibir eventos nativos de la cámara.
 
+### ⚠️ Riesgo a verificar antes que nada: seguimiento automático
+
+Tanto la Picoo B1 (comprada) como la A2 (evaluada antes) tienen **IA de
+seguimiento automático**: la cámara se mueve sola para seguir a la persona
+detectada. Esto es un problema serio para este sistema en particular,
+porque las zonas restringidas (`ZonaRestringida.poligono`) se dibujan sobre
+una **foto fija de referencia** (`Camara.snapshot_referencia`) — si la
+cámara se mueve sola, el encuadre del stream en vivo deja de coincidir con
+esa foto, y las coordenadas de zona quedan mal calibradas justo cuando hay
+alguien delante (que es cuando más importa). No se encontró documentación
+que confirme si ese seguimiento se puede desactivar desde la app DMSS —
+**es lo primero que hay que probar con la cámara real**, antes que el RTSP:
+buscar en el menú de la cámara (DMSS) algo como "Auto Tracking"/"Target
+Tracking" y apagarlo. Si no se puede apagar, esta serie de cámaras no sirve
+tal cual para el enfoque de zonas fijas de este sistema, y habría que
+evaluar un modelo sin seguimiento automático (fijo o PTZ manual).
+
 ### Pendiente de verificar con hardware real (no se puede probar en este entorno)
 
+- **Que el seguimiento automático se pueda desactivar** (ver arriba) — el
+  más urgente de verificar, condiciona si esta cámara sirve del todo.
 - Que la URL RTSP por defecto (`Camara.rtsp_url_efectiva`) realmente
-  conecte con la Picoo A2 tal cual — o si hace falta ajustar el patrón
+  conecte con la Picoo B1 tal cual — o si hace falta ajustar el patrón
   (puerto, canal, subtype) o usar el campo `rtsp_url` explícito.
-- Confirmar de una vez por todas si hay ONVIF (`ONVIF Device Manager` u
-  `onvif-cli` contra la IP real) — si sí lo hay, se podría simplificar el
-  equipo local más adelante (eventos nativos en vez de detección propia).
 - Calidad real de la detección YOLOv8n con la cámara instalada: iluminación
   del sitio, ángulo, distancia, y si `subtype=1` (substream) da suficiente
   resolución o hace falta el canal principal.
 - Calibración del escalado de coordenadas (frame RTSP → snapshot de
   referencia) con la resolución real del stream.
+
+<details>
+<summary>Investigación previa: Dahua Picoo A2 (evaluada, no comprada)</summary>
+
+Modelos `DH-P3AE-PV` (3MP) / `DH-P5AE-PV` (5MP), SKU internacional
+`SD2A500HB-GN-AW-PV-S2`. Wi-Fi + Ethernet, movimiento motorizado pan/tilt
+(lente fijo de 4mm, no es zoom óptico real pese al nombre "PTZ" usado
+coloquialmente), detección de humano/vehículo con IA propia ("Smart Dual
+Light") con el mismo seguimiento automático que la B1. RTSP soportado
+(puerto 554, patrón estándar Dahua), ONVIF probablemente NO implementado
+en esta serie (a diferencia de la B1). Se mantiene documentada por si se
+compran unidades adicionales de este modelo más adelante.
+
+</details>
 
 Se mantiene el mismo supuesto de diseño de siempre: la detección de
 movimiento la hace la cámara/equipo local, pero **la lógica de "¿cayó
