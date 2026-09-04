@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from contratistas.models import EmpresaContratista
 
-from .models import Empresa, PerfilUsuario, SuscripcionPush
+from .models import Empresa, PerfilUsuario, RegistroInicioSesion, SuscripcionPush
 from .push import enviar_push_a_personal_interno, enviar_push_a_usuario
 from .validators import MAX_UPLOAD_MB, validar_tamano_archivo
 
@@ -88,6 +88,109 @@ class LoginThrottleTests(TestCase):
             self.url, {"username": "admin", "password": "clave12345"}, content_type="application/json"
         )
         self.assertEqual(bloqueado.status_code, 429)
+
+
+class RegistroInicioSesionTests(TestCase):
+    """El historial de inicios de sesión (Sistema → Auditoría) — solo lo
+    puede ver el superusuario real, ni siquiera otro Administrador."""
+
+    def setUp(self):
+        cache.clear()
+        self.superusuario = Usuario.objects.create_superuser("dueño", "dueno@x.com", "clave12345")
+        self.admin_no_super = Usuario.objects.create_user("jefe", "jefe@x.com", "clave12345")
+        self.admin_no_super.perfil.rol = PerfilUsuario.Rol.ADMINISTRADOR
+        self.admin_no_super.perfil.save()
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.login_url = reverse("core:login")
+        self.lista_url = reverse("core:inicios_sesion_lista")
+        self.exportar_url = reverse("core:inicios_sesion_exportar")
+
+    def _token(self, user):
+        response = self.client.post(
+            self.login_url, {"username": user.username, "password": "clave12345"}, content_type="application/json"
+        )
+        return response.data["token"]
+
+    def _auth(self, user):
+        return {"HTTP_AUTHORIZATION": f"Token {self._token(user)}"}
+
+    def test_login_exitoso_queda_registrado(self):
+        cantidad_antes = RegistroInicioSesion.objects.count()
+        self.client.post(
+            self.login_url,
+            {"username": "dueño", "password": "clave12345"},
+            content_type="application/json",
+        )
+        self.assertEqual(RegistroInicioSesion.objects.count(), cantidad_antes + 1)
+        registro = RegistroInicioSesion.objects.latest("fecha")
+        self.assertEqual(registro.usuario, self.superusuario)
+        self.assertTrue(registro.exitoso)
+
+    def test_login_fallido_queda_registrado_sin_usuario(self):
+        cache.clear()
+        self.client.post(
+            self.login_url,
+            {"username": "dueño", "password": "clave-mala"},
+            content_type="application/json",
+        )
+        registro = RegistroInicioSesion.objects.latest("fecha")
+        self.assertIsNone(registro.usuario)
+        self.assertEqual(registro.username_intentado, "dueño")
+        self.assertFalse(registro.exitoso)
+
+    def test_ip_se_toma_del_x_forwarded_for(self):
+        self.client.post(
+            self.login_url,
+            {"username": "dueño", "password": "clave12345"},
+            content_type="application/json",
+            HTTP_X_FORWARDED_FOR="203.0.113.5, 10.0.0.1",
+        )
+        registro = RegistroInicioSesion.objects.latest("fecha")
+        self.assertEqual(registro.ip, "203.0.113.5")
+
+    def test_superusuario_puede_listar(self):
+        response = self.client.get(self.lista_url, **self._auth(self.superusuario))
+        self.assertEqual(response.status_code, 200)
+
+    def test_administrador_no_superusuario_no_puede_listar(self):
+        response = self.client.get(self.lista_url, **self._auth(self.admin_no_super))
+        self.assertEqual(response.status_code, 403)
+
+    def test_operador_no_puede_listar(self):
+        response = self.client.get(self.lista_url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
+
+    def test_anonimo_no_puede_listar(self):
+        response = self.client.get(self.lista_url)
+        self.assertEqual(response.status_code, 401)
+
+    def test_filtro_exitoso(self):
+        self.client.post(
+            self.login_url, {"username": "dueño", "password": "mala"}, content_type="application/json"
+        )
+        response = self.client.get(self.lista_url + "?exitoso=false", **self._auth(self.superusuario))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(all(not r["exitoso"] for r in response.data))
+
+    def test_administrador_no_superusuario_no_puede_exportar(self):
+        response = self.client.get(self.exportar_url, **self._auth(self.admin_no_super))
+        self.assertEqual(response.status_code, 403)
+
+    def test_superusuario_exporta_excel_con_las_filas(self):
+        import openpyxl
+        from io import BytesIO
+
+        response = self.client.get(self.exportar_url, **self._auth(self.superusuario))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        hoja = libro.active
+        filas = list(hoja.iter_rows(values_only=True))
+        self.assertEqual(filas[0][0], "Fecha")
+        self.assertIn("dueño", [c for fila in filas[1:] for c in fila])
 
 
 class UsuarioManagementTests(TestCase):

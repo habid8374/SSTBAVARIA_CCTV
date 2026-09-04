@@ -59,6 +59,7 @@ export type Usuario = {
   nombre: string;
   email: string;
   is_staff: boolean;
+  es_superusuario: boolean;
   rol: Rol | null;
   contratista_id: number | null;
   contratista_nombre: string | null;
@@ -672,6 +673,62 @@ export function listarAuditoria(
   return request<RegistroAuditoria[]>(`/api/contratistas/auditoria/${query ? `?${query}` : ""}`, {
     headers: authHeaders(token),
   });
+}
+
+export function exportarAuditoriaExcel(
+  token: string,
+  filtros?: { modelo?: string; objeto_id?: number }
+): Promise<void> {
+  const parametros = new URLSearchParams();
+  if (filtros?.modelo) parametros.set("modelo", filtros.modelo);
+  if (filtros?.objeto_id) parametros.set("objeto_id", String(filtros.objeto_id));
+  const query = parametros.toString();
+  return descargarArchivo(
+    token,
+    `/api/contratistas/auditoria/exportar/${query ? `?${query}` : ""}`,
+    "auditoria.xlsx"
+  );
+}
+
+export type RegistroInicioSesion = {
+  id: number;
+  usuario: number | null;
+  usuario_nombre: string;
+  username_intentado: string;
+  ip: string | null;
+  user_agent: string;
+  exitoso: boolean;
+  fecha: string;
+};
+
+type FiltrosInicioSesion = { usuario?: number; exitoso?: boolean; desde?: string; hasta?: string };
+
+function paramsInicioSesion(filtros?: FiltrosInicioSesion): URLSearchParams {
+  const parametros = new URLSearchParams();
+  if (filtros?.usuario !== undefined) parametros.set("usuario", String(filtros.usuario));
+  if (filtros?.exitoso !== undefined) parametros.set("exitoso", String(filtros.exitoso));
+  if (filtros?.desde) parametros.set("desde", filtros.desde);
+  if (filtros?.hasta) parametros.set("hasta", filtros.hasta);
+  return parametros;
+}
+
+export function listarInicioSesion(
+  token: string,
+  filtros?: FiltrosInicioSesion
+): Promise<RegistroInicioSesion[]> {
+  const query = paramsInicioSesion(filtros).toString();
+  return request<RegistroInicioSesion[]>(`/api/auth/inicios-sesion/${query ? `?${query}` : ""}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function exportarInicioSesionExcel(token: string, filtros?: FiltrosInicioSesion): Promise<void> {
+  const query = paramsInicioSesion(filtros).toString();
+  return descargarArchivo(
+    token,
+    `/api/auth/inicios-sesion/exportar/${query ? `?${query}` : ""}`,
+    "inicios_de_sesion.xlsx"
+  );
 }
 
 export type TipoNotificacionInterna =

@@ -84,6 +84,37 @@ class SuscripcionPush(models.Model):
         return f"{self.usuario.username} — {self.endpoint[:60]}"
 
 
+class RegistroInicioSesion(models.Model):
+    """Traza de cada intento de login al dashboard (exitoso o fallido) —
+    para que el superusuario pueda auditar quién se conectó, cuándo y desde
+    qué IP, o detectar intentos de acceso fallidos sospechosos. Se guarda el
+    username tal como se escribió (además del usuario real si existe),
+    porque un intento fallido puede ser contra un username que no existe."""
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="inicios_sesion",
+    )
+    username_intentado = models.CharField(max_length=150, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    exitoso = models.BooleanField(default=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "inicio de sesión"
+        verbose_name_plural = "inicios de sesión"
+        ordering = ["-fecha"]
+
+    def __str__(self):
+        quien = self.usuario.username if self.usuario else self.username_intentado
+        marca = "✔" if self.exitoso else "✘"
+        return f"{marca} {quien} — {self.fecha:%Y-%m-%d %H:%M}"
+
+
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def crear_perfil_usuario(sender, instance, created, **kwargs):
     """Todo usuario nuevo recibe un perfil automáticamente: Administrador si

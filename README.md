@@ -208,19 +208,32 @@ frontend en Vercel — pero viven en el mismo repositorio.
     en `_crear_notificacion_interna` y también desde `disparar_alerta` de
     cámaras (`camaras_ia/services.py`) — cada quien lo activa desde su
     propio dispositivo en la campanita.
-  - **Auditoría/trazabilidad** (pestaña "Auditoría" en Sistema, solo
-    Administrador; `contratistas.RegistroAuditoria`): cada creación, edición
-    o eliminación de los 5 modelos críticos de cumplimiento (empresas
-    contratistas, trabajadores, radicaciones de seguridad social,
-    declaraciones de método y funcionarios firmantes) queda registrada con
-    quién la hizo (`request.user`), cuándo, y — en las ediciones — qué
-    campos cambiaron y sus valores antes/después
-    (`contratistas/auditoria.py: capturar_snapshot`/`registrar_auditoria`).
-    Incluye también la aprobación/rechazo de radicaciones y declaraciones,
-    que no pasan por el `perform_update` genérico de DRF. El registro guarda
-    una foto del objeto (`objeto_str`) para seguir siendo legible aunque el
-    registro original se elimine después. Es de solo lectura — nada se
-    edita ni se borra desde el dashboard ni desde el admin de Django.
+  - **Auditoría/trazabilidad** (pestaña "Auditoría" en Sistema, solo el
+    **superusuario real** — `core.permissions.EsSuperusuario`, ni siquiera
+    otra cuenta con rol Administrador tiene acceso): dos tablas, ambas
+    exportables a Excel con los mismos filtros aplicados
+    (`.../exportar/`, `openpyxl`).
+    - **Inicios de sesión** (`core.RegistroInicioSesion`): cada intento de
+      login al dashboard, exitoso o fallido, con usuario (o el username
+      escrito, si no existe/falla), IP y navegador — se registra desde
+      `core/views.py: login()`. La IP se toma de `X-Forwarded-For` (la
+      primera de la lista) porque Railway pone su propia IP en
+      `REMOTE_ADDR`; ver `_ip_cliente`. Filtrable por resultado y rango de
+      fechas (`GET .../inicios-sesion/?exitoso=&desde=&hasta=`).
+    - **Cambios, aprobaciones y rechazos** (`contratistas.RegistroAuditoria`):
+      cada creación, edición o eliminación de los 5 modelos críticos de
+      cumplimiento (empresas contratistas, trabajadores, radicaciones de
+      seguridad social, declaraciones de método y funcionarios firmantes)
+      queda registrada con quién la hizo (`request.user`), cuándo, y — en
+      las ediciones — qué campos cambiaron y sus valores antes/después
+      (`contratistas/auditoria.py: capturar_snapshot`/`registrar_auditoria`).
+      Incluye también la aprobación/rechazo de radicaciones y declaraciones,
+      que no pasan por el `perform_update` genérico de DRF. El registro
+      guarda una foto del objeto (`objeto_str`) para seguir siendo legible
+      aunque el registro original se elimine después.
+
+    Ambas tablas son de solo lectura — nada se edita ni se borra desde el
+    dashboard ni desde el admin de Django.
   - **Autorización de Ingreso** (sección "Autorización de Ingreso" en el sidebar;
     `contratistas.AutorizacionIngreso`/`TrabajadorAutorizacionIngreso`): réplica del
     formato real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA" — vigencia

@@ -21,7 +21,7 @@ import ReglasContratistasView from "./ReglasContratistasView";
 
 type Pestana = "brevo" | "equipo-local" | "reglas" | "auditoria";
 
-export default function SistemaView({ token }: { token: string }) {
+export default function SistemaView({ token, esSuperusuario }: { token: string; esSuperusuario: boolean }) {
   const [pestana, setPestana] = useState<Pestana>("brevo");
 
   return (
@@ -36,15 +36,17 @@ export default function SistemaView({ token }: { token: string }) {
         <BotonPestana activa={pestana === "reglas"} onClick={() => setPestana("reglas")}>
           Reglas de contratistas
         </BotonPestana>
-        <BotonPestana activa={pestana === "auditoria"} onClick={() => setPestana("auditoria")}>
-          Auditoría
-        </BotonPestana>
+        {esSuperusuario && (
+          <BotonPestana activa={pestana === "auditoria"} onClick={() => setPestana("auditoria")}>
+            Auditoría
+          </BotonPestana>
+        )}
       </div>
 
       {pestana === "brevo" && <ConfiguracionBrevo token={token} />}
       {pestana === "equipo-local" && <EquiposLocales token={token} />}
       {pestana === "reglas" && <ReglasContratistasView token={token} />}
-      {pestana === "auditoria" && <AuditoriaView token={token} />}
+      {pestana === "auditoria" && esSuperusuario && <AuditoriaView token={token} />}
     </div>
   );
 }

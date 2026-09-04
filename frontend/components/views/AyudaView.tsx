@@ -630,14 +630,29 @@ const TEMAS: Tema[] = [
         </P>
         <Sub>Auditoría</Sub>
         <P>
-          Traza de solo lectura de quién creó, editó o eliminó cada registro crítico de cumplimiento: empresas
-          contratistas, trabajadores, radicaciones de seguridad social, declaraciones de método, autorizaciones
-          de ingreso y funcionarios firmantes. Cada fila muestra fecha, tipo de acción, qué registro fue y qué
-          usuario lo hizo; en{" "}
-          <strong>&quot;Ver cambios&quot;</strong> se ve exactamente qué campos cambiaron y sus valores antes/
-          después. Se puede filtrar por tipo de registro. Un registro se guarda aunque el registro original se
-          elimine después (para no perder el rastro), y nada acá se puede editar ni borrar.
+          Esta pestaña <strong>solo la ve el superusuario real</strong> — ni siquiera otra cuenta con rol
+          Administrador tiene acceso, porque acá hay información sensible (IPs, quién aprobó/rechazó qué).
+          Tiene dos partes:
         </P>
+        <P>
+          <strong>Inicios de sesión</strong>: quién se conectó al dashboard (o lo intentó sin éxito), cuándo
+          y desde qué IP — incluye los intentos fallidos, para detectar accesos sospechosos. Se filtra por
+          resultado (exitoso/fallido) y por rango de fechas.
+        </P>
+        <P>
+          <strong>Cambios, aprobaciones y rechazos</strong>: traza de solo lectura de quién creó, editó o
+          eliminó cada registro crítico de cumplimiento: empresas contratistas, trabajadores, radicaciones de
+          seguridad social, declaraciones de método, autorizaciones de ingreso y funcionarios firmantes. Cada
+          fila muestra fecha, tipo de acción, qué registro fue y qué usuario lo hizo; en{" "}
+          <strong>&quot;Ver cambios&quot;</strong> se ve exactamente qué campos cambiaron y sus valores antes/
+          después (incluido aprobar/rechazar, que queda como un cambio de estado). Se puede filtrar por tipo
+          de registro. Un registro se guarda aunque el registro original se elimine después (para no perder el
+          rastro), y nada acá se puede editar ni borrar.
+        </P>
+        <Nota>
+          Las dos tablas tienen su propio botón <strong>&quot;Exportar a Excel&quot;</strong>, que descarga
+          exactamente lo que se está viendo con los filtros aplicados.
+        </Nota>
       </>
     ),
   },

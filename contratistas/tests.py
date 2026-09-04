@@ -782,6 +782,46 @@ class RegistroAuditoriaTests(ApiTestsBase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(all(r["modelo"] == "EmpresaContratista" for r in response.data))
 
+    def test_administrador_no_superusuario_no_puede_ver_auditoria(self):
+        """La auditoría es solo del superusuario real — el rol Administrador
+        de PerfilUsuario no alcanza, aunque en el resto del sistema sí."""
+        jefe = Usuario.objects.create_user("jefe", "jefe@x.com", "clave12345")
+        jefe.perfil.rol = PerfilUsuario.Rol.ADMINISTRADOR
+        jefe.perfil.save()
+        response = self.client.get(reverse("contratistas:auditoria_lista"), **self._auth(jefe))
+        self.assertEqual(response.status_code, 403)
+
+    def test_administrador_no_superusuario_no_puede_exportar_auditoria(self):
+        jefe = Usuario.objects.create_user("jefe", "jefe@x.com", "clave12345")
+        jefe.perfil.rol = PerfilUsuario.Rol.ADMINISTRADOR
+        jefe.perfil.save()
+        response = self.client.get(reverse("contratistas:auditoria_exportar"), **self._auth(jefe))
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_exporta_auditoria_a_excel(self):
+        import openpyxl
+        from io import BytesIO
+
+        self.client.post(
+            reverse("contratistas:empresas_lista"),
+            {"nombre": "Otra Contratista SAS"},
+            **self._auth(self.admin),
+        )
+        response = self.client.get(
+            reverse("contratistas:auditoria_exportar") + "?modelo=EmpresaContratista",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        hoja = libro.active
+        filas = list(hoja.iter_rows(values_only=True))
+        self.assertEqual(filas[0][0], "Fecha")
+        self.assertIn("Otra Contratista SAS", [c for fila in filas[1:] for c in fila])
+
 
 class TrabajadorTests(ApiTestsBase):
     def test_cursos_pendientes_lista_obligatorios_incompletos(self):

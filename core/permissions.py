@@ -18,6 +18,20 @@ class EsAdministrador(BasePermission):
         return bool(perfil and perfil.rol == PerfilUsuario.Rol.ADMINISTRADOR)
 
 
+class EsSuperusuario(BasePermission):
+    """Solo el superusuario real de Django (`is_superuser`) — a diferencia
+    de EsAdministrador, el rol Administrador de PerfilUsuario NO alcanza acá.
+    Para lo más sensible del sistema (auditoría de quién se conectó desde
+    qué IP y trazabilidad de aprobaciones/rechazos): ni siquiera otro
+    Administrador debería poder verlo, solo el dueño de la cuenta."""
+
+    message = "Solo el superusuario puede ver esto."
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.is_superuser)
+
+
 class EsAdministradorOSoloLectura(BasePermission):
     """Cualquier usuario autenticado puede leer (GET); escribir requiere rol
     Administrador — para configuración (zonas, reglas) que un Operador puede

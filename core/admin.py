@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import Empresa, PerfilUsuario, SuscripcionPush
+from .models import Empresa, PerfilUsuario, RegistroInicioSesion, SuscripcionPush
 
 Usuario = get_user_model()
 
@@ -49,3 +49,17 @@ class SuscripcionPushAdmin(admin.ModelAdmin):
     list_display = ("usuario", "endpoint", "creada_en")
     list_filter = ("usuario",)
     readonly_fields = ("endpoint", "p256dh", "auth", "creada_en")
+
+
+@admin.register(RegistroInicioSesion)
+class RegistroInicioSesionAdmin(admin.ModelAdmin):
+    list_display = ("fecha", "usuario", "username_intentado", "ip", "exitoso")
+    list_filter = ("exitoso",)
+    search_fields = ("username_intentado", "ip")
+    readonly_fields = ("usuario", "username_intentado", "ip", "user_agent", "exitoso", "fecha")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from contratistas.models import EmpresaContratista
 
-from .models import PerfilUsuario, SuscripcionPush
+from .models import PerfilUsuario, RegistroInicioSesion, SuscripcionPush
 
 Usuario = get_user_model()
 
@@ -115,3 +115,16 @@ class SuscripcionPushSerializer(serializers.Serializer):
         if faltantes:
             raise serializers.ValidationError(f"Faltan las llaves: {', '.join(sorted(faltantes))}.")
         return keys
+
+
+class RegistroInicioSesionSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RegistroInicioSesion
+        fields = ["id", "usuario", "usuario_nombre", "username_intentado", "ip", "user_agent", "exitoso", "fecha"]
+
+    def get_usuario_nombre(self, obj):
+        if obj.usuario:
+            return obj.usuario.get_full_name() or obj.usuario.username
+        return obj.username_intentado

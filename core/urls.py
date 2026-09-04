@@ -14,4 +14,6 @@ urlpatterns = [
     path("push/vapid-public-key/", views.push_vapid_public_key, name="push_vapid_public_key"),
     path("push/suscribir/", views.push_suscribir, name="push_suscribir"),
     path("push/desuscribir/", views.push_desuscribir, name="push_desuscribir"),
+    path("inicios-sesion/", views.RegistroInicioSesionLista.as_view(), name="inicios_sesion_lista"),
+    path("inicios-sesion/exportar/", views.inicios_sesion_exportar, name="inicios_sesion_exportar"),
 ]

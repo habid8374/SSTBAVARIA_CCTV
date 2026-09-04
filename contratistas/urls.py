@@ -18,6 +18,7 @@ urlpatterns = [
     path("equipos-epp/<int:pk>/", views.EquipoProteccionPersonalDetalle.as_view(), name="equipos_epp_detalle"),
     path("configuracion-alertas/", views.ConfiguracionAlertasDetalle.as_view(), name="configuracion_alertas"),
     path("auditoria/", views.RegistroAuditoriaLista.as_view(), name="auditoria_lista"),
+    path("auditoria/exportar/", views.auditoria_exportar, name="auditoria_exportar"),
     path("notificaciones-internas/", views.NotificacionInternaLista.as_view(), name="notificaciones_internas_lista"),
     path(
         "notificaciones-internas/<int:pk>/marcar-leida/",

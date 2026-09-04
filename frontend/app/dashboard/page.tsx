@@ -115,7 +115,9 @@ function DashboardContent() {
       {seccion === "capacitacion" && <CapacitacionView token={token} rol={usuario.rol} />}
       {seccion === "funcionarios" && <FuncionariosView token={token} rol={usuario.rol} />}
       {seccion === "indicadores-contratistas" && <IndicadoresContratistasView token={token} />}
-      {seccion === "sistema" && usuario.rol === "administrador" && <SistemaView token={token} />}
+      {seccion === "sistema" && usuario.rol === "administrador" && (
+        <SistemaView token={token} esSuperusuario={usuario.es_superusuario} />
+      )}
       {seccion === "usuarios" && usuario.rol === "administrador" && (
         <UsuariosView token={token} usuarioActualId={usuario.id} />
       )}

@@ -11,11 +11,11 @@ from rest_framework.response import Response
 
 from core.models import PerfilUsuario
 from core.permissions import (
-    EsAdministrador,
     EsAdministradorOSoloLectura,
     EsAdministradorParaEliminar,
     EsPersonalInterno,
     EsPersonalInternoOSoloLectura,
+    EsSuperusuario,
 )
 
 from .auditoria import capturar_snapshot, registrar_auditoria
@@ -683,23 +683,66 @@ def firmar_declaracion(request, pk):
     return Response(FirmaMetodoSerializer(firma).data, status=status.HTTP_201_CREATED)
 
 
+def _filtrar_auditoria(qs, params):
+    modelo = params.get("modelo")
+    if modelo:
+        qs = qs.filter(modelo=modelo)
+    objeto_id = params.get("objeto_id")
+    if objeto_id:
+        qs = qs.filter(objeto_id=objeto_id)
+    return qs
+
+
 class RegistroAuditoriaLista(generics.ListAPIView):
     """Solo lectura — la traza de auditoría nunca se edita ni se borra desde
     acá. Filtrable por ?modelo= para revisar solo, por ejemplo, los cambios
-    de Trabajador."""
+    de Trabajador. Solo el superusuario real (ver EsSuperusuario) — ni
+    siquiera otro Administrador."""
 
     serializer_class = RegistroAuditoriaSerializer
-    permission_classes = [EsAdministrador]
+    permission_classes = [EsSuperusuario]
 
     def get_queryset(self):
         qs = RegistroAuditoria.objects.select_related("usuario")
-        modelo = self.request.query_params.get("modelo")
-        if modelo:
-            qs = qs.filter(modelo=modelo)
-        objeto_id = self.request.query_params.get("objeto_id")
-        if objeto_id:
-            qs = qs.filter(objeto_id=objeto_id)
+        qs = _filtrar_auditoria(qs, self.request.query_params)
         return qs[:500]
+
+
+@api_view(["GET"])
+@permission_classes([EsSuperusuario])
+def auditoria_exportar(request):
+    """Descarga en Excel la traza de auditoría que calce con los mismos
+    filtros del listado — "exportar lo que estoy viendo"."""
+    from django.http import HttpResponse
+    from openpyxl import Workbook
+
+    qs = RegistroAuditoria.objects.select_related("usuario").order_by("-fecha")
+    qs = _filtrar_auditoria(qs, request.query_params)
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Auditoría"
+    hoja.append(["Fecha", "Acción", "Modelo", "Registro", "Usuario", "Cambios"])
+    for registro in qs:
+        cambios_texto = "; ".join(
+            f"{campo}: {valores.get('antes', '—')} → {valores.get('despues', '—')}"
+            for campo, valores in (registro.cambios or {}).items()
+        )
+        hoja.append(
+            [
+                timezone.localtime(registro.fecha).strftime("%Y-%m-%d %H:%M:%S"),
+                registro.get_accion_display(),
+                registro.modelo,
+                registro.objeto_str,
+                registro.usuario.username if registro.usuario else "—",
+                cambios_texto,
+            ]
+        )
+
+    respuesta = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    respuesta["Content-Disposition"] = 'attachment; filename="auditoria.xlsx"'
+    libro.save(respuesta)
+    return respuesta
 
 
 class NotificacionInternaLista(generics.ListAPIView):
