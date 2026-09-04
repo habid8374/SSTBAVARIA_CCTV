@@ -134,6 +134,13 @@ const TEMAS: Tema[] = [
             escribir la <strong>URL RTSP</strong> completa a mano; si se deja vacío, el sistema arma la URL
             sola con la IP y las credenciales de arriba.</li>
         </Ol>
+        <Nota tipo="aviso">
+          Con cámaras Dahua Picoo (A2/B1, las que usa este proyecto): antes de registrarla acá, entrar a la
+          app DMSS y <strong>apagar el seguimiento automático</strong> (&quot;Auto Tracking&quot;/&quot;Target
+          Tracking&quot;). Si la cámara se mueve sola al detectar a alguien, el encuadre en vivo deja de
+          coincidir con la foto de referencia de abajo, y las zonas restringidas quedan mal calibradas justo
+          cuando hay alguien delante.
+        </Nota>
         <Sub>Encuadre de referencia</Sub>
         <P>
           Cada cámara necesita una foto fija (&quot;snapshot de referencia&quot;) sobre la cual se dibujan las

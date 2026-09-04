@@ -335,6 +335,16 @@ function FormularioCamara({
         <h2 className="text-lg font-semibold text-corp-navy">
           {camara ? "Editar cámara" : "Nueva cámara"}
         </h2>
+        {!camara && (
+          <div className="mt-3">
+            <Nota tipo="aviso">
+              Si es una Dahua Picoo (A2 o B1): antes de registrarla acá, entra a la app DMSS y{" "}
+              <strong>apaga el seguimiento automático</strong> (&quot;Auto Tracking&quot;/&quot;Target
+              Tracking&quot;). Si la cámara se mueve sola al detectar a alguien, el encuadre deja de
+              coincidir con la foto de referencia y las zonas restringidas quedan mal calibradas.
+            </Nota>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <Campo label="Nombre">
             <input
