@@ -20,6 +20,7 @@ urlpatterns = [
         views.subir_snapshot_referencia,
         name="subir_snapshot_referencia",
     ),
+    path("dashboard/camaras/<int:pk>/calibrar/", views.calibrar_camara, name="calibrar_camara"),
     path("dashboard/zonas/", views.ZonaListaCrear.as_view(), name="zonas_lista"),
     path("dashboard/zonas/<int:pk>/", views.ZonaDetalle.as_view(), name="zonas_detalle"),
     path("dashboard/reglas/", views.ReglaListaCrear.as_view(), name="reglas_lista"),

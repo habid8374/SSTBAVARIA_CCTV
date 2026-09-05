@@ -33,6 +33,16 @@ class SnapshotReferenciaSerializer(serializers.Serializer):
     snapshot_referencia = serializers.ImageField(validators=[validar_tamano_archivo])
 
 
+class CamaraCalibracionSerializer(serializers.Serializer):
+    """Entrada del flujo de calibración: dos puntos marcados sobre el
+    snapshot de referencia y la distancia real (en metros) entre ellos —
+    de ahí sale Camara.px_por_metro (ver esa property)."""
+
+    punto1 = serializers.ListField(child=serializers.FloatField(), min_length=2, max_length=2)
+    punto2 = serializers.ListField(child=serializers.FloatField(), min_length=2, max_length=2)
+    distancia_metros = serializers.FloatField(min_value=0.01)
+
+
 class ReglaAlertaActivaSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReglaAlerta
@@ -52,7 +62,7 @@ class ZonaActivaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ZonaRestringida
-        fields = ["id", "nombre", "poligono", "reglas"]
+        fields = ["id", "nombre", "tipo", "poligono", "centro_x", "centro_y", "radio_metros", "reglas"]
 
     def get_reglas(self, zona):
         reglas_activas = zona.reglas.filter(activa=True)
@@ -64,10 +74,15 @@ class CamaraActivaSerializer(serializers.ModelSerializer):
     credenciales, incluye la URL RTSP ya resuelta y el snapshot de referencia
     — con esto y las zonas (en coordenadas de píxel de ese snapshot) el
     equipo local tiene todo lo necesario para conectarse, escalar las
-    coordenadas de sus detecciones y reportar eventos."""
+    coordenadas de sus detecciones y reportar eventos. `px_por_metro` ya
+    viene calculado (ver Camara.px_por_metro) para que el equipo local no
+    tenga que repetir la cuenta de calibración — null si la cámara no está
+    calibrada, en cuyo caso sus zonas tipo "punto y radio" simplemente nunca
+    disparan (ver services.punto_en_zona)."""
 
     zonas = serializers.SerializerMethodField()
     rtsp_url = serializers.CharField(source="rtsp_url_efectiva", read_only=True)
+    px_por_metro = serializers.FloatField(read_only=True, allow_null=True)
 
     class Meta:
         model = Camara
@@ -80,6 +95,7 @@ class CamaraActivaSerializer(serializers.ModelSerializer):
             "password_onvif",
             "rtsp_url",
             "snapshot_referencia",
+            "px_por_metro",
             "zonas",
         ]
 
@@ -116,7 +132,44 @@ class ZonaDashboardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ZonaRestringida
-        fields = ["id", "camara", "camara_nombre", "nombre", "poligono", "activa", "reglas"]
+        fields = [
+            "id",
+            "camara",
+            "camara_nombre",
+            "nombre",
+            "tipo",
+            "poligono",
+            "centro_x",
+            "centro_y",
+            "radio_metros",
+            "activa",
+            "reglas",
+        ]
+
+    def validate(self, datos):
+        tipo = datos.get("tipo", getattr(self.instance, "tipo", ZonaRestringida.Tipo.POLIGONO))
+        if tipo == ZonaRestringida.Tipo.POLIGONO:
+            poligono = datos.get("poligono", getattr(self.instance, "poligono", None))
+            if not poligono or len(poligono) < 3:
+                raise serializers.ValidationError(
+                    {"poligono": "Una zona tipo Polígono necesita al menos 3 puntos."}
+                )
+        else:
+            centro_x = datos.get("centro_x", getattr(self.instance, "centro_x", None))
+            centro_y = datos.get("centro_y", getattr(self.instance, "centro_y", None))
+            radio_metros = datos.get("radio_metros", getattr(self.instance, "radio_metros", None))
+            faltantes = [
+                nombre
+                for nombre, valor in (("centro_x", centro_x), ("centro_y", centro_y), ("radio_metros", radio_metros))
+                if valor is None
+            ]
+            if faltantes:
+                raise serializers.ValidationError(
+                    {campo: "Obligatorio para una zona tipo Punto y radio." for campo in faltantes}
+                )
+            if radio_metros <= 0:
+                raise serializers.ValidationError({"radio_metros": "Debe ser mayor que cero."})
+        return datos
 
 
 class EventoDashboardSerializer(serializers.ModelSerializer):
@@ -172,6 +225,7 @@ class UltimoEventoSerializer(serializers.ModelSerializer):
 class CamaraDashboardSerializer(serializers.ModelSerializer):
     zonas = ZonaDashboardSerializer(many=True, read_only=True)
     ultimo_evento = serializers.SerializerMethodField()
+    px_por_metro = serializers.FloatField(read_only=True, allow_null=True)
 
     class Meta:
         model = Camara
@@ -186,6 +240,7 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
             "ubicacion",
             "activa",
             "snapshot_referencia",
+            "px_por_metro",
             "zonas",
             "ultimo_evento",
         ]

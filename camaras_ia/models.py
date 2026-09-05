@@ -41,6 +41,23 @@ class Camara(models.Model):
     activa = models.BooleanField(default=True)
     creada_en = models.DateTimeField(auto_now_add=True)
 
+    # Calibración para zonas tipo "punto y radio" (ver ZonaRestringida.Tipo):
+    # dos puntos marcados sobre el snapshot de referencia y la distancia real
+    # (en metros) entre ellos — de ahí sale Camara.px_por_metro. Es una escala
+    # constante, no una homografía completa de perspectiva: suficiente para
+    # una zona acotada cerca de esos puntos, pierde precisión lejos de ellos
+    # si la cámara tiene mucho ángulo/inclinación.
+    calibracion_punto1_x = models.FloatField("calibración: punto 1 (x)", null=True, blank=True)
+    calibracion_punto1_y = models.FloatField("calibración: punto 1 (y)", null=True, blank=True)
+    calibracion_punto2_x = models.FloatField("calibración: punto 2 (x)", null=True, blank=True)
+    calibracion_punto2_y = models.FloatField("calibración: punto 2 (y)", null=True, blank=True)
+    calibracion_distancia_metros = models.FloatField(
+        "calibración: distancia real (m)",
+        null=True,
+        blank=True,
+        help_text="Distancia real, en metros, entre los dos puntos de calibración marcados sobre el snapshot",
+    )
+
     class Meta:
         verbose_name = "cámara"
         verbose_name_plural = "cámaras"
@@ -48,6 +65,28 @@ class Camara(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.ip})"
+
+    @property
+    def px_por_metro(self):
+        """Escala de la cámara (píxeles por metro real), o None si no está
+        calibrada. Ver evaluar_zona_horario/ZonaRestringida.Tipo.PUNTO_RADIO."""
+        campos = (
+            self.calibracion_punto1_x,
+            self.calibracion_punto1_y,
+            self.calibracion_punto2_x,
+            self.calibracion_punto2_y,
+            self.calibracion_distancia_metros,
+        )
+        if any(c is None for c in campos):
+            return None
+        if self.calibracion_distancia_metros <= 0:
+            return None
+        dx = self.calibracion_punto2_x - self.calibracion_punto1_x
+        dy = self.calibracion_punto2_y - self.calibracion_punto1_y
+        distancia_px = (dx**2 + dy**2) ** 0.5
+        if distancia_px <= 0:
+            return None
+        return distancia_px / self.calibracion_distancia_metros
 
     @property
     def rtsp_url_efectiva(self):
@@ -107,13 +146,37 @@ class EquipoLocal(models.Model):
 
 
 class ZonaRestringida(models.Model):
-    """Polígono sobre el encuadre de una cámara donde no debería haber personas."""
+    """Área sobre el encuadre de una cámara donde no debería haber personas —
+    un polígono dibujado a mano, o un punto marcado (ej. una estiba) más un
+    radio en metros reales (requiere que la cámara esté calibrada, ver
+    Camara.px_por_metro) para zonas que se deben recalcular si ese punto se
+    mueve, sin tener que redibujar nada."""
+
+    class Tipo(models.TextChoices):
+        POLIGONO = "poligono", "Polígono"
+        PUNTO_RADIO = "punto_radio", "Punto y radio"
 
     camara = models.ForeignKey(Camara, on_delete=models.CASCADE, related_name="zonas")
     nombre = models.CharField(max_length=150)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.POLIGONO)
     poligono = models.JSONField(
         "polígono",
-        help_text="Lista de coordenadas [[x1, y1], [x2, y2], ...] sobre el encuadre de referencia",
+        blank=True,
+        default=list,
+        help_text="Lista de coordenadas [[x1, y1], [x2, y2], ...] sobre el encuadre de referencia — solo para tipo Polígono",
+    )
+    centro_x = models.FloatField(
+        "centro (x)",
+        null=True,
+        blank=True,
+        help_text="Punto marcado (ej. una estiba) sobre el encuadre de referencia — solo para tipo Punto y radio",
+    )
+    centro_y = models.FloatField("centro (y)", null=True, blank=True)
+    radio_metros = models.FloatField(
+        "radio (metros)",
+        null=True,
+        blank=True,
+        help_text="Distancia real, en metros, alrededor del centro que se considera zona restringida — solo para tipo Punto y radio",
     )
     activa = models.BooleanField(default=True)
     creada_en = models.DateTimeField(auto_now_add=True)

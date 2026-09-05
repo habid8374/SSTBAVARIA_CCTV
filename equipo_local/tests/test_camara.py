@@ -70,6 +70,41 @@ class EvaluarDeteccionTests(unittest.TestCase):
         self.assertEqual(len(zonas), 1)
 
 
+class EvaluarDeteccionPuntoRadioTests(unittest.TestCase):
+    def _camara_datos_punto_radio(self, px_por_metro=10):
+        return _camara_datos(
+            px_por_metro=px_por_metro,
+            zonas=[
+                {
+                    "id": 30,
+                    "nombre": "3m de la estiba",
+                    "tipo": "punto_radio",
+                    "centro_x": 50,
+                    "centro_y": 50,
+                    "radio_metros": 3,
+                }
+            ],
+        )
+
+    def test_punto_dentro_del_radio_se_reporta(self):
+        monitor = CamaraMonitor(self._camara_datos_punto_radio(), MagicMock(), MagicMock(), _config())
+        # radio_metros=3 * px_por_metro=10 -> radio de 30px; (60,50) está a 10px del centro.
+        _, zonas = monitor.evaluar_deteccion((60, 50), (100, 100), ahora=0)
+        self.assertEqual([z["id"] for z in zonas], [30])
+
+    def test_punto_fuera_del_radio_no_se_reporta(self):
+        monitor = CamaraMonitor(self._camara_datos_punto_radio(), MagicMock(), MagicMock(), _config())
+        _, zonas = monitor.evaluar_deteccion((95, 95), (100, 100), ahora=0)
+        self.assertEqual(zonas, [])
+
+    def test_camara_sin_calibrar_nunca_reporta(self):
+        monitor = CamaraMonitor(
+            self._camara_datos_punto_radio(px_por_metro=None), MagicMock(), MagicMock(), _config()
+        )
+        _, zonas = monitor.evaluar_deteccion((50, 50), (100, 100), ahora=0)
+        self.assertEqual(zonas, [])
+
+
 class ActualizarTests(unittest.TestCase):
     def test_actualizar_refresca_zonas_sin_perder_cooldown(self):
         monitor = CamaraMonitor(_camara_datos(), MagicMock(), MagicMock(), _config())
@@ -82,6 +117,12 @@ class ActualizarTests(unittest.TestCase):
         # El cooldown viejo de la zona 10 sigue en memoria pero ya no aplica a nada (zona nueva).
         _, zonas = monitor.evaluar_deteccion((50, 50), (100, 100), ahora=1)
         self.assertEqual([z["id"] for z in zonas], [20])
+
+    def test_actualizar_refresca_px_por_metro(self):
+        monitor = CamaraMonitor(_camara_datos(px_por_metro=None), MagicMock(), MagicMock(), _config())
+        self.assertIsNone(monitor.px_por_metro)
+        monitor.actualizar(_camara_datos(px_por_metro=12.5))
+        self.assertEqual(monitor.px_por_metro, 12.5)
 
     def test_actualizar_invalida_cache_de_referencia_si_cambia_la_url(self):
         monitor = CamaraMonitor(

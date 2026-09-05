@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 import requests
 
-from .geometria import escalar_punto, punto_en_poligono
+from .geometria import escalar_punto, punto_en_zona
 from .grabador import GrabadorCamara
 
 logger = logging.getLogger("equipo_local.camara")
@@ -28,6 +28,7 @@ class CamaraMonitor:
         self.nombre = camara_datos.get("nombre", f"Cámara {self.id}")
         self.rtsp_url = camara_datos["rtsp_url"]
         self.zonas = camara_datos.get("zonas", [])
+        self.px_por_metro = camara_datos.get("px_por_metro")
         self._snapshot_referencia_url = camara_datos.get("snapshot_referencia")
         self.detector = detector
         self.cliente_api = cliente_api
@@ -53,6 +54,7 @@ class CamaraMonitor:
         self.nombre = camara_datos.get("nombre", self.nombre)
         self.rtsp_url = camara_datos["rtsp_url"]
         self.zonas = camara_datos.get("zonas", [])
+        self.px_por_metro = camara_datos.get("px_por_metro")
         if camara_datos.get("snapshot_referencia") != self._snapshot_referencia_url:
             self._snapshot_referencia_url = camara_datos.get("snapshot_referencia")
             self._tamano_referencia = None  # cambió la referencia, hay que releerla
@@ -88,7 +90,7 @@ class CamaraMonitor:
 
         zonas_a_reportar = []
         for zona in self.zonas:
-            if not punto_en_poligono(punto_escalado, zona["poligono"]):
+            if not punto_en_zona(punto_escalado, zona, self.px_por_metro):
                 continue
             if self._paso_cooldown(zona["id"], ahora):
                 zonas_a_reportar.append(zona)

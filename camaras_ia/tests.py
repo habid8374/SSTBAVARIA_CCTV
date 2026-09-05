@@ -13,7 +13,7 @@ from django.utils import timezone
 from core.models import Empresa
 
 from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
-from .services import _regla_vigente, disparar_alerta, evaluar_zona_horario, punto_en_poligono
+from .services import _regla_vigente, disparar_alerta, evaluar_zona_horario, punto_en_circulo, punto_en_poligono, punto_en_zona
 
 Usuario = get_user_model()
 
@@ -55,6 +55,87 @@ class PuntoEnPoligonoTests(TestCase):
 
     def test_poligono_invalido(self):
         self.assertFalse(punto_en_poligono((1, 1), [[0, 0], [1, 1]]))
+
+
+class PuntoEnCirculoTests(TestCase):
+    def test_punto_dentro(self):
+        self.assertTrue(punto_en_circulo((3, 4), (0, 0), 5))
+
+    def test_punto_fuera(self):
+        self.assertFalse(punto_en_circulo((10, 10), (0, 0), 5))
+
+    def test_radio_none_nunca_contiene_nada(self):
+        self.assertFalse(punto_en_circulo((0, 0), (0, 0), None))
+
+
+class PuntoEnZonaTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+
+    def test_tipo_poligono(self):
+        zona = ZonaRestringida(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.assertTrue(punto_en_zona((5, 5), zona))
+        self.assertFalse(punto_en_zona((50, 50), zona))
+
+    def test_tipo_punto_radio_con_calibracion(self):
+        zona = ZonaRestringida(
+            camara=self.camara,
+            nombre="3m de la estiba",
+            tipo=ZonaRestringida.Tipo.PUNTO_RADIO,
+            centro_x=100,
+            centro_y=100,
+            radio_metros=3,
+        )
+        # px_por_metro=10 -> radio de 30px
+        self.assertTrue(punto_en_zona((110, 100), zona, px_por_metro=10))
+        self.assertFalse(punto_en_zona((200, 200), zona, px_por_metro=10))
+
+    def test_tipo_punto_radio_sin_calibrar_nunca_dispara(self):
+        zona = ZonaRestringida(
+            camara=self.camara,
+            nombre="3m de la estiba",
+            tipo=ZonaRestringida.Tipo.PUNTO_RADIO,
+            centro_x=100,
+            centro_y=100,
+            radio_metros=3,
+        )
+        self.assertFalse(punto_en_zona((100, 100), zona, px_por_metro=None))
+
+
+class PxPorMetroTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+
+    def test_sin_calibrar_devuelve_none(self):
+        camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.assertIsNone(camara.px_por_metro)
+
+    def test_calibrada_calcula_la_escala(self):
+        camara = Camara.objects.create(
+            empresa=self.empresa,
+            nombre="Cam 1",
+            ip="10.0.0.1",
+            calibracion_punto1_x=0,
+            calibracion_punto1_y=0,
+            calibracion_punto2_x=100,
+            calibracion_punto2_y=0,
+            calibracion_distancia_metros=2,
+        )
+        self.assertEqual(camara.px_por_metro, 50)
+
+    def test_distancia_cero_devuelve_none(self):
+        camara = Camara.objects.create(
+            empresa=self.empresa,
+            nombre="Cam 1",
+            ip="10.0.0.1",
+            calibracion_punto1_x=0,
+            calibracion_punto1_y=0,
+            calibracion_punto2_x=100,
+            calibracion_punto2_y=0,
+            calibracion_distancia_metros=0,
+        )
+        self.assertIsNone(camara.px_por_metro)
 
 
 class ReglaVigenteTests(TestCase):
@@ -130,6 +211,60 @@ class EvaluarZonaHorarioTests(TestCase):
         self.zona.activa = False
         self.zona.save()
         zona, regla = evaluar_zona_horario(self.camara, (5, 5))
+        self.assertIsNone(zona)
+        self.assertIsNone(regla)
+
+
+class EvaluarZonaHorarioPuntoRadioTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.camara_calibrada = Camara.objects.create(
+            empresa=self.empresa,
+            nombre="Cam calibrada",
+            ip="10.0.0.1",
+            calibracion_punto1_x=0,
+            calibracion_punto1_y=0,
+            calibracion_punto2_x=100,
+            calibracion_punto2_y=0,
+            calibracion_distancia_metros=10,  # 10px = 1m
+        )
+        self.zona = ZonaRestringida.objects.create(
+            camara=self.camara_calibrada,
+            nombre="3m de la estiba",
+            tipo=ZonaRestringida.Tipo.PUNTO_RADIO,
+            centro_x=200,
+            centro_y=200,
+            radio_metros=3,  # radio de 30px con esta calibración
+        )
+        ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            destinatario="+573000000000",
+        )
+
+    def test_punto_dentro_del_radio_dispara(self):
+        zona, regla = evaluar_zona_horario(self.camara_calibrada, (215, 200))  # a 15px del centro
+        self.assertEqual(zona, self.zona)
+        self.assertIsNotNone(regla)
+
+    def test_punto_fuera_del_radio_no_dispara(self):
+        zona, regla = evaluar_zona_horario(self.camara_calibrada, (500, 500))
+        self.assertIsNone(zona)
+        self.assertIsNone(regla)
+
+    def test_camara_sin_calibrar_nunca_dispara(self):
+        camara_sin_calibrar = Camara.objects.create(empresa=self.empresa, nombre="Cam 2", ip="10.0.0.2")
+        ZonaRestringida.objects.create(
+            camara=camara_sin_calibrar,
+            nombre="3m de la estiba",
+            tipo=ZonaRestringida.Tipo.PUNTO_RADIO,
+            centro_x=200,
+            centro_y=200,
+            radio_metros=3,
+        )
+        zona, regla = evaluar_zona_horario(camara_sin_calibrar, (200, 200))
         self.assertIsNone(zona)
         self.assertIsNone(regla)
 
@@ -417,6 +552,63 @@ class DashboardEndpointsTests(TestCase):
         )
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(ZonaRestringida.objects.filter(nombre="Nueva zona").exists())
+
+    def test_admin_crea_zona_tipo_punto_radio(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {
+                "camara": self.camara.pk,
+                "nombre": "3m de la estiba",
+                "tipo": "punto_radio",
+                "centro_x": 100,
+                "centro_y": 100,
+                "radio_metros": 3,
+            },
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_crear_zona_punto_radio_sin_centro_falla(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {"camara": self.camara.pk, "nombre": "Sin centro", "tipo": "punto_radio", "radio_metros": 3},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_crear_zona_poligono_con_menos_de_3_puntos_falla(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {"camara": self.camara.pk, "nombre": "Muy chica", "poligono": [[0, 0], [1, 1]]},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_admin_calibra_camara(self):
+        url = reverse("camaras_ia:calibrar_camara", args=[self.camara.pk])
+        response = self.client.post(
+            url,
+            {"punto1": [0, 0], "punto2": [100, 0], "distancia_metros": 2},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["px_por_metro"], 50)
+        self.camara.refresh_from_db()
+        self.assertEqual(self.camara.px_por_metro, 50)
+
+    def test_operador_no_puede_calibrar_camara(self):
+        url = reverse("camaras_ia:calibrar_camara", args=[self.camara.pk])
+        response = self.client.post(
+            url,
+            {"punto1": [0, 0], "punto2": [100, 0], "distancia_metros": 2},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_admin_crea_regla_para_zona(self):
         response = self.client.post(

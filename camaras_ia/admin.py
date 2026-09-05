@@ -37,8 +37,8 @@ class EquipoLocalAdmin(admin.ModelAdmin):
 
 @admin.register(ZonaRestringida)
 class ZonaRestringidaAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "camara", "activa")
-    list_filter = ("camara__empresa", "activa")
+    list_display = ("nombre", "camara", "tipo", "activa")
+    list_filter = ("camara__empresa", "tipo", "activa")
     search_fields = ("nombre",)
     inlines = [ReglaAlertaInline]
 

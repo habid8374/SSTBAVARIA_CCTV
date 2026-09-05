@@ -139,10 +139,20 @@ Proyecto nuevo (no una app dentro de otro proyecto). Apps internas:
 
 ## Modelos clave
 
-- `Camara`: nombre, IP, credenciales ONVIF, ubicación, empresa (tenant)
+- `Camara`: nombre, IP, credenciales ONVIF, ubicación, empresa (tenant).
+  `px_por_metro` (property): escala de la cámara en píxeles por metro real,
+  calculada de dos puntos de calibración marcados sobre el snapshot de
+  referencia + la distancia real entre ellos (ver "Zonas tipo Punto y
+  radio" abajo) — None si no está calibrada.
 - `EquipoLocal`: identifica el mini-PC/equipo en sitio que reporta eventos —
   autenticado por API key propia, no por usuario/clave de persona
-- `ZonaRestringida`: FK a Camara, polígono (lista de coordenadas), nombre
+- `ZonaRestringida`: FK a Camara, `tipo` (Polígono, por defecto, o Punto y
+  radio), nombre. Polígono: lista de coordenadas. Punto y radio: un punto
+  (`centro_x`/`centro_y`) más un radio en metros reales (`radio_metros`) —
+  útil para "no debe haber nadie a menos de N metros de X" cuando X (ej. una
+  estiba) se puede mover, sin tener que redibujar el polígono cada vez, solo
+  volver a marcar el punto. Requiere que `Camara.px_por_metro` no sea None
+  (ver abajo) — si la cámara no está calibrada, esas zonas nunca disparan.
 - `ReglaAlerta`: FK a ZonaRestringida, horario de inicio/fin, días de la semana,
   canal de notificación (WhatsApp/correo), destinatario
 - `EventoDetectado`: FK a Camara y ZonaRestringida (si aplica), timestamp,
@@ -151,6 +161,43 @@ Proyecto nuevo (no una app dentro de otro proyecto). Apps internas:
   Brevo y el remitente — editable desde el dashboard (Sistema → Brevo) en
   vez de solo por variable de entorno; si queda vacía, cae de vuelta a
   settings.BREVO_* (compatibilidad con quien sí las maneja por Railway)
+
+### Zonas tipo "Punto y radio" (distancia real a un objeto que se mueve)
+
+Pensado para reglas del tipo "nadie a menos de 3 metros de la estiba":
+en vez de redibujar el polígono cada vez que el objeto de referencia se
+mueve, el administrador marca un solo punto sobre el snapshot (un clic) y
+un radio en metros — el sistema calcula el círculo de esa distancia real
+alrededor del punto.
+
+Para convertir metros reales en píxeles hace falta calibrar la cámara una
+vez: marcar dos puntos sobre el snapshot y decir la distancia real (en
+metros) entre ellos (ej. el ancho de la estiba, o dos baldosas del piso).
+De ahí sale `Camara.px_por_metro` = distancia en píxeles entre esos dos
+puntos / distancia real en metros.
+
+**Limitación deliberada, documentada a propósito**: esto es una escala
+constante (un solo número), no una homografía completa de perspectiva. Es
+precisa cerca de los puntos de calibración y pierde precisión a medida que
+el punto marcado se aleja de ellos, sobre todo con cámaras muy inclinadas
+o zonas que abarcan mucha profundidad de la escena. Se eligió así a
+propósito frente a una homografía de 4 puntos (más precisa en toda la
+imagen) porque: (a) el caso de uso real (una zona acotada cerca de un
+punto fijo, tipo "3m de la estiba") no lo necesita, y (b) calibrar con 2
+clics + un número es mucho más simple de explicar a un usuario sin
+conocimientos técnicos que calibrar con 4 puntos + entender qué es un
+plano de referencia. Si en el futuro hace falta más precisión en toda la
+escena, migrar a homografía es un cambio localizado en
+`Camara.px_por_metro` (y su equivalente en `equipo_local/geometria.py`),
+no en el resto del pipeline.
+
+Se decidió explícitamente **no entrenar un modelo de IA para detectar el
+objeto de referencia (ej. la estiba) automáticamente** — habría requerido
+juntar y etiquetar fotos reales del sitio y entrenar un modelo aparte
+(YOLOv8n de fábrica no lo reconoce, solo las ~80 clases genéricas de
+COCO), sin garantía de buena precisión sin muchas fotos de entrenamiento.
+Marcar el punto a mano es la opción que ya funciona hoy con la
+infraestructura existente.
 
 ## Funciones/servicios clave
 
@@ -187,8 +234,10 @@ También la Fase 4 completa (ver más abajo):
   cliente (persona detectada en verde, alerta en rojo, zona en amarillo).
 - **Zonas y horarios**: editor visual — seleccionar cámara, subir su
   snapshot de referencia, dibujar el polígono haciendo clic sobre la imagen
-  (coordenadas en píxeles naturales de esa foto) y configurar sus reglas de
-  horario (días, franja, canal, destinatario) sin tocar el admin de Django.
+  (coordenadas en píxeles naturales de esa foto) — o, alternativa, marcar un
+  punto y un radio en metros reales (ver "Zonas tipo Punto y radio" abajo)
+  — y configurar sus reglas de horario (días, franja, canal, destinatario)
+  sin tocar el admin de Django.
 - **Alertas**: bandeja de `EventoDetectado` con foto, filtros por
   estado/disparo de alerta, y marcar revisado — solo triage, sin datos de
   notificación.

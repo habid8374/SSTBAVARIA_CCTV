@@ -231,12 +231,18 @@ export type ReglaAlerta = {
 
 export type NuevaRegla = Omit<ReglaAlerta, "id" | "zona_nombre" | "activa"> & { activa?: boolean };
 
+export type TipoZona = "poligono" | "punto_radio";
+
 export type ZonaDashboard = {
   id: number;
   camara: number;
   camara_nombre: string;
   nombre: string;
+  tipo: TipoZona;
   poligono: number[][];
+  centro_x: number | null;
+  centro_y: number | null;
+  radio_metros: number | null;
   activa: boolean;
   reglas: ReglaAlerta[];
 };
@@ -244,7 +250,11 @@ export type ZonaDashboard = {
 export type NuevaZona = {
   camara: number;
   nombre: string;
-  poligono: number[][];
+  tipo?: TipoZona;
+  poligono?: number[][];
+  centro_x?: number;
+  centro_y?: number;
+  radio_metros?: number;
   activa?: boolean;
 };
 
@@ -270,6 +280,7 @@ export type CamaraDashboard = {
   ubicacion: string;
   activa: boolean;
   snapshot_referencia: string | null;
+  px_por_metro: number | null;
   zonas: ZonaDashboard[];
   ultimo_evento: UltimoEvento | null;
 };
@@ -373,10 +384,24 @@ export function crearZona(token: string, datos: NuevaZona): Promise<ZonaDashboar
   });
 }
 
+export function calibrarCamara(
+  token: string,
+  camaraId: number,
+  datos: { punto1: [number, number]; punto2: [number, number]; distancia_metros: number }
+): Promise<CamaraDashboard> {
+  return request<CamaraDashboard>(`/api/camaras-ia/dashboard/camaras/${camaraId}/calibrar/`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
 export function actualizarZona(
   token: string,
   id: number,
-  cambios: Partial<Pick<ZonaDashboard, "nombre" | "poligono" | "activa">>
+  cambios: Partial<
+    Pick<ZonaDashboard, "nombre" | "tipo" | "poligono" | "centro_x" | "centro_y" | "radio_metros" | "activa">
+  >
 ): Promise<ZonaDashboard> {
   return request<ZonaDashboard>(`/api/camaras-ia/dashboard/zonas/${id}/`, {
     method: "PATCH",

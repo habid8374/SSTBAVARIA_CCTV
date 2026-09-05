@@ -33,6 +33,28 @@ def punto_en_poligono(punto, poligono):
     return dentro
 
 
+def punto_en_circulo(punto, centro, radio_px):
+    """True si `punto` (x, y) cae dentro del círculo de centro `centro`
+    (x, y) y radio `radio_px`, ya en píxeles. `radio_px` None o <= 0 nunca
+    contiene nada (ej. cámara sin calibrar, ver Camara.px_por_metro)."""
+    if radio_px is None or radio_px <= 0:
+        return False
+    x, y = punto
+    cx, cy = centro
+    return (x - cx) ** 2 + (y - cy) ** 2 <= radio_px**2
+
+
+def punto_en_zona(punto, zona, px_por_metro=None):
+    """Dispatch según zona.tipo: polígono (por defecto) o punto+radio real
+    (necesita que la cámara esté calibrada — px_por_metro no None)."""
+    if zona.tipo == zona.Tipo.PUNTO_RADIO:
+        if zona.centro_x is None or zona.centro_y is None or zona.radio_metros is None or not px_por_metro:
+            return False
+        radio_px = zona.radio_metros * px_por_metro
+        return punto_en_circulo(punto, (zona.centro_x, zona.centro_y), radio_px)
+    return punto_en_poligono(punto, zona.poligono)
+
+
 def _regla_vigente(regla, momento):
     """True si `regla` está activa para el día/hora de `momento`.
 
@@ -65,8 +87,9 @@ def evaluar_zona_horario(camara, punto, momento=None):
     """
     momento = momento or timezone.localtime()
 
+    px_por_metro = camara.px_por_metro
     for zona in camara.zonas.filter(activa=True).prefetch_related("reglas"):
-        if not punto_en_poligono(punto, zona.poligono):
+        if not punto_en_zona(punto, zona, px_por_metro):
             continue
         for regla in zona.reglas.filter(activa=True):
             if _regla_vigente(regla, momento):

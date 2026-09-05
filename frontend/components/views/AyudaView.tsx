@@ -164,14 +164,35 @@ const TEMAS: Tema[] = [
           Acá se dibuja, sobre la foto de cada cámara, el área exacta donde no debería haber nadie (zona
           restringida), y se configura cuándo eso dispara una alerta.
         </P>
-        <Sub>Dibujar una zona</Sub>
+        <Sub>Dibujar una zona (tipo Polígono)</Sub>
         <Ol>
           <li>Elegir la cámara. Si todavía no tiene foto de referencia, subirla primero (botón en esta
             misma vista).</li>
+          <li>Botón <strong>&quot;+ Nueva zona&quot;</strong> y dejar seleccionado <strong>Polígono</strong>.</li>
           <li>Clic sobre la imagen para ir marcando los vértices del polígono — con 3 o más puntos ya se
             puede cerrar la zona.</li>
           <li>Ponerle un nombre a la zona (ej. &quot;Zona de carga&quot;).</li>
         </Ol>
+        <Sub>Zona tipo &quot;Punto y radio&quot; (distancia real a algo que se mueve)</Sub>
+        <P>
+          Para reglas como &quot;nadie a menos de 3 metros de la estiba&quot;, cuando ese objeto se puede mover
+          de sitio y no se quiere redibujar el polígono cada vez.
+        </P>
+        <Ol>
+          <li>Primero, <strong>calibrar la cámara una sola vez</strong>: botón &quot;Calibrar cámara&quot;
+            (arriba de la foto) → hacer clic en dos puntos de una distancia real conocida en la foto (ej. el
+            ancho de la estiba, o dos baldosas del piso) → escribir esa distancia en metros → &quot;Guardar
+            calibración&quot;. El texto debajo del título muestra si la cámara ya está calibrada.</li>
+          <li>Botón <strong>&quot;+ Nueva zona&quot;</strong> → elegir <strong>&quot;Punto y radio&quot;</strong> →
+            un solo clic sobre la imagen para marcar el centro (ej. donde está la estiba hoy) — un clic nuevo
+            mueve el punto.</li>
+          <li>Escribir el <strong>radio en metros</strong> (ej. 3) y el nombre de la zona.</li>
+        </Ol>
+        <Nota tipo="aviso">
+          Si el objeto de referencia se mueve de sitio, no hay que redibujar nada: solo entrar de nuevo a la
+          zona y marcar el nuevo punto con un clic. Y si la cámara nunca se calibra, estas zonas no disparan
+          alerta — el aviso debajo del título de la foto lo indica.
+        </Nota>
         <Sub>Reglas de horario</Sub>
         <P>Cada zona puede tener una o varias reglas — cada regla define:</P>
         <Ul>

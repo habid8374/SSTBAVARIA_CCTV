@@ -20,6 +20,7 @@ from core.permissions import EsAdministrador, EsAdministradorOSoloLectura
 from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
 from .serializers import (
     CamaraActivaSerializer,
+    CamaraCalibracionSerializer,
     CamaraCrearSerializer,
     CamaraDashboardSerializer,
     ConfiguracionNotificacionesSerializer,
@@ -243,6 +244,34 @@ def subir_snapshot_referencia(request, pk):
     entrada.is_valid(raise_exception=True)
     camara.snapshot_referencia = entrada.validated_data["snapshot_referencia"]
     camara.save(update_fields=["snapshot_referencia"])
+    return Response(CamaraDashboardSerializer(camara, context={"request": request}).data)
+
+
+@api_view(["POST"])
+@permission_classes([EsAdministrador])
+def calibrar_camara(request, pk):
+    """Guarda la calibración de una cámara: dos puntos marcados sobre el
+    snapshot de referencia y la distancia real (en metros) entre ellos —
+    con eso, Camara.px_por_metro queda disponible para las zonas tipo
+    "punto y radio" (ver services.punto_en_zona)."""
+    camara = get_object_or_404(Camara, pk=pk)
+    entrada = CamaraCalibracionSerializer(data=request.data)
+    entrada.is_valid(raise_exception=True)
+    (x1, y1), (x2, y2) = entrada.validated_data["punto1"], entrada.validated_data["punto2"]
+    camara.calibracion_punto1_x = x1
+    camara.calibracion_punto1_y = y1
+    camara.calibracion_punto2_x = x2
+    camara.calibracion_punto2_y = y2
+    camara.calibracion_distancia_metros = entrada.validated_data["distancia_metros"]
+    camara.save(
+        update_fields=[
+            "calibracion_punto1_x",
+            "calibracion_punto1_y",
+            "calibracion_punto2_x",
+            "calibracion_punto2_y",
+            "calibracion_distancia_metros",
+        ]
+    )
     return Response(CamaraDashboardSerializer(camara, context={"request": request}).data)
 
 

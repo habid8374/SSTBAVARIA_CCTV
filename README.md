@@ -451,7 +451,8 @@ eliminar) requiere rol Administrador.
 | `PATCH /api/camaras-ia/dashboard/eventos/<id>/` | Marcar un evento como revisado (o de vuelta a nuevo) |
 | `GET /api/camaras-ia/dashboard/camaras/` | Cámaras con sus zonas y el último evento — usado por Cámaras IA y por el editor de Zonas |
 | `POST /api/camaras-ia/dashboard/camaras/<id>/snapshot-referencia/` | Sube/reemplaza el encuadre fijo sobre el que se dibujan las zonas (multipart, campo `snapshot_referencia`) |
-| `GET/POST /api/camaras-ia/dashboard/zonas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/zonas/<id>/` | CRUD de `ZonaRestringida` — el polígono se dibuja haciendo clic sobre el snapshot de referencia, en las mismas coordenadas de píxel de esa imagen |
+| `POST /api/camaras-ia/dashboard/camaras/<id>/calibrar/` | Calibra la cámara: `punto1`/`punto2` (píxeles) + `distancia_metros` real entre ellos → calcula `Camara.px_por_metro`, usado por las zonas tipo Punto y radio |
+| `GET/POST /api/camaras-ia/dashboard/zonas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/zonas/<id>/` | CRUD de `ZonaRestringida` — tipo Polígono (se dibuja haciendo clic sobre el snapshot de referencia, en las mismas coordenadas de píxel de esa imagen) o tipo Punto y radio (`centro_x`/`centro_y` + `radio_metros`, requiere la cámara calibrada) |
 | `GET/POST /api/camaras-ia/dashboard/reglas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/reglas/<id>/` | CRUD de `ReglaAlerta` (horario/días/canal/destinatario) de una zona |
 
 ### Endpoints de `contratistas` (autenticados por token de usuario)
@@ -505,7 +506,11 @@ creado ahí.
   empresa.
 - **Editor de zonas**: en "Zonas y horarios", selecciona una cámara, sube su
   snapshot de referencia si no tiene, y haz clic sobre la imagen para ir
-  agregando los vértices del polígono (mínimo 3). Las coordenadas se
+  agregando los vértices del polígono (mínimo 3) — o, tipo "Punto y radio",
+  marca un solo punto (ej. una estiba) y un radio en metros reales, útil si
+  ese punto se puede mover sin tener que redibujar nada. Este segundo tipo
+  necesita calibrar la cámara antes (botón "Calibrar cámara": marcar 2
+  puntos y decir la distancia real entre ellos). Las coordenadas se
   guardan en el sistema de píxeles naturales de esa imagen — el mismo que
   debe usar el equipo local al reportar `punto_x`/`punto_y` de un evento.
 - **Responsive**: sidebar fijo y colapsable en desktop, drawer deslizante en
