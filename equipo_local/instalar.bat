@@ -52,8 +52,8 @@ if not exist ".env" (
     echo ERROR: No se encontro el archivo .env en esta carpeta.
     echo.
     echo Descargalo desde el dashboard: Sistema -^> Equipo local -^> boton
-    echo "Descargar .env", y colocalo en esta misma carpeta (junto a este
-    echo instalador) antes de volver a correrlo.
+    echo "Descargar equipo_local .zip" de la fila del equipo -^> vuelve a
+    echo descomprimirlo, junto con este instalador, y correlo de nuevo.
     pause
     exit /b 1
 )
