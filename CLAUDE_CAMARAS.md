@@ -78,13 +78,18 @@ detección. **Debe quedar siempre apagado** en cada cámara que se configure
 para este sistema — si alguien lo prende sin saber, rompe la calibración
 de zonas de esa cámara.
 
+### ✅ Confirmado con hardware real: el RTSP conecta con el patrón por defecto
+
+Probado con VLC contra la DH-P3B-PV real en la red local, usuario `admin` y
+la contraseña del dispositivo (no la de la cuenta DMSS/cloud, son cosas
+distintas): `rtsp://admin:contraseña@IP:554/cam/realmonitor?channel=1&subtype=1`
+— **el mismo patrón exacto que ya arma `Camara.rtsp_url_efectiva` por
+defecto**. Video en vivo confirmado en VLC — no hace falta tocar el campo
+`rtsp_url` explícito para esta cámara, con solo IP + usuario + contraseña
+alcanza.
+
 ### Pendiente de verificar con hardware real
 
-- Que la URL RTSP por defecto (`Camara.rtsp_url_efectiva`) realmente
-  conecte con la Picoo B1 tal cual (probar con VLC:
-  `rtsp://usuario:password@IP:554/cam/realmonitor?channel=1&subtype=1`)
-  — o si hace falta ajustar el patrón (puerto, canal, subtype) o usar el
-  campo `rtsp_url` explícito.
 - Calidad real de la detección YOLOv8n con la cámara instalada: iluminación
   del sitio, ángulo, distancia, y si `subtype=1` (substream) da suficiente
   resolución o hace falta el canal principal.
