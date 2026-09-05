@@ -13,21 +13,44 @@ import sys
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv
 
-# Ruta explícita (no la búsqueda automática por defecto de load_dotenv, que
-# parte de la carpeta de trabajo actual) — así el .env se encuentra sin
-# importar con qué carpeta de trabajo se haya arrancado el proceso (ver
-# windows/instalar_tarea_programada.ps1 y systemd/equipo-local-camaras.service:
-# la carpeta de trabajo tiene que ser la carpeta *padre* de este paquete
-# para que "python -m equipo_local.main" se pueda importar).
-load_dotenv(Path(__file__).resolve().parent / ".env")
+def _configurar_logging(nivel="INFO"):
+    """Corre como Tarea Programada sin ventana (pythonw.exe): sys.stderr no
+    existe ahí, así que un logging.basicConfig() normal (StreamHandler a
+    stderr) no imprime nada en ningún lado y cualquier error se pierde en
+    silencio. Por eso siempre se agrega un archivo — equipo_local.log, junto
+    a este script — que sí persiste sin importar cómo se esté corriendo.
+    Se llama al importar este módulo (no solo dentro de main()) para que ni
+    siquiera un error temprano al importar una dependencia (ej. cv2) se
+    pierda sin dejar rastro."""
+    directorio = Path(__file__).resolve().parent
+    handlers = [logging.FileHandler(directorio / "equipo_local.log", encoding="utf-8")]
+    if sys.stderr is not None:
+        handlers.append(logging.StreamHandler())
+    logging.basicConfig(level=nivel, format="%(asctime)s %(levelname)s %(name)s: %(message)s", handlers=handlers)
 
-from .camara import CamaraMonitor  # noqa: E402
-from .cliente_api import ClienteApi, ErrorApi  # noqa: E402
-from .config import Config  # noqa: E402
 
+_configurar_logging()
 logger = logging.getLogger("equipo_local.main")
+
+try:
+    from dotenv import load_dotenv
+
+    # Ruta explícita (no la búsqueda automática por defecto de load_dotenv,
+    # que parte de la carpeta de trabajo actual) — así el .env se encuentra
+    # sin importar con qué carpeta de trabajo se haya arrancado el proceso
+    # (ver windows/instalar_tarea_programada.ps1 y
+    # systemd/equipo-local-camaras.service: la carpeta de trabajo tiene que
+    # ser la carpeta *padre* de este paquete para que
+    # "python -m equipo_local.main" se pueda importar).
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+
+    from .camara import CamaraMonitor
+    from .cliente_api import ClienteApi, ErrorApi
+    from .config import Config
+except Exception:
+    logger.exception("Error importando una dependencia — el programa se detiene.")
+    sys.exit(1)
 
 
 class SincronizadorCamaras:
@@ -71,23 +94,8 @@ class SincronizadorCamaras:
         self.monitores.clear()
 
 
-def _configurar_logging():
-    """Corre como Tarea Programada sin ventana (pythonw.exe): sys.stderr no
-    existe ahí, así que un logging.basicConfig() normal (StreamHandler a
-    stderr) no imprime nada en ningún lado y cualquier error se pierde en
-    silencio. Por eso siempre se agrega un archivo — equipo_local.log, junto
-    a este script — que sí persiste sin importar cómo se esté corriendo."""
-    directorio = Path(__file__).resolve().parent
-    handlers = [logging.FileHandler(directorio / "equipo_local.log", encoding="utf-8")]
-    if sys.stderr is not None:
-        handlers.append(logging.StreamHandler())
-    logging.basicConfig(
-        level=Config.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s: %(message)s", handlers=handlers
-    )
-
-
 def main():
-    _configurar_logging()
+    logging.getLogger().setLevel(Config.LOG_LEVEL)  # el bootstrap arrancó en INFO; ya se puede ajustar
     try:
         Config.validar()
     except ValueError as err:
@@ -145,5 +153,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        logging.getLogger("equipo_local.main").exception("Error fatal no manejado — el programa se detiene.")
+        logger.exception("Error fatal no manejado — el programa se detiene.")
         sys.exit(1)

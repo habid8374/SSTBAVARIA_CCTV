@@ -10,3 +10,4 @@ db.sqlite3
 *.env
 .env
 equipo_local/grabaciones/
+equipo_local/*.log
