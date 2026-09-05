@@ -155,8 +155,8 @@ evento — y aparecer casi al instante en la bandeja de Alertas del dashboard.
 ```bash
 sudo mkdir -p /opt/sstbavaria-camaras
 sudo cp -r . /opt/sstbavaria-camaras/equipo_local
-sudo cp .env /opt/sstbavaria-camaras/.env
-cd /opt/sstbavaria-camaras && sudo python -m venv venv && sudo ./venv/bin/pip install -r equipo_local/requirements.txt
+sudo cp .env /opt/sstbavaria-camaras/equipo_local/.env
+cd /opt/sstbavaria-camaras/equipo_local && sudo python -m venv venv && sudo ./venv/bin/pip install -r requirements.txt
 
 sudo cp equipo_local/systemd/equipo-local-camaras.service /etc/systemd/system/
 sudo systemctl daemon-reload
