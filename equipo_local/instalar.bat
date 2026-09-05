@@ -17,8 +17,12 @@ REM ============================================================
 
 REM --- Pedir permisos de Administrador si hace falta (los necesita
 REM     la Tarea Programada) - vuelve a abrirse solo, pidiendo el
-REM     permiso de Windows.
-net session >nul 2>&1
+REM     permiso de Windows. Se usa "fsutil dirty query" en vez de
+REM     "net session" para detectar el permiso: "net session" depende
+REM     de un servicio de Windows (Servidor) que en algunos PCs esta
+REM     apagado, y ahi falla siempre aunque ya seas Administrador -
+REM     "fsutil dirty query" no depende de ningun servicio.
+fsutil dirty query %systemdrive% >nul 2>&1
 if not "%errorlevel%"=="0" (
     echo Pidiendo permisos de Administrador...
     powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
