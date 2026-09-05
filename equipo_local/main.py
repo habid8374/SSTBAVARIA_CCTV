@@ -11,6 +11,7 @@ import logging
 import signal
 import sys
 import time
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -65,7 +66,18 @@ class SincronizadorCamaras:
 
 
 def _configurar_logging():
-    logging.basicConfig(level=Config.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    """Corre como Tarea Programada sin ventana (pythonw.exe): sys.stderr no
+    existe ahí, así que un logging.basicConfig() normal (StreamHandler a
+    stderr) no imprime nada en ningún lado y cualquier error se pierde en
+    silencio. Por eso siempre se agrega un archivo — equipo_local.log, junto
+    a este script — que sí persiste sin importar cómo se esté corriendo."""
+    directorio = Path(__file__).resolve().parent
+    handlers = [logging.FileHandler(directorio / "equipo_local.log", encoding="utf-8")]
+    if sys.stderr is not None:
+        handlers.append(logging.StreamHandler())
+    logging.basicConfig(
+        level=Config.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s: %(message)s", handlers=handlers
+    )
 
 
 def main():
@@ -124,4 +136,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        logging.getLogger("equipo_local.main").exception("Error fatal no manejado — el programa se detiene.")
+        sys.exit(1)
