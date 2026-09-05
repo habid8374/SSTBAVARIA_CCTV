@@ -1,6 +1,6 @@
 requests==2.32.3
 opencv-python-headless==4.10.0.84
-ultralytics==8.3.0
+ultralytics==8.3.150
 python-dotenv==1.0.1
 flask==3.0.3
 zeroconf==0.151.3
