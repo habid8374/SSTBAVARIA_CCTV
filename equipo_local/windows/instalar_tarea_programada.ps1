@@ -15,7 +15,7 @@ $carpeta = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $carpeta "venv\Scripts\pythonw.exe"
 
 if (-not (Test-Path $python)) {
-    Write-Error "No se encontró $python — crea antes el entorno virtual (ver README.md)."
+    Write-Error "No se encontro $python - crea antes el entorno virtual (ver README.md)."
     exit 1
 }
 
@@ -30,7 +30,7 @@ Register-ScheduledTask `
     -Trigger $disparador `
     -Settings $configuracion `
     -Principal $principal `
-    -Description "Equipo local de camaras IA de SST Bavaria — detecta personas en zonas restringidas y reporta al dashboard." `
+    -Description "Equipo local de camaras IA de SST Bavaria - detecta personas en zonas restringidas y reporta al dashboard." `
     -Force
 
 Write-Host "Tarea programada registrada. Se puede iniciar ahora con:"

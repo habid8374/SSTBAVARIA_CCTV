@@ -8,7 +8,7 @@ REM
 REM  Que hace: crea el entorno, instala las dependencias, registra
 REM  el programa como Tarea Programada (arranca solo con el PC) y
 REM  lo deja corriendo ya mismo. Es seguro correrlo varias veces
-REM  (por ejemplo despues de una actualizacion) — no duplica nada.
+REM  (por ejemplo despues de una actualizacion) - no duplica nada.
 REM
 REM  Requisito unico, de una sola vez en este PC: tener Python
 REM  instalado (ver mensaje de error abajo si falta). Todo lo demas
@@ -16,7 +16,7 @@ REM  lo hace este script solo.
 REM ============================================================
 
 REM --- Pedir permisos de Administrador si hace falta (los necesita
-REM     la Tarea Programada) — vuelve a abrirse solo, pidiendo el
+REM     la Tarea Programada) - vuelve a abrirse solo, pidiendo el
 REM     permiso de Windows.
 net session >nul 2>&1
 if not "%errorlevel%"=="0" (
@@ -61,13 +61,13 @@ if not exist "venv" (
     echo [1/4] El entorno ya existia, se reutiliza.
 )
 
-echo [2/4] Instalando dependencias — la primera vez puede tardar varios
+echo [2/4] Instalando dependencias - la primera vez puede tardar varios
 echo       minutos, es normal. No cierres esta ventana.
 ".\venv\Scripts\python.exe" -m pip install --upgrade pip >nul
 ".\venv\Scripts\pip.exe" install -r requirements.txt
 if errorlevel 1 (
     echo.
-    echo ERROR instalando las dependencias — revisa el mensaje de arriba.
+    echo ERROR instalando las dependencias - revisa el mensaje de arriba.
     pause
     exit /b 1
 )
@@ -76,7 +76,7 @@ echo [3/4] Registrando el programa para que arranque solo con el PC...
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\windows\instalar_tarea_programada.ps1"
 if errorlevel 1 (
     echo.
-    echo ERROR registrando la tarea programada — revisa el mensaje de arriba.
+    echo ERROR registrando la tarea programada - revisa el mensaje de arriba.
     pause
     exit /b 1
 )
