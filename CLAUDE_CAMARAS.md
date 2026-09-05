@@ -38,22 +38,22 @@ que no se mezclan:
 
 ## Cámara de referencia
 
-**Comprada y en uso: Dahua Picoo B1** — modelos `DH-P5B-PV` (5MP) /
-`DH-P3B-PV` (3MP), misma familia Wi-Fi de consumo/prosumer que la Picoo A2
-(evaluada antes, ver abajo, pero no la que se terminó comprando).
-Investigado por Claude (fuentes: foro IPCamTalk, datasheet oficial Dahua,
-septiembre 2026 — no es info verificada en sitio con hardware real, solo
-lectura de manuales/comunidad):
+**Comprada y en uso: Dahua Picoo B1, modelo `DH-P3B-PV` (3MP)** — misma
+familia Wi-Fi de consumo/prosumer que la Picoo A2 (evaluada antes, ver
+abajo, pero no la que se terminó comprando). Encendida y configurada por
+primera vez en septiembre 2026 (ver verificaciones confirmadas abajo);
+el resto es investigación de fuentes externas (foro IPCamTalk, datasheet
+oficial Dahua) sin confirmar en sitio:
 
-- Wi-Fi 2.4GHz + Ethernet 10/100 (RJ-45), pan 0°-355° / tilt 0°-90°, sensor
-  1/3" 2880×1620 (5MP), IR nocturno hasta 30m + luz LED inteligente.
-- Detección de humano/vehículo con IA propia + **seguimiento automático**
-  (la cámara se mueve sola al detectar a alguien) y rutas de patrullaje
-  configurables — ver el riesgo importante más abajo.
+- Wi-Fi 2.4GHz + Ethernet 10/100 (RJ-45), movimiento motorizado pan/tilt,
+  IR nocturno + luz LED inteligente.
+- Detección de humano/vehículo con IA propia, con seguimiento automático
+  **disponible pero desactivable** — ver verificación confirmada abajo.
 - **RTSP sí soportado**: puerto 554, formato estándar Dahua
   `rtsp://usuario:password@IP:554/cam/realmonitor?channel=1&subtype=1`
   — el mismo patrón que ya usa por defecto `Camara.rtsp_url_efectiva`, así
-  que en teoría no hace falta tocar código, solo registrar IP/credenciales.
+  que en teoría no hace falta tocar código, solo registrar IP/credenciales
+  (pendiente de probar con VLC, ver abajo).
 - **ONVIF sí soportado** (a diferencia de la Picoo A2, donde probablemente
   no lo está) — no lo usa el equipo local hoy (toma RTSP directo), pero
   deja la puerta abierta a simplificar más adelante si hiciera falta.
@@ -64,30 +64,27 @@ lectura de manuales/comunidad):
   corre la detección con un modelo propio (YOLOv8n) en el mini-PC del
   sitio, en vez de recibir eventos nativos de la cámara.
 
-### ⚠️ Riesgo a verificar antes que nada: seguimiento automático
+### ✅ Confirmado con hardware real: el seguimiento automático se puede apagar
 
-Tanto la Picoo B1 (comprada) como la A2 (evaluada antes) tienen **IA de
-seguimiento automático**: la cámara se mueve sola para seguir a la persona
-detectada. Esto es un problema serio para este sistema en particular,
-porque las zonas restringidas (`ZonaRestringida.poligono`) se dibujan sobre
-una **foto fija de referencia** (`Camara.snapshot_referencia`) — si la
-cámara se mueve sola, el encuadre del stream en vivo deja de coincidir con
-esa foto, y las coordenadas de zona quedan mal calibradas justo cuando hay
-alguien delante (que es cuando más importa). No se encontró documentación
-que confirme si ese seguimiento se puede desactivar desde la app DMSS —
-**es lo primero que hay que probar con la cámara real**, antes que el RTSP:
-buscar en el menú de la cámara (DMSS) algo como "Auto Tracking"/"Target
-Tracking" y apagarlo. Si no se puede apagar, esta serie de cámaras no sirve
-tal cual para el enfoque de zonas fijas de este sistema, y habría que
-evaluar un modelo sin seguimiento automático (fijo o PTZ manual).
+Era el riesgo más urgente de este proyecto (ver historial): si la cámara
+se mueve sola para seguir a una persona, el encuadre en vivo deja de
+coincidir con la foto de referencia sobre la que se dibujan las zonas
+restringidas, y la detección de zonas queda mal calibrada. **Confirmado en
+la DH-P3B-PV real** (app DMSS → dispositivo → **IA** → pestaña
+**Detección**): hay un interruptor **"Seguimiento automático"** ("Sigue y
+enfoca los objetivos mientras se mueven"), separado de los interruptores
+de detección de Humano/Vehículo — se puede dejar apagado sin perder la
+detección. **Debe quedar siempre apagado** en cada cámara que se configure
+para este sistema — si alguien lo prende sin saber, rompe la calibración
+de zonas de esa cámara.
 
-### Pendiente de verificar con hardware real (no se puede probar en este entorno)
+### Pendiente de verificar con hardware real
 
-- **Que el seguimiento automático se pueda desactivar** (ver arriba) — el
-  más urgente de verificar, condiciona si esta cámara sirve del todo.
 - Que la URL RTSP por defecto (`Camara.rtsp_url_efectiva`) realmente
-  conecte con la Picoo B1 tal cual — o si hace falta ajustar el patrón
-  (puerto, canal, subtype) o usar el campo `rtsp_url` explícito.
+  conecte con la Picoo B1 tal cual (probar con VLC:
+  `rtsp://usuario:password@IP:554/cam/realmonitor?channel=1&subtype=1`)
+  — o si hace falta ajustar el patrón (puerto, canal, subtype) o usar el
+  campo `rtsp_url` explícito.
 - Calidad real de la detección YOLOv8n con la cámara instalada: iluminación
   del sitio, ángulo, distancia, y si `subtype=1` (substream) da suficiente
   resolución o hace falta el canal principal.

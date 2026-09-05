@@ -136,8 +136,9 @@ const TEMAS: Tema[] = [
         </Ol>
         <Nota tipo="aviso">
           Con cámaras Dahua Picoo (A2/B1, las que usa este proyecto): antes de registrarla acá, entrar a la
-          app DMSS y <strong>apagar el seguimiento automático</strong> (&quot;Auto Tracking&quot;/&quot;Target
-          Tracking&quot;). Si la cámara se mueve sola al detectar a alguien, el encuadre en vivo deja de
+          app DMSS → <strong>IA → Detección</strong> y confirmar que{" "}
+          <strong>&quot;Seguimiento automático&quot;</strong> esté apagado (viene como un interruptor aparte
+          de Humano/Vehículo). Si la cámara se mueve sola al detectar a alguien, el encuadre en vivo deja de
           coincidir con la foto de referencia de abajo, y las zonas restringidas quedan mal calibradas justo
           cuando hay alguien delante.
         </Nota>

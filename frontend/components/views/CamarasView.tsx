@@ -282,10 +282,11 @@ function FormularioCamara({
         {!camara && (
           <div className="mt-3">
             <Nota tipo="aviso">
-              Si es una Dahua Picoo (A2 o B1): antes de registrarla acá, entra a la app DMSS y{" "}
-              <strong>apaga el seguimiento automático</strong> (&quot;Auto Tracking&quot;/&quot;Target
-              Tracking&quot;). Si la cámara se mueve sola al detectar a alguien, el encuadre deja de
-              coincidir con la foto de referencia y las zonas restringidas quedan mal calibradas.
+              Si es una Dahua Picoo (A2 o B1): antes de registrarla acá, entra a la app DMSS →{" "}
+              <strong>IA → Detección</strong> y confirma que{" "}
+              <strong>&quot;Seguimiento automático&quot;</strong> esté apagado. Si la cámara se mueve sola al
+              detectar a alguien, el encuadre deja de coincidir con la foto de referencia y las zonas
+              restringidas quedan mal calibradas.
             </Nota>
           </div>
         )}
