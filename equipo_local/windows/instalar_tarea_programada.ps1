@@ -27,7 +27,12 @@ if (-not (Test-Path $python)) {
 # esto (ver main.py: el .env se carga con ruta explicita).
 $accion = New-ScheduledTaskAction -Execute $python -Argument "-m equipo_local.main" -WorkingDirectory $carpeta_padre
 $disparador = New-ScheduledTaskTrigger -AtStartup
-$configuracion = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable
+# MultipleInstances StopExisting: por defecto Windows es "IgnoreNew" — si
+# Windows cree que ya hay una instancia corriendo (aunque este colgada de
+# un intento anterior), un "Ejecutar" manual o el disparador de arranque no
+# hacen nada. Con StopExisting, cada intento de arrancar mata la instancia
+# vieja primero y arranca una limpia, sin ambiguedad.
+$configuracion = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable -MultipleInstances StopExisting
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
 Register-ScheduledTask `
@@ -38,6 +43,11 @@ Register-ScheduledTask `
     -Principal $principal `
     -Description "Equipo local de camaras IA de SST Bavaria - detecta personas en zonas restringidas y reporta al dashboard." `
     -Force
+
+# Activa el historial de tareas de Windows (viene deshabilitado por
+# defecto) — asi la pestana "Historial" del Programador de tareas muestra
+# los intentos reales y sus errores, en vez de aparecer vacia.
+wevtutil sl Microsoft-Windows-TaskScheduler/Operational /e:true 2>$null
 
 Write-Host "Tarea programada registrada. Se puede iniciar ahora con:"
 Write-Host "  Start-ScheduledTask -TaskName SSTBavaria-EquipoLocalCamaras"
