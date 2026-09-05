@@ -624,14 +624,16 @@ const TEMAS: Tema[] = [
         <Sub>Equipo local</Sub>
         <P>
           Acá se registra cada PC físico dedicado que corre el programa <Mono>equipo_local</Mono> en sitio
-          (no hace falta un DVR/NVR, sirve cualquier PC/mini-PC común). Botón{" "}
-          <strong>&quot;Copiar&quot;</strong> junto al API key: copia la clave de ese equipo para pegarla en
-          el <Mono>.env</Mono> (renombrado desde <Mono>.env.example</Mono>, dentro del <Mono>.zip</Mono>
-          descargado) — con eso, más doble clic en el instalador de un clic (<Mono>instalar.bat</Mono> en
-          Windows, <Mono>instalar.sh</Mono> en Linux/Mac), queda todo instalado y corriendo solo, sin
-          necesidad de saber de líneas de comando. El badge <strong>Conectado</strong> se pone verde cuando
-          ese equipo sincronizó hace menos de 5 minutos. Ver el tema <strong>&quot;El equipo local&quot;</strong>{" "}
-          más abajo para el flujo completo de cómo se conecta a las cámaras y cómo ver el video en vivo.
+          (no hace falta un DVR/NVR, sirve cualquier PC/mini-PC común). En la fila de cada equipo, botón{" "}
+          <strong>&quot;Descargar equipo_local (.zip)&quot;</strong>: trae la carpeta completa del programa
+          con un <Mono>.env</Mono> ya completo adentro (URL del backend + <Mono>api_key</Mono> de ese equipo
+          en particular) — no hay que editar ni pegar nada a mano. Con eso, más doble clic en el instalador
+          de un clic (<Mono>instalar.bat</Mono> en Windows, <Mono>instalar.sh</Mono> en Linux/Mac), queda
+          todo instalado y corriendo solo, sin necesidad de saber de líneas de comando. El botón{" "}
+          <strong>&quot;Copiar&quot;</strong> junto al API key sigue disponible por si se prefiere el modo
+          manual. El badge <strong>Conectado</strong> se pone verde cuando ese equipo sincronizó hace menos
+          de 5 minutos. Ver el tema <strong>&quot;El equipo local&quot;</strong> más abajo para el flujo
+          completo de cómo se conecta a las cámaras y cómo ver el video en vivo.
         </P>
         <Sub>Reglas de contratistas</Sub>
         <P>
@@ -808,20 +810,16 @@ const TEMAS: Tema[] = [
           <li>Con un usuario Administrador, ir a <strong>Sistema → Equipo local</strong>.</li>
           <li>Botón <strong>&quot;+ Nuevo equipo&quot;</strong> → ponerle un nombre que lo identifique (ej.
             &quot;Cámaras Planta Tocancipá&quot;) → guardar.</li>
-          <li>Botón <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> (arriba de la tabla) — trae la
-            carpeta completa del programa, lista para copiar al PC de la planta.</li>
-          <li>En la fila de ese equipo recién creado, botón <strong>&quot;Copiar&quot;</strong> junto al API
-            key — queda copiado en el portapapeles para pegarlo en el paso siguiente.</li>
+          <li>En la fila de ese equipo recién creado, botón{" "}
+            <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> — trae la carpeta completa del
+            programa, lista para copiar al PC de la planta, con un <Mono>.env</Mono> ya completo adentro
+            (URL del backend + API key de ese equipo) — no hay que editar ni pegar nada a mano.</li>
         </Ol>
         <Sub>Paso 3 — Instalar y dejarlo corriendo</Sub>
         <Ol>
           <li>En el PC de la planta, descomprimir el <Mono>.zip</Mono> del paso anterior (clic derecho →
             &quot;Extraer todo&quot; en Windows) en cualquier ubicación cómoda (ej. el Escritorio o
-            &quot;Documentos&quot;) — queda una carpeta <Mono>equipo_local</Mono>.</li>
-          <li>Dentro de esa carpeta, renombrar el archivo <Mono>.env.example</Mono> a <Mono>.env</Mono>
-            (quitar el <Mono>.example</Mono>) y pegar el API key copiado en la línea{" "}
-            <Mono>API_KEY=</Mono> (sin espacios ni comillas) — la URL del backend ya viene puesta por
-            defecto, no hace falta tocarla.</li>
+            &quot;Documentos&quot;) — queda una carpeta <Mono>equipo_local</Mono> con todo listo adentro.</li>
           <li><strong>Windows</strong>: doble clic en <Mono>instalar.bat</Mono> (está dentro de la carpeta{" "}
             <Mono>equipo_local</Mono>). Windows va a preguntar &quot;¿Permitir que esta app haga cambios en tu
             dispositivo?&quot; — clic en <strong>&quot;Sí&quot;</strong>, es normal y necesario (así el

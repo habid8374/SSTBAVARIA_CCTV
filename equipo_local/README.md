@@ -60,14 +60,12 @@ siempre que el PC ya tenga Python instalado (una sola vez, ver abajo).
 
 1. En el dashboard: sección **Sistema → Equipo local** → **"+ Nuevo
    equipo"** → ponerle un nombre (ej. "Cámaras Planta Tocancipá").
-2. Botón **"Descargar equipo_local (.zip)"** (arriba de la tabla, no hace
-   falta acceso al repositorio de código) y, en la fila del equipo recién
-   creado, botón **"Copiar"** junto al `api_key`.
+2. En la fila de ese equipo recién creado, botón **"Descargar equipo_local
+   (.zip)"** — no hace falta acceso al repositorio de código, y el `.zip`
+   ya trae un archivo `.env` completo (URL del backend + `api_key` de ese
+   equipo en particular) — no hay que editar ni pegar nada a mano.
 3. En el PC de la planta, descomprimir el `.zip` (clic derecho → "Extraer
-   todo" en Windows) en cualquier ubicación cómoda. Dentro de la carpeta,
-   renombrar `.env.example` a `.env` y pegar ahí el `api_key` copiado (en
-   la línea `API_KEY=`, sin espacios ni comillas) — la URL del backend ya
-   viene puesta por defecto.
+   todo" en Windows) en cualquier ubicación cómoda.
 4. **Windows**: doble clic en **`instalar.bat`**. Va a pedir permiso de
    Administrador (normal, aceptar) y, si es la primera vez, puede tardar
    varios minutos instalando — no hay que hacer nada más, ni cerrar la

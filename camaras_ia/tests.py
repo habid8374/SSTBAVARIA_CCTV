@@ -479,6 +479,7 @@ class DashboardEndpointsTests(TestCase):
         self.evento = EventoDetectado.objects.create(
             camara=self.camara, zona=self.zona, punto_x=5, punto_y=5, disparo_alerta=True
         )
+        self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
 
     def _token(self, user):
         response = self.client.post(
@@ -740,7 +741,7 @@ class DashboardEndpointsTests(TestCase):
         EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
         response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.operador))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data), 2)  # el de setUp + el de este test
         self.assertIn("api_key", response.data[0])
 
     def test_operador_no_puede_crear_equipo_local(self):
@@ -813,7 +814,8 @@ class DashboardEndpointsTests(TestCase):
 
     def test_operador_puede_descargar_el_zip_de_equipo_local(self):
         response = self.client.get(
-            reverse("camaras_ia:equipos_locales_descargar_zip"), **self._auth(self.operador)
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.operador),
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/zip")
@@ -822,18 +824,43 @@ class DashboardEndpointsTests(TestCase):
         self.assertIn("equipo_local/instalar.bat", nombres)
         self.assertIn("equipo_local/instalar.sh", nombres)
         self.assertIn("equipo_local/main.py", nombres)
+        self.assertIn("equipo_local/.env", nombres)
+        self.assertNotIn("equipo_local/.env.example", nombres)
         self.assertTrue(all(not n.startswith("equipo_local/venv/") for n in nombres))
         self.assertTrue(all("__pycache__" not in n for n in nombres))
         self.assertTrue(all(not n.startswith("equipo_local/tests/") for n in nombres))
         self.assertTrue(all(not n.startswith("equipo_local/grabaciones/") for n in nombres))
 
+    def test_env_generado_trae_url_y_api_key_reales(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.admin),
+        )
+        contenido = zipfile.ZipFile(io.BytesIO(response.content))
+        env = contenido.read("equipo_local/.env").decode("utf-8")
+        self.assertIn(f"API_KEY={self.equipo.api_key}", env)
+        self.assertIn("API_BASE_URL=http://testserver", env)
+
+    def test_descargar_zip_sin_equipo_id_falla(self):
+        response = self.client.get(reverse("camaras_ia:equipos_locales_descargar_zip"), **self._auth(self.admin))
+        self.assertEqual(response.status_code, 400)
+
+    def test_descargar_zip_con_equipo_id_inexistente_falla(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + "?equipo_id=99999", **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_anonimo_no_puede_descargar_el_zip_de_equipo_local(self):
-        response = self.client.get(reverse("camaras_ia:equipos_locales_descargar_zip"))
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}"
+        )
         self.assertEqual(response.status_code, 401)
 
     def test_zip_de_equipo_local_conserva_el_bit_ejecutable_de_instalar_sh(self):
         response = self.client.get(
-            reverse("camaras_ia:equipos_locales_descargar_zip"), **self._auth(self.admin)
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.admin),
         )
         contenido = zipfile.ZipFile(io.BytesIO(response.content))
         info = contenido.getinfo("equipo_local/instalar.sh")

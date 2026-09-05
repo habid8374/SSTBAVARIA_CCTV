@@ -194,7 +194,7 @@ function EquiposLocales({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
-  const [descargandoZip, setDescargandoZip] = useState(false);
+  const [descargandoZipId, setDescargandoZipId] = useState<number | null>(null);
   const { confirmar } = useDialog();
 
   function cargar() {
@@ -240,14 +240,14 @@ function EquiposLocales({ token }: { token: string }) {
     }
   }
 
-  async function descargarZip() {
-    setDescargandoZip(true);
+  async function descargarZip(equipo: EquipoLocal) {
+    setDescargandoZipId(equipo.id);
     try {
-      await descargarEquipoLocalZip(token);
+      await descargarEquipoLocalZip(token, equipo.id);
     } catch {
       setError("No se pudo descargar el archivo del programa equipo_local.");
     } finally {
-      setDescargandoZip(false);
+      setDescargandoZipId(null);
     }
   }
 
@@ -256,21 +256,14 @@ function EquiposLocales({ token }: { token: string }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
           Cada PC dedicado en sitio que corre <code>equipo_local</code> necesita un registro acá. Lo más
-          simple: botón <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> → descomprimirlo en el PC
-          de la planta → renombrar <code>.env.example</code> a <code>.env</code> → pegar ahí el{" "}
-          <code>api_key</code> de la fila del equipo (botón &quot;Copiar&quot;) → doble clic en{" "}
-          <code>instalar.bat</code> (Windows) o correr <code>./instalar.sh</code> (Linux/Mac) — ese instalador
-          deja todo corriendo solo, sin necesidad de saber de líneas de comando.
+          simple: botón <strong>&quot;+ Nuevo equipo&quot;</strong> → en su fila, botón{" "}
+          <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> (ya trae el <code>.env</code> completo,
+          con la conexión al backend y el <code>api_key</code> de ese equipo — no hay que editar nada) →
+          descomprimirlo en el PC de la planta → doble clic en <code>instalar.bat</code> (Windows) o correr{" "}
+          <code>./instalar.sh</code> (Linux/Mac) — ese instalador deja todo corriendo solo, sin necesidad de
+          saber de líneas de comando.
         </p>
         <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={descargarZip}
-            disabled={descargandoZip}
-            className="rounded-lg border border-corp-border bg-white px-4 py-2 text-sm font-semibold text-corp-navy transition hover:bg-corp-blue-light disabled:opacity-60"
-          >
-            {descargandoZip ? "Descargando…" : "Descargar equipo_local (.zip)"}
-          </button>
           <button
             type="button"
             onClick={() => setMostrarFormulario(true)}
@@ -359,6 +352,14 @@ function EquiposLocales({ token }: { token: string }) {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => descargarZip(equipo)}
+                      disabled={descargandoZipId === equipo.id}
+                      className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy hover:border-corp-blue disabled:opacity-60"
+                    >
+                      {descargandoZipId === equipo.id ? "Descargando…" : "Descargar equipo_local (.zip)"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => alternarActivo(equipo)}

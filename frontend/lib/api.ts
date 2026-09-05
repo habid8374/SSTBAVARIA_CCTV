@@ -517,8 +517,12 @@ export function eliminarEquipoLocal(token: string, id: number): Promise<void> {
   });
 }
 
-export function descargarEquipoLocalZip(token: string): Promise<void> {
-  return descargarArchivo(token, "/api/camaras-ia/dashboard/equipos-locales/descargar-zip/", "equipo_local.zip");
+export function descargarEquipoLocalZip(token: string, equipoId: number): Promise<void> {
+  return descargarArchivo(
+    token,
+    `/api/camaras-ia/dashboard/equipos-locales/descargar-zip/?equipo_id=${equipoId}`,
+    "equipo_local.zip"
+  );
 }
 
 // --- Contratistas: empresas, trabajadores, seguridad social, declaración de método ---

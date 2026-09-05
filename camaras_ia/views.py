@@ -345,16 +345,35 @@ class EquipoLocalDetalle(generics.RetrieveUpdateDestroyAPIView):
 _EQUIPO_LOCAL_EXCLUIR_DEL_ZIP = {"venv", "__pycache__", "grabaciones", "tests", ".pytest_cache"}
 
 
+def _env_real_para_equipo(request, equipo):
+    """Arma el contenido de un .env ya completo (URL del backend + api_key
+    de este equipo en particular) — la persona que instala en el PC de la
+    planta no tiene que editar ni pegar nada a mano."""
+    api_base_url = request.build_absolute_uri("/").rstrip("/")
+    return (
+        "# Generado automáticamente para este equipo — ya viene completo,\n"
+        "# no hace falta editar nada. No lo compartas: trae una API key.\n"
+        "\n"
+        f"API_BASE_URL={api_base_url}\n"
+        f"API_KEY={equipo.api_key}\n"
+    )
+
+
 @api_view(["GET"])
 @permission_classes([EsAdministradorOSoloLectura])
 def descargar_equipo_local_zip(request):
     """Empaqueta la carpeta equipo_local/ (el programa que corre en el PC
-    de la planta) en un .zip listo para copiar a ese PC, junto con el
-    .env descargable de cada equipo — así quien lo instala no necesita
-    acceso al repositorio de código, solo el dashboard. Se arma al vuelo
-    desde el mismo checkout que corre este backend en Railway; excluye lo
-    que no hace falta llevar (entornos virtuales, cachés, grabaciones,
-    tests)."""
+    de la planta) en un .zip listo para copiar a ese PC, con el .env ya
+    completo (URL del backend + api_key) del equipo indicado en
+    ?equipo_id= — así quien lo instala no necesita acceso al repositorio de
+    código ni editar nada a mano, solo el dashboard. Se arma al vuelo desde
+    el mismo checkout que corre este backend en Railway; excluye lo que no
+    hace falta llevar (entornos virtuales, cachés, grabaciones, tests)."""
+    equipo_id = request.query_params.get("equipo_id")
+    if not equipo_id:
+        return Response({"detail": "Falta el parámetro equipo_id."}, status=status.HTTP_400_BAD_REQUEST)
+    equipo = get_object_or_404(EquipoLocal, pk=equipo_id)
+
     carpeta = Path(settings.BASE_DIR) / "equipo_local"
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_archivo:
@@ -364,12 +383,16 @@ def descargar_equipo_local_zip(request):
             partes = ruta.relative_to(carpeta.parent).parts
             if any(parte in _EQUIPO_LOCAL_EXCLUIR_DEL_ZIP or parte.endswith(".pyc") for parte in partes):
                 continue
+            if ruta.name == ".env.example":
+                continue  # se reemplaza por el .env real de abajo
             arcname = str(ruta.relative_to(carpeta.parent))
             info = zipfile.ZipInfo(arcname, date_time=time.localtime(ruta.stat().st_mtime)[:6])
             # Conserva el bit ejecutable (necesario para instalar.sh en Linux/Mac).
             info.external_attr = (ruta.stat().st_mode & 0xFFFF) << 16
             info.compress_type = zipfile.ZIP_DEFLATED
             zip_archivo.writestr(info, ruta.read_bytes())
+
+        zip_archivo.writestr("equipo_local/.env", _env_real_para_equipo(request, equipo))
 
     respuesta = HttpResponse(buffer.getvalue(), content_type="application/zip")
     respuesta["Content-Disposition"] = 'attachment; filename="equipo_local.zip"'
