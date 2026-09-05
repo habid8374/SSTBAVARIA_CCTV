@@ -4,7 +4,6 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { useDialog } from "@/components/DialogProvider";
 import {
-  API_URL,
   ApiError,
   actualizarConfiguracionNotificaciones,
   actualizarEquipoLocal,
@@ -252,33 +251,16 @@ function EquiposLocales({ token }: { token: string }) {
     }
   }
 
-  function descargarEnv(equipo: EquipoLocal) {
-    // Genera el .env ya completo (URL del backend + api_key) para que en el
-    // PC del equipo local solo haya que arrastrar el archivo a la carpeta
-    // "equipo_local" — sin abrir ni editar nada a mano.
-    const contenido = `API_BASE_URL=${API_URL}\nAPI_KEY=${equipo.api_key}\n`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const enlace = document.createElement("a");
-    enlace.href = url;
-    enlace.download = ".env";
-    document.body.appendChild(enlace);
-    enlace.click();
-    enlace.remove();
-    URL.revokeObjectURL(url);
-  }
-
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
           Cada PC dedicado en sitio que corre <code>equipo_local</code> necesita un registro acá. Lo más
           simple: botón <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> → descomprimirlo en el PC
-          de la planta → botón <strong>&quot;Descargar .env&quot;</strong> de la fila del equipo → poner ese
-          archivo dentro de la carpeta descomprimida → doble clic en <code>instalar.bat</code> (Windows) o
-          correr <code>./instalar.sh</code> (Linux/Mac) — ese instalador deja todo corriendo solo, sin
-          necesidad de editar nada a mano ni saber de líneas de comando. También se puede copiar el{" "}
-          <code>api_key</code> manualmente si se prefiere el modo manual.
+          de la planta → renombrar <code>.env.example</code> a <code>.env</code> → pegar ahí el{" "}
+          <code>api_key</code> de la fila del equipo (botón &quot;Copiar&quot;) → doble clic en{" "}
+          <code>instalar.bat</code> (Windows) o correr <code>./instalar.sh</code> (Linux/Mac) — ese instalador
+          deja todo corriendo solo, sin necesidad de saber de líneas de comando.
         </p>
         <div className="flex shrink-0 gap-2">
           <button
@@ -349,13 +331,6 @@ function EquiposLocales({ token }: { token: string }) {
                       className="text-xs font-medium text-corp-blue hover:underline"
                     >
                       {copiadoId === equipo.id ? "¡Copiado!" : "Copiar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => descargarEnv(equipo)}
-                      className="text-xs font-medium text-corp-blue hover:underline"
-                    >
-                      Descargar .env
                     </button>
                   </div>
                 </td>
