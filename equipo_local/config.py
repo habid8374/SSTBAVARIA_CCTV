@@ -6,6 +6,9 @@ main.py con python-dotenv) — nada de credenciales en el código.
 """
 
 import os
+from pathlib import Path
+
+_CARPETA_EQUIPO_LOCAL = Path(__file__).resolve().parent
 
 
 def _entero(nombre, default):
@@ -71,7 +74,12 @@ class Config:
 
     # Carpeta base donde se guardan los clips: <carpeta>/<camara_id>/<YYYY-MM-DD>/HH-MM-SS.mp4
     # — con esa estructura, "eliminar por fecha" es simplemente borrar una subcarpeta.
-    GRABACIONES_DIR = os.environ.get("GRABACIONES_DIR", "grabaciones")
+    # Ruta absoluta por defecto (equipo_local/grabaciones), no relativa a la
+    # carpeta de trabajo del proceso — la Tarea Programada/servicio corren
+    # con la carpeta de trabajo en el padre de equipo_local (ver
+    # windows/instalar_tarea_programada.ps1), así que una ruta relativa
+    # terminaría creando la carpeta en el lugar equivocado.
+    GRABACIONES_DIR = os.environ.get("GRABACIONES_DIR") or str(_CARPETA_EQUIPO_LOCAL / "grabaciones")
 
     # Cada cuánto se cierra el clip actual y se abre uno nuevo — clips más
     # cortos son más fáciles de indexar/borrar por fecha, pero generan más

@@ -15,7 +15,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()  # antes de leer Config: toma las variables de un .env si existe junto a este archivo
+# Ruta explícita (no la búsqueda automática por defecto de load_dotenv, que
+# parte de la carpeta de trabajo actual) — así el .env se encuentra sin
+# importar con qué carpeta de trabajo se haya arrancado el proceso (ver
+# windows/instalar_tarea_programada.ps1 y systemd/equipo-local-camaras.service:
+# la carpeta de trabajo tiene que ser la carpeta *padre* de este paquete
+# para que "python -m equipo_local.main" se pueda importar).
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from .camara import CamaraMonitor  # noqa: E402
 from .cliente_api import ClienteApi, ErrorApi  # noqa: E402

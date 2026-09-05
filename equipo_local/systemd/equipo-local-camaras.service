@@ -6,10 +6,13 @@ Wants=network-online.target
 [Service]
 Type=simple
 # Ajusta el usuario y las rutas a como quede instalado en el PC de la planta.
+# WorkingDirectory tiene que ser la carpeta *padre* de equipo_local (no
+# equipo_local mismo) para que "-m equipo_local.main" pueda importar el
+# paquete — Python solo lo busca como subcarpeta de la carpeta de trabajo.
 User=camaras
 WorkingDirectory=/opt/sstbavaria-camaras
-EnvironmentFile=/opt/sstbavaria-camaras/.env
-ExecStart=/opt/sstbavaria-camaras/venv/bin/python -m equipo_local.main
+EnvironmentFile=/opt/sstbavaria-camaras/equipo_local/.env
+ExecStart=/opt/sstbavaria-camaras/equipo_local/venv/bin/python -m equipo_local.main
 Restart=always
 RestartSec=5
 

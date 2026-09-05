@@ -57,11 +57,15 @@ echo "      minutos, es normal."
 echo "[3/4] Registrando el programa como servicio del sistema (puede pedir"
 echo "      la contraseña de este usuario para instalar el servicio)..."
 CARPETA_ACTUAL="$(pwd)"
+CARPETA_PADRE="$(dirname "$CARPETA_ACTUAL")"
 USUARIO_ACTUAL="$(whoami)"
+# WorkingDirectory = la carpeta padre de esta (equipo_local), no esta misma
+# — necesario para que "-m equipo_local.main" encuentre el paquete (ver
+# systemd/equipo-local-camaras.service).
 sed \
-    -e "s#WorkingDirectory=/opt/sstbavaria-camaras#WorkingDirectory=${CARPETA_ACTUAL}#" \
-    -e "s#EnvironmentFile=/opt/sstbavaria-camaras/.env#EnvironmentFile=${CARPETA_ACTUAL}/.env#" \
-    -e "s#ExecStart=/opt/sstbavaria-camaras/venv/bin/python#ExecStart=${CARPETA_ACTUAL}/venv/bin/python#" \
+    -e "s#WorkingDirectory=/opt/sstbavaria-camaras#WorkingDirectory=${CARPETA_PADRE}#" \
+    -e "s#EnvironmentFile=/opt/sstbavaria-camaras/equipo_local/.env#EnvironmentFile=${CARPETA_ACTUAL}/.env#" \
+    -e "s#ExecStart=/opt/sstbavaria-camaras/equipo_local/venv/bin/python#ExecStart=${CARPETA_ACTUAL}/venv/bin/python#" \
     -e "s#User=camaras#User=${USUARIO_ACTUAL}#" \
     systemd/equipo-local-camaras.service | sudo tee /etc/systemd/system/equipo-local-camaras.service >/dev/null
 

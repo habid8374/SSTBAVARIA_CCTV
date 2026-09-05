@@ -12,6 +12,7 @@
 $ErrorActionPreference = "Stop"
 
 $carpeta = Split-Path -Parent $PSScriptRoot
+$carpeta_padre = Split-Path -Parent $carpeta
 $python = Join-Path $carpeta "venv\Scripts\pythonw.exe"
 
 if (-not (Test-Path $python)) {
@@ -19,7 +20,12 @@ if (-not (Test-Path $python)) {
     exit 1
 }
 
-$accion = New-ScheduledTaskAction -Execute $python -Argument "-m equipo_local.main" -WorkingDirectory $carpeta
+# La carpeta de trabajo tiene que ser la carpeta *padre* de equipo_local
+# (no equipo_local mismo) para que "-m equipo_local.main" encuentre el
+# paquete — Python solo busca "equipo_local" como subcarpeta de la carpeta
+# de trabajo. El .env y demas rutas relativas del programa no dependen de
+# esto (ver main.py: el .env se carga con ruta explicita).
+$accion = New-ScheduledTaskAction -Execute $python -Argument "-m equipo_local.main" -WorkingDirectory $carpeta_padre
 $disparador = New-ScheduledTaskTrigger -AtStartup
 $configuracion = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
