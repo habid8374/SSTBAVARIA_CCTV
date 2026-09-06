@@ -87,6 +87,32 @@ Sigue faltando un paso, que es del dashboard y no de este instalador: dar de
 alta cada cámara y dibujar sus zonas restringidas — ver [Configurar las
 cámaras y zonas](#configurar-las-cámaras-y-zonas-dashboard) abajo.
 
+## Instalación sin Python (versión compilada, Windows)
+
+Si el PC final de la planta no va a tener Python instalado (o simplemente
+se prefiere no depender de eso), se puede compilar todo en un único
+`equipo_local.exe` que ya trae Python y las dependencias adentro. Solo hace
+falta Python en **otro** PC (el de "armado" — puede ser tu PC de casa), una
+sola vez:
+
+1. En ese PC de armado: seguir los pasos 1-4 de arriba (descargar el `.zip`,
+   correr `instalar.bat` una vez) — eso deja el entorno `venv` listo, que es
+   lo que `compilar.bat` necesita.
+2. En la misma carpeta, doble clic en **`compilar.bat`**. La primera vez
+   tarda varios minutos (instala PyInstaller y empaqueta todo). Al terminar
+   deja un `equipo_local.exe` en esa misma carpeta.
+3. Copiar **toda la carpeta** (ya con `equipo_local.exe` adentro) al PC
+   final de la planta — por USB o red, como sea más cómodo.
+4. En el PC final: doble clic en **`instalar_exe.bat`** (no `instalar.bat`)
+   — pide permiso de Administrador igual que el otro instalador, pero no
+   instala nada de Python, solo registra la Tarea Programada apuntando al
+   `.exe` y lo deja corriendo.
+
+El resultado final (arranca solo con el PC, se ve igual en el dashboard) es
+idéntico al de la instalación normal — la única diferencia es que el PC
+final no necesita Python. Si más adelante se actualiza el código, hay que
+volver a compilar en el PC de armado y repetir el paso 3-4 en el PC final.
+
 ## Configurar las cámaras y zonas (dashboard)
 
 1. Cada cámara desde el dashboard (sección **Cámaras**): IP, usuario/

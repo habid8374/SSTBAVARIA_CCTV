@@ -6,9 +6,10 @@ main.py con python-dotenv) — nada de credenciales en el código.
 """
 
 import os
-from pathlib import Path
 
-_CARPETA_EQUIPO_LOCAL = Path(__file__).resolve().parent
+from .rutas import carpeta_base
+
+_CARPETA_EQUIPO_LOCAL = carpeta_base()
 
 
 def _entero(nombre, default):

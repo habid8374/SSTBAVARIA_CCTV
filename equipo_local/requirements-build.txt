@@ -1,0 +1,4 @@
+# Dependencia solo para COMPILAR equipo_local.exe (ver windows/compilar.bat)
+# — no hace falta en el PC final que solo corre el .exe ya compilado, así
+# que no está en requirements.txt.
+pyinstaller==6.22.2

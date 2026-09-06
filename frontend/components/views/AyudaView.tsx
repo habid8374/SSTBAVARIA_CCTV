@@ -849,6 +849,22 @@ const TEMAS: Tema[] = [
           <strong>Cámaras</strong> (IP, usuario/contraseña) y dibujar sus zonas restringidas en{" "}
           <strong>Zonas y horarios</strong> — ver esos temas de esta Ayuda para el detalle.
         </P>
+        <Sub>Alternativa: instalar sin Python (PC final compilado)</Sub>
+        <P>
+          Los pasos de arriba necesitan Python instalado en el PC final de la planta. Si se prefiere que ese
+          PC no tenga Python (por ejemplo si es un PC dedicado que se quiere dejar &quot;limpio&quot;), se puede
+          compilar todo en un único programa <Mono>equipo_local.exe</Mono> que ya trae Python adentro:
+        </P>
+        <Ol>
+          <li>En <strong>otro</strong> PC que sí tenga Python (por ejemplo uno de prueba), seguir los Pasos 1 a
+            3 de arriba normalmente (con <Mono>instalar.bat</Mono>).</li>
+          <li>En esa misma carpeta, doble clic en <Mono>compilar.bat</Mono> — tarda varios minutos la primera
+            vez y deja un archivo <Mono>equipo_local.exe</Mono> listo.</li>
+          <li>Copiar toda la carpeta (ya con el <Mono>.exe</Mono> adentro) al PC final de la planta.</li>
+          <li>Ahí, en vez de <Mono>instalar.bat</Mono>, doble clic en <Mono>instalar_exe.bat</Mono> — pide el
+            mismo permiso de Administrador pero no instala nada de Python, solo deja el programa corriendo
+            solo con el PC.</li>
+        </Ol>
         <Sub>Cómo se conectan las cámaras al equipo local</Sub>
         <P>No es cableado — es configuración, así:</P>
         <Ol>

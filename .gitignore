@@ -11,3 +11,7 @@ db.sqlite3
 .env
 equipo_local/grabaciones/
 equipo_local/*.log
+equipo_local/build/
+equipo_local/dist/
+equipo_local/*.spec
+equipo_local/equipo_local.exe

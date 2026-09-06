@@ -11,7 +11,8 @@ import logging
 import signal
 import sys
 import time
-from pathlib import Path
+
+from .rutas import carpeta_base
 
 
 def _configurar_logging(nivel="INFO"):
@@ -19,11 +20,11 @@ def _configurar_logging(nivel="INFO"):
     existe ahí, así que un logging.basicConfig() normal (StreamHandler a
     stderr) no imprime nada en ningún lado y cualquier error se pierde en
     silencio. Por eso siempre se agrega un archivo — equipo_local.log, junto
-    a este script — que sí persiste sin importar cómo se esté corriendo.
+    al programa — que sí persiste sin importar cómo se esté corriendo.
     Se llama al importar este módulo (no solo dentro de main()) para que ni
     siquiera un error temprano al importar una dependencia (ej. cv2) se
     pierda sin dejar rastro."""
-    directorio = Path(__file__).resolve().parent
+    directorio = carpeta_base()
     handlers = [logging.FileHandler(directorio / "equipo_local.log", encoding="utf-8")]
     if sys.stderr is not None:
         handlers.append(logging.StreamHandler())
@@ -42,8 +43,9 @@ try:
     # (ver windows/instalar_tarea_programada.ps1 y
     # systemd/equipo-local-camaras.service: la carpeta de trabajo tiene que
     # ser la carpeta *padre* de este paquete para que
-    # "python -m equipo_local.main" se pueda importar).
-    load_dotenv(Path(__file__).resolve().parent / ".env")
+    # "python -m equipo_local.main" se pueda importar) ni de si se está
+    # corriendo compilado (ver rutas.py).
+    load_dotenv(carpeta_base() / ".env")
 
     from .camara import CamaraMonitor
     from .cliente_api import ClienteApi, ErrorApi
