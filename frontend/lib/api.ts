@@ -376,6 +376,13 @@ export function subirSnapshotReferencia(
   });
 }
 
+export function eliminarCamara(token: string, id: number): Promise<void> {
+  return request<void>(`/api/camaras-ia/dashboard/camaras/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
 export function eliminarSnapshotReferencia(token: string, camaraId: number): Promise<CamaraDashboard> {
   return request<CamaraDashboard>(`/api/camaras-ia/dashboard/camaras/${camaraId}/snapshot-referencia/`, {
     method: "DELETE",

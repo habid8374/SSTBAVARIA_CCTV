@@ -1010,6 +1010,21 @@ class DashboardEndpointsTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_admin_elimina_camara(self):
+        camara_id = self.camara.pk
+        zona_id = self.zona.pk
+        url = reverse("camaras_ia:camaras_detalle", args=[camara_id])
+        response = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Camara.objects.filter(pk=camara_id).exists())
+        self.assertFalse(ZonaRestringida.objects.filter(pk=zona_id).exists())
+
+    def test_operador_no_puede_eliminar_camara(self):
+        url = reverse("camaras_ia:camaras_detalle", args=[self.camara.pk])
+        response = self.client.delete(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Camara.objects.filter(pk=self.camara.pk).exists())
+
     # --- Sección Sistema: configuración de notificaciones ---
 
     def test_operador_puede_leer_configuracion_notificaciones(self):

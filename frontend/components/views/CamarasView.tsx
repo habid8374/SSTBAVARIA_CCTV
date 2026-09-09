@@ -5,10 +5,12 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { Nota } from "@/components/DocTexto";
 import PoligonoOverlay from "@/components/PoligonoOverlay";
+import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
   actualizarCamara,
   crearCamara,
+  eliminarCamara,
   listarCamarasDashboard,
   type CamaraDashboard,
   type NuevaCamara,
@@ -17,6 +19,7 @@ import {
 
 export default function CamarasView({ token, rol }: { token: string; rol: Rol | null }) {
   const esAdmin = rol === "administrador";
+  const { confirmar } = useDialog();
   const [camaras, setCamaras] = useState<CamaraDashboard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formulario, setFormulario] = useState<"nueva" | CamaraDashboard | null>(null);
@@ -35,6 +38,25 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
       cargar();
     } catch {
       setError("No se pudo actualizar la cámara.");
+    }
+  }
+
+  async function eliminar(camara: CamaraDashboard) {
+    const ok = await confirmar({
+      titulo: "Eliminar cámara",
+      mensaje:
+        `¿Eliminar "${camara.nombre}"? Esto también borra sus zonas, horarios y el historial de eventos ` +
+        "de esta cámara — no se puede deshacer. Si el equipo local sigue reportando a esta cámara, va a " +
+        "empezar a fallar hasta que la borres de la configuración del equipo local también.",
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminarCamara(token, camara.id);
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar la cámara.");
     }
   }
 
@@ -88,6 +110,7 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
             esAdmin={esAdmin}
             onEditar={() => setFormulario(camara)}
             onAlternarActiva={() => alternarActiva(camara)}
+            onEliminar={() => eliminar(camara)}
           />
         ))}
       </div>
@@ -112,11 +135,13 @@ function TarjetaCamara({
   esAdmin,
   onEditar,
   onAlternarActiva,
+  onEliminar,
 }: {
   camara: CamaraDashboard;
   esAdmin: boolean;
   onEditar: () => void;
   onAlternarActiva: () => void;
+  onEliminar: () => void;
 }) {
   const [dimensiones, setDimensiones] = useState<{ w: number; h: number } | null>(null);
   const evento = camara.ultimo_evento;
@@ -218,6 +243,13 @@ function TarjetaCamara({
             className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy transition hover:border-corp-blue"
           >
             {camara.activa ? "Desactivar" : "Activar"}
+          </button>
+          <button
+            type="button"
+            onClick={onEliminar}
+            className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 transition hover:border-red-400"
+          >
+            Eliminar
           </button>
         </div>
       )}
