@@ -849,8 +849,14 @@ const TEMAS: Tema[] = [
         <Sub>Paso 3 — Instalar y dejarlo corriendo</Sub>
         <Ol>
           <li>En el PC de la planta, descomprimir el <Mono>.zip</Mono> del paso anterior (clic derecho →
-            &quot;Extraer todo&quot; en Windows) en cualquier ubicación cómoda (ej. el Escritorio o
-            &quot;Documentos&quot;) — queda una carpeta <Mono>equipo_local</Mono> con todo listo adentro.</li>
+            &quot;Extraer todo&quot; en Windows) en una carpeta local fija, ej. <Mono>C:\SSTBavaria\</Mono> —
+            queda una carpeta <Mono>equipo_local</Mono> con todo listo adentro.
+            <br /><strong>Evitar Escritorio, Documentos o Descargas</strong>: en la mayoría de PCs con cuenta
+            de empresa/Microsoft 365 esas carpetas están sincronizadas con OneDrive, y el programa arranca
+            solo con el PC (Tarea Programada) usando una cuenta que no puede acceder ahí — el resultado es
+            que nunca aparece &quot;Conectado&quot; en el dashboard aunque el instalador haya dicho
+            &quot;LISTO&quot;. <Mono>instalar.bat</Mono> avisa si detecta que la carpeta está dentro de
+            OneDrive.</li>
           <li><strong>Windows</strong>: doble clic en <Mono>instalar.bat</Mono> (está dentro de la carpeta{" "}
             <Mono>equipo_local</Mono>). Windows va a preguntar &quot;¿Permitir que esta app haga cambios en tu
             dispositivo?&quot; — clic en <strong>&quot;Sí&quot;</strong>, es normal y necesario (así el
@@ -1016,6 +1022,17 @@ const TEMAS: Tema[] = [
           Revisa Sistema → Brevo: que el badge diga &quot;API key configurada&quot;. Si lo está, revisa
           Notificaciones → Envíos — la columna Detalle explica el motivo exacto de cada error (credenciales
           inválidas, remitente no verificado en Brevo, etc.).
+        </P>
+        <Sub>El equipo local nunca queda &quot;Conectado&quot; (aunque el instalador dijo &quot;LISTO&quot;)</Sub>
+        <P>
+          Causa más común: la carpeta <Mono>equipo_local</Mono> quedó dentro de una carpeta sincronizada con
+          OneDrive (Escritorio, Documentos o Descargas, en la mayoría de PCs con cuenta de empresa/Microsoft
+          365). El programa arranca solo con el PC usando una Tarea Programada que corre con una cuenta
+          distinta a la del usuario — esa cuenta no puede acceder a las carpetas de OneDrive, así que la
+          tarea falla en silencio (ni siquiera queda registrado el error) mientras que correrlo a mano sí
+          funciona. Solución: mover toda la carpeta <Mono>equipo_local</Mono> a una ruta local fija fuera de
+          OneDrive (ej. <Mono>C:\SSTBavaria\equipo_local</Mono>) y volver a correr{" "}
+          <Mono>instalar.bat</Mono> desde ahí — ver el tema &quot;El equipo local&quot;, Paso 3.
         </P>
         <Sub>No veo cámaras en vivo</Sub>
         <P>

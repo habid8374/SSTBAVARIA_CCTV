@@ -76,7 +76,14 @@ siempre que el PC ya tenga Python instalado (una sola vez, ver abajo).
    ya trae un archivo `.env` completo (URL del backend + `api_key` de ese
    equipo en particular) — no hay que editar ni pegar nada a mano.
 3. En el PC de la planta, descomprimir el `.zip` (clic derecho → "Extraer
-   todo" en Windows) en cualquier ubicación cómoda.
+   todo" en Windows) en una carpeta local fija — ej. `C:\SSTBavaria\`.
+   **Evitar Descargas, Escritorio o Documentos**: en la mayoría de PCs con
+   cuenta de empresa/Microsoft 365, esas carpetas están sincronizadas con
+   OneDrive, y la Tarea Programada (que corre como SYSTEM, no como el
+   usuario) no puede acceder ahí — el programa arrancaría bien corrido a
+   mano, pero la tarea programada fallaría en silencio y nunca se vería
+   "Conectado" en el dashboard (`instalar.bat` avisa si detecta esto e
+   invita a confirmar antes de seguir).
 4. **Windows**: doble clic en **`instalar.bat`**. Va a pedir permiso de
    Administrador (normal, aceptar) y, si es la primera vez, puede tardar
    varios minutos instalando — no hay que hacer nada más, ni cerrar la

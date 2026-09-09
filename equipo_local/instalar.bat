@@ -35,6 +35,32 @@ echo === Instalador del Equipo local de camaras SST Bavaria ===
 echo Carpeta: %cd%
 echo.
 
+REM --- Aviso si la carpeta esta dentro de OneDrive (Descargas, Escritorio y
+REM     Documentos suelen estar redirigidos ahi en Windows 10/11 con cuenta
+REM     de empresa/Microsoft 365). La Tarea Programada corre como SYSTEM, y
+REM     SYSTEM no tiene acceso a las carpetas sincronizadas con OneDrive del
+REM     usuario - el programa arranca manualmente (con tu usuario) pero la
+REM     tarea programada falla en silencio, sin dejar ni una linea en el
+REM     .log (ni siquiera llega a poder crear el archivo del log). Sintoma:
+REM     "Conexion: Nunca" en el dashboard aunque corrido a mano si funcione.
+echo %cd% | findstr /i "onedrive" >nul
+if not errorlevel 1 (
+    echo ADVERTENCIA: esta carpeta esta dentro de OneDrive.
+    echo.
+    echo La Tarea Programada de Windows corre con la cuenta SYSTEM, que NO
+    echo puede acceder a carpetas sincronizadas con OneDrive de tu usuario
+    echo - el programa va a arrancar bien si lo corres tu a mano, pero la
+    echo tarea programada va a fallar en silencio y nunca va a aparecer
+    echo como "Conectado" en el dashboard.
+    echo.
+    echo Recomendado: mueve toda esta carpeta a una ruta fuera de OneDrive
+    echo antes de continuar, por ejemplo C:\SSTBavaria\equipo_local, y
+    echo corre este instalador desde ahi.
+    echo.
+    choice /c SN /n /m "Continuar de todas formas aqui en OneDrive? (S/N): "
+    if errorlevel 2 exit /b 1
+)
+
 where python >nul 2>&1
 if errorlevel 1 (
     echo ERROR: No se encontro Python instalado en este PC.
