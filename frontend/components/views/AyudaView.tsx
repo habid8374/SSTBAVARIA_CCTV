@@ -1034,6 +1034,18 @@ const TEMAS: Tema[] = [
           OneDrive (ej. <Mono>C:\SSTBavaria\equipo_local</Mono>) y volver a correr{" "}
           <Mono>instalar.bat</Mono> desde ahí — ver el tema &quot;El equipo local&quot;, Paso 3.
         </P>
+        <Sub>Configuré la zona y el horario pero no llega ninguna alerta</Sub>
+        <P>
+          Primero revisa <strong>Alertas</strong>: si el evento aparece ahí (con o sin alerta), la detección
+          sí funcionó y el problema es de notificación (revisa Sistema → Brevo), no de la zona. Si no aparece
+          nada ahí tampoco, puede ser que: (a) acabas de guardar el horario y el equipo local todavía no lo
+          recogió — tarda hasta ~60 segundos en sincronizar; (b) la persona no quedó dentro del polígono
+          dibujado — el punto que se evalúa es la posición de los pies, no el centro del cuerpo; o (c) estaba
+          muy cerca de la cámara (solo se ve la parte de arriba de la cabeza) y el modelo no la reconoció como
+          persona. Para verlo con detalle, en el equipo local se puede poner{" "}
+          <Mono>LOG_LEVEL=DEBUG</Mono> en el <Mono>.env</Mono> — ver{" "}
+          <Mono>equipo_local/README.md</Mono>, sección de este mismo tema.
+        </P>
         <Sub>No veo cámaras en vivo</Sub>
         <P>
           Primero confirma que el equipo local esté &quot;Conectado&quot; en Sistema → Equipo local — si no

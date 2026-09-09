@@ -180,6 +180,37 @@ NVR: acá es donde se dice qué vigilar, no en la nube.
    dashboard (instalaciones previas a este cambio), se importan solas la
    primera vez para no perder esa configuración.
 
+### "Configuré la zona y el horario pero no llega ninguna alerta"
+
+Antes que nada, revisa el dashboard → **Alertas**: si el evento sí aparece
+ahí (con o sin alerta), la detección funcionó y el problema es de
+notificación (ej. Brevo sin configurar en Sistema → Brevo), no de zona. Si
+**no** aparece nada ahí tampoco, el problema es anterior — no se está
+detectando a nadie, o se detecta pero nunca cae dentro de la zona dibujada.
+
+Para verlo con detalle, poner `LOG_LEVEL=DEBUG` en el `.env` y reiniciar el
+programa (`Restart-ScheduledTask -TaskName SSTBavaria-EquipoLocalCamaras` en
+Windows, o el servicio en Linux/Mac) — con eso, cada frame donde YOLO
+detecta a alguien queda registrado en `equipo_local.log`, diga o no diga
+que cayó dentro de una zona:
+
+- **Ninguna línea de "persona(s) detectada(s)" nunca**: el modelo no está
+  reconociendo a nadie en ese encuadre — probable si la persona está muy
+  cerca de la cámara (solo se ve la parte de arriba de la cabeza) o con
+  poca luz. Probar parándose más lejos, de cuerpo casi completo, con
+  buena luz.
+- **Sí aparecen detecciones pero siempre con "no cae en ninguna zona
+  activa"**: la persona está siendo detectada, pero fuera del polígono
+  dibujado — revisar en `/configurar` si la zona realmente cubre el punto
+  donde se paró (el punto que se evalúa es la posición de los pies, el
+  borde inferior del recuadro de la detección, no el centro).
+- **También recordar el ciclo de sincronización**: después de guardar un
+  horario nuevo, el equipo local puede tardar hasta ~60s en recogerlo —
+  si se prueba en los primeros segundos, la zona todavía no tenía reglas.
+
+Volver a `LOG_LEVEL=INFO` (o quitar la variable) una vez resuelto — en
+`DEBUG` el log crece mucho más rápido.
+
 ## Instalación manual / diagnóstico (avanzado)
 
 Para quien prefiera hacerlo paso a paso a mano (o si el instalador de un

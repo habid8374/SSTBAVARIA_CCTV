@@ -1,3 +1,4 @@
+import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -255,6 +256,34 @@ class UltimoFrameYGrabacionTests(unittest.TestCase):
 
         grabador.procesar_frame.assert_called_once_with(frame)
         self.assertIsNotNone(monitor.obtener_ultimo_frame_jpeg())
+
+    def test_procesar_frame_registra_detecciones_en_debug(self):
+        """Diagnóstico para cuando no llega ninguna alerta: sin esto no había forma
+        de saber, desde el log, si YOLO no detectó a nadie o si sí detectó pero cayó
+        fuera de toda zona — ver conversación de soporte sobre "hice la prueba y nada"."""
+        # (500, 500) queda fuera del cuadrado 0,0-100,100 de _camara_datos().
+        detector = MagicMock(detectar=MagicMock(return_value=[(500, 500, 0.9)]))
+        monitor = CamaraMonitor(_camara_datos(), detector, MagicMock(), _config(GRABAR_VIDEO=False))
+        frame = np.zeros((1000, 1000, 3), dtype=np.uint8)
+
+        with self.assertLogs("equipo_local.camara", level="DEBUG") as registro:
+            monitor._procesar_frame(frame)
+
+        mensajes = "\n".join(registro.output)
+        self.assertIn("1 persona(s) detectada(s)", mensajes)
+        self.assertIn("no cae en ninguna zona activa", mensajes)
+
+    def test_procesar_frame_sin_detecciones_no_registra_nada(self):
+        detector = MagicMock(detectar=MagicMock(return_value=[]))
+        monitor = CamaraMonitor(_camara_datos(), detector, MagicMock(), _config(GRABAR_VIDEO=False))
+        frame = np.zeros((100, 100, 3), dtype=np.uint8)
+
+        with self.assertLogs("equipo_local.camara", level="DEBUG") as registro:
+            monitor._procesar_frame(frame)
+            logging.getLogger("equipo_local.camara").debug("centinela")  # assertLogs exige al menos un log
+
+        mensajes = "\n".join(registro.output)
+        self.assertNotIn("detectada(s)", mensajes)
 
     def test_evento_con_alerta_marca_el_evento_en_el_grabador(self):
         fabrica_grabador = MagicMock()

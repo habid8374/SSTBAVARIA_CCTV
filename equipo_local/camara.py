@@ -169,8 +169,22 @@ class CamaraMonitor:
 
     def _procesar_frame(self, frame):
         alto, ancho = frame.shape[:2]
-        for x, y, confianza in self.detector.detectar(frame):
+        detecciones = self.detector.detectar(frame)
+        if detecciones:
+            logger.debug(
+                "%s: %d persona(s) detectada(s) — %s",
+                self.nombre,
+                len(detecciones),
+                ", ".join(f"({x:.0f},{y:.0f}) conf={confianza:.2f}" for x, y, confianza in detecciones),
+            )
+        for x, y, confianza in detecciones:
             punto_escalado, zonas = self.evaluar_deteccion((x, y), (ancho, alto))
+            if not zonas:
+                logger.debug(
+                    "%s: detección en (%.0f,%.0f) no cae en ninguna zona activa (o está en cooldown)",
+                    self.nombre,
+                    *punto_escalado,
+                )
             for zona in zonas:
                 self._reportar(punto_escalado, frame, zona, confianza)
 
