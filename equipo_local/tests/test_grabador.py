@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 from equipo_local.grabador import (
     GrabadorCamara,
+    GrabadorEventos,
     LimpiadorPeriodico,
     carpeta_dia,
     eliminar_grabaciones,
@@ -209,6 +210,109 @@ class GrabadorCamaraTests(unittest.TestCase):
     def test_cerrar_sin_haber_grabado_no_falla(self):
         grabador = GrabadorCamara(1, self.base, fps=3, duracion_clip_segundos=3600, fabrica_escritor=self.fabrica_escritor)
         grabador.cerrar()  # no debe lanzar
+
+
+class GrabadorEventosTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.base = self._tmp.name
+        self.addCleanup(self._tmp.cleanup)
+        self.escritores_creados = []
+
+        def fabrica(ruta, ancho, alto):
+            escritor = MagicMock()
+            escritor.ruta = ruta
+            escritor.tamano = (ancho, alto)
+            self.escritores_creados.append(escritor)
+            return escritor
+
+        self.fabrica_escritor = fabrica
+
+    def _frame(self, ancho=640, alto=480):
+        import numpy as np
+
+        return np.zeros((alto, ancho, 3), dtype="uint8")
+
+    def _grabador(self, pre=16, post=16, duracion_maxima=None):
+        return GrabadorEventos(
+            1, self.base, fps=3, pre_evento_segundos=pre, post_evento_segundos=post,
+            duracion_maxima_clip_segundos=duracion_maxima, fabrica_escritor=self.fabrica_escritor,
+        )
+
+    def test_sin_evento_no_escribe_nada_a_disco(self):
+        grabador = self._grabador()
+        for segundo in range(30):
+            grabador.procesar_frame(self._frame(), ahora=segundo)
+        self.assertEqual(len(self.escritores_creados), 0)
+
+    def test_marcar_evento_vuelca_el_buffer_de_pre_evento(self):
+        grabador = self._grabador(pre=16, post=16)
+        grabador.procesar_frame(self._frame(), ahora=0)
+        grabador.procesar_frame(self._frame(), ahora=1)
+        grabador.procesar_frame(self._frame(), ahora=2)  # los 3 quedan en el buffer (pre_evento=16s)
+        grabador.marcar_evento(ahora=2)
+        self.assertEqual(len(self.escritores_creados), 1)
+        self.assertEqual(self.escritores_creados[0].write.call_count, 3)
+
+    def test_sigue_grabando_despues_del_evento_hasta_vencer_el_post_evento(self):
+        grabador = self._grabador(pre=16, post=16)
+        grabador.procesar_frame(self._frame(), ahora=0)
+        grabador.marcar_evento(ahora=0)  # vuelca el buffer (1 frame) y graba hasta ahora=16
+        grabador.procesar_frame(self._frame(), ahora=10)  # todavía dentro del post-evento
+        self.assertEqual(self.escritores_creados[0].write.call_count, 2)
+        grabador.procesar_frame(self._frame(), ahora=17)  # ya pasaron los 16s de post-evento
+        self.escritores_creados[0].release.assert_called_once()
+
+    def test_evento_nuevo_mientras_grababa_extiende_en_vez_de_reabrir(self):
+        grabador = self._grabador(pre=16, post=16)
+        grabador.procesar_frame(self._frame(), ahora=0)
+        grabador.marcar_evento(ahora=0)  # graba hasta ahora=16
+        grabador.marcar_evento(ahora=10)  # nuevo evento: ahora graba hasta ahora=26
+        grabador.procesar_frame(self._frame(), ahora=20)  # habría cerrado con el primer evento, no con el segundo
+        self.assertEqual(len(self.escritores_creados), 1)  # sigue siendo el mismo clip
+
+    def test_clip_se_corta_al_llegar_a_la_duracion_maxima(self):
+        grabador = self._grabador(pre=1, post=100, duracion_maxima=60)
+        grabador.procesar_frame(self._frame(), ahora=0)
+        grabador.marcar_evento(ahora=0)  # abre el clip 1 (inicio_clip=0), graba hasta ahora=100
+        grabador.procesar_frame(self._frame(), ahora=30)  # todavía dentro de los 60s del clip 1
+        self.assertEqual(len(self.escritores_creados), 1)
+        grabador.procesar_frame(self._frame(), ahora=61)  # (61-0)>=60: se corta y abre el clip 2
+        self.assertEqual(len(self.escritores_creados), 2)
+        self.escritores_creados[0].release.assert_called_once()
+
+    def test_reabre_si_cambia_el_tamano_del_frame_durante_el_evento(self):
+        grabador = self._grabador(pre=16, post=16)
+        grabador.procesar_frame(self._frame(640, 480), ahora=0)
+        grabador.marcar_evento(ahora=0)
+        grabador.procesar_frame(self._frame(1280, 720), ahora=1)
+        self.assertEqual(len(self.escritores_creados), 2)
+
+    def test_error_al_abrir_no_rompe_y_sigue_sin_grabar(self):
+        def fabrica_rota(ruta, ancho, alto):
+            raise OSError("disco lleno")
+
+        grabador = GrabadorEventos(
+            1, self.base, fps=3, pre_evento_segundos=16, post_evento_segundos=16,
+            fabrica_escritor=fabrica_rota,
+        )
+        grabador.procesar_frame(self._frame(), ahora=0)
+        grabador.marcar_evento(ahora=0)  # no debe lanzar
+
+    def test_cerrar_sin_haber_grabado_no_falla(self):
+        grabador = self._grabador()
+        grabador.cerrar()  # no debe lanzar
+
+    def test_cerrar_libera_el_escritor_activo_y_permite_un_evento_nuevo_despues(self):
+        grabador = self._grabador(pre=16, post=16)
+        grabador.procesar_frame(self._frame(), ahora=0)
+        grabador.marcar_evento(ahora=0)
+        grabador.cerrar()
+        self.escritores_creados[0].release.assert_called_once()
+
+        grabador.procesar_frame(self._frame(), ahora=1)
+        grabador.marcar_evento(ahora=1)  # nuevo evento tras cerrar: abre un clip nuevo
+        self.assertEqual(len(self.escritores_creados), 2)
 
 
 if __name__ == "__main__":

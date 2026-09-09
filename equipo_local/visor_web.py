@@ -115,7 +115,10 @@ def crear_app(sincronizador, config):
     @app.route("/api/camaras")
     def api_camaras():
         return jsonify(
-            [{"id": monitor.id, "nombre": monitor.nombre} for monitor in sincronizador.monitores.values()]
+            [
+                {"id": monitor.id, "nombre": monitor.nombre, "px_por_metro": monitor.px_por_metro}
+                for monitor in sincronizador.monitores.values()
+            ]
         )
 
     @app.route("/vivo/<int:camara_id>")
@@ -559,16 +562,24 @@ _PAGINA_CONFIGURAR_CAMARA = """<!doctype html>
   <div>
     <div class="barra">
       <button id="btn-refrescar" type="button" class="secundario">Refrescar imagen</button>
-      <button id="btn-nueva-zona" type="button">+ Nueva zona (polígono)</button>
+      <select id="tipo-nueva-zona">
+        <option value="poligono">Polígono</option>
+        <option value="punto_radio">Punto y radio</option>
+      </select>
+      <button id="btn-nueva-zona" type="button">+ Nueva zona</button>
       <button id="btn-cerrar-zona" type="button" class="secundario" disabled>Cerrar y guardar zona</button>
       <button id="btn-cancelar-zona" type="button" class="secundario" disabled>Cancelar</button>
     </div>
     <div id="mensaje-dibujo" class="mensaje" style="display:none"></div>
+    <div id="mensaje-calibracion" class="mensaje" style="display:none"></div>
     <div class="lienzo-wrap">
       <img id="frame" src="/api/camaras/__CAMARA_ID__/frame.jpg" alt="Encuadre de la cámara">
       <canvas id="lienzo"></canvas>
     </div>
-    <p class="vacio">Clic para marcar cada esquina del polígono; con 3 o más puntos, "Cerrar y guardar zona".</p>
+    <p id="ayuda-dibujo" class="vacio">
+      Polígono: clic para marcar cada esquina; con 3 o más puntos, "Cerrar y guardar zona". Punto y radio: un
+      solo clic marca el centro (un clic nuevo lo mueve), luego "Cerrar y guardar zona" pide el radio en metros.
+    </p>
   </div>
   <div class="panel">
     <div class="barra">
@@ -583,7 +594,24 @@ const CAMARA_ID = __CAMARA_ID__;
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 let zonas = [];
 let dibujando = false;
+let tipoDibujo = "poligono";
 let puntoActual = [];
+let pxPorMetro = null;
+
+async function cargarCalibracion() {
+  const resp = await fetch("/api/camaras");
+  const camaras = await resp.json();
+  const camara = camaras.find((c) => c.id === CAMARA_ID);
+  pxPorMetro = camara ? camara.px_por_metro : null;
+  mostrarMensaje(
+    "mensaje-calibracion",
+    pxPorMetro
+      ? `Cámara calibrada — 1 metro real ≈ ${pxPorMetro.toFixed(1)}px en esta foto.`
+      : "Cámara sin calibrar: las zonas tipo Punto y radio se pueden crear igual, pero el círculo que se " +
+        "ve acá no va a ser el tamaño real hasta calibrar la cámara desde el dashboard.",
+    pxPorMetro ? "ok" : "error"
+  );
+}
 
 function mostrarMensaje(id, texto, tipo) {
   const el = document.getElementById(id);
@@ -605,9 +633,32 @@ function dibujar() {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   zonas.filter((z) => z.tipo === "poligono" && z.activa).forEach((z) => dibujarPoligono(ctx, z.poligono, "#22c55e"));
-  if (dibujando && puntoActual.length > 0) {
+  zonas
+    .filter((z) => z.tipo === "punto_radio" && z.activa)
+    .forEach((z) => {
+      const radioPx = pxPorMetro ? z.radio_metros * pxPorMetro : canvas.width * 0.008;
+      dibujarCirculo(ctx, [z.centro_x, z.centro_y], radioPx, "#22c55e");
+    });
+  if (dibujando && tipoDibujo === "poligono" && puntoActual.length > 0) {
     dibujarPoligono(ctx, puntoActual, "#facc15", true);
   }
+  if (dibujando && tipoDibujo === "punto_radio" && puntoActual.length > 0) {
+    dibujarCirculo(ctx, puntoActual[0], canvas.width * 0.008, "#facc15");
+  }
+}
+
+function dibujarCirculo(ctx, centro, radioPx, color) {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color + "33";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(centro[0], centro[1], Math.max(radioPx, 3), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(centro[0], centro[1], 4, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
 }
 
 function dibujarPoligono(ctx, puntos, color, abierto) {
@@ -636,18 +687,31 @@ document.getElementById("lienzo").addEventListener("click", (ev) => {
   const escalaY = canvas.height / rect.height;
   const x = (ev.clientX - rect.left) * escalaX;
   const y = (ev.clientY - rect.top) * escalaY;
-  puntoActual.push([Math.round(x), Math.round(y)]);
-  document.getElementById("btn-cerrar-zona").disabled = puntoActual.length < 3;
+  if (tipoDibujo === "punto_radio") {
+    puntoActual = [[Math.round(x), Math.round(y)]];
+    document.getElementById("btn-cerrar-zona").disabled = false;
+  } else {
+    puntoActual.push([Math.round(x), Math.round(y)]);
+    document.getElementById("btn-cerrar-zona").disabled = puntoActual.length < 3;
+  }
   dibujar();
 });
 
 document.getElementById("btn-nueva-zona").addEventListener("click", () => {
   dibujando = true;
+  tipoDibujo = document.getElementById("tipo-nueva-zona").value;
   puntoActual = [];
   document.getElementById("btn-cerrar-zona").disabled = true;
   document.getElementById("btn-cancelar-zona").disabled = false;
   document.getElementById("btn-nueva-zona").disabled = true;
-  mostrarMensaje("mensaje-dibujo", "Haciendo clic sobre la imagen, marca cada esquina de la zona.", "ok");
+  document.getElementById("tipo-nueva-zona").disabled = true;
+  mostrarMensaje(
+    "mensaje-dibujo",
+    tipoDibujo === "punto_radio"
+      ? "Haz clic sobre la imagen para marcar el centro (un clic nuevo lo mueve)."
+      : "Haciendo clic sobre la imagen, marca cada esquina de la zona.",
+    "ok"
+  );
 });
 
 document.getElementById("btn-cancelar-zona").addEventListener("click", () => {
@@ -656,6 +720,7 @@ document.getElementById("btn-cancelar-zona").addEventListener("click", () => {
   document.getElementById("btn-cerrar-zona").disabled = true;
   document.getElementById("btn-cancelar-zona").disabled = true;
   document.getElementById("btn-nueva-zona").disabled = false;
+  document.getElementById("tipo-nueva-zona").disabled = false;
   mostrarMensaje("mensaje-dibujo", "", "ok");
   dibujar();
 });
@@ -663,10 +728,29 @@ document.getElementById("btn-cancelar-zona").addEventListener("click", () => {
 document.getElementById("btn-cerrar-zona").addEventListener("click", async () => {
   const nombre = prompt("Nombre de la zona (ej. \\"Bodega de químicos\\"):");
   if (!nombre) return;
+  let cuerpo;
+  if (tipoDibujo === "punto_radio") {
+    const radioTexto = prompt("Radio en metros alrededor del centro marcado (ej. 3):");
+    const radioMetros = Number(radioTexto);
+    if (!radioTexto || !(radioMetros > 0)) {
+      mostrarMensaje("mensaje-dibujo", "Radio inválido — no se guardó la zona.", "error");
+      return;
+    }
+    cuerpo = {
+      nombre,
+      tipo: "punto_radio",
+      centro_x: puntoActual[0][0],
+      centro_y: puntoActual[0][1],
+      radio_metros: radioMetros,
+      activa: true,
+    };
+  } else {
+    cuerpo = { nombre, tipo: "poligono", poligono: puntoActual, activa: true };
+  }
   const resp = await fetch(`/api/config/camaras/${CAMARA_ID}/zonas`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ nombre, tipo: "poligono", poligono: puntoActual, activa: true }),
+    body: JSON.stringify(cuerpo),
   });
   const datos = await resp.json();
   if (!resp.ok) {
@@ -758,7 +842,7 @@ function tarjetaZona(zona) {
     : '<p class="vacio">Sin horarios — esta zona no dispara alertas todavía.</p>';
   div.innerHTML = `
     <h3>${zona.nombre} <span class="estado">${estadoSync(zona)}</span></h3>
-    <div class="meta">${zona.tipo === "poligono" ? zona.poligono.length + " puntos" : "Punto y radio"} ·
+    <div class="meta">${zona.tipo === "poligono" ? zona.poligono.length + " puntos" : `Punto y radio · ${zona.radio_metros}m`} ·
       ${zona.activa ? "Activa" : "Desactivada"}</div>
     ${reglasHtml}
     <div class="barra" style="margin-top:.6rem">
@@ -785,7 +869,7 @@ async function cargarZonas() {
 
 document.getElementById("frame").addEventListener("load", ajustarLienzo);
 if (document.getElementById("frame").complete) ajustarLienzo();
-cargarZonas();
+cargarCalibracion().then(cargarZonas);
 </script>
 </body>
 </html>

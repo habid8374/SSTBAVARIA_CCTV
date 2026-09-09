@@ -15,13 +15,13 @@ import numpy as np
 import requests
 
 from .geometria import escalar_punto, punto_en_zona
-from .grabador import GrabadorCamara
+from .grabador import GrabadorEventos
 
 logger = logging.getLogger("equipo_local.camara")
 
 
 class CamaraMonitor:
-    def __init__(self, camara_datos, detector, cliente_api, config, fabrica_grabador=GrabadorCamara):
+    def __init__(self, camara_datos, detector, cliente_api, config, fabrica_grabador=GrabadorEventos):
         """`camara_datos` es el dict de una cámara tal como lo devuelve
         obtener_reglas_activas(): id, nombre, rtsp_url, snapshot_referencia, zonas[]."""
         self.id = camara_datos["id"]
@@ -45,7 +45,9 @@ class CamaraMonitor:
                 self.id,
                 config.GRABACIONES_DIR,
                 config.GRABACIONES_FPS,
-                config.GRABACIONES_DURACION_CLIP_MINUTOS * 60,
+                config.GRABACIONES_PRE_EVENTO_SEGUNDOS,
+                config.GRABACIONES_POST_EVENTO_SEGUNDOS,
+                config.GRABACIONES_DURACION_MAXIMA_CLIP_MINUTOS * 60,
             )
 
     def actualizar(self, camara_datos):
@@ -146,7 +148,7 @@ class CamaraMonitor:
                     break
                 self._actualizar_ultimo_frame(frame)
                 if self._grabador is not None:
-                    self._grabador.escribir_frame(frame)
+                    self._grabador.procesar_frame(frame)
                 self._procesar_frame(frame)
                 time.sleep(self.config.INTERVALO_DETECCION_SEGUNDOS)
             captura.release()
@@ -177,5 +179,7 @@ class CamaraMonitor:
                 confianza,
                 resultado.get("disparo_alerta"),
             )
+            if resultado.get("disparo_alerta") and self._grabador is not None:
+                self._grabador.marcar_evento()
         except Exception:
             logger.exception("No se pudo reportar el evento de %s / %s", self.nombre, zona.get("nombre"))

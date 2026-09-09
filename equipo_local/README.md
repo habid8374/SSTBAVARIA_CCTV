@@ -145,13 +145,25 @@ NVR: acá es donde se dice qué vigilar, no en la nube.
 2. **Dibujar las zonas restringidas y definir sus horarios acá, en el
    equipo local**: con el programa corriendo, entrar desde un navegador (en
    la misma red) a `http://<este-pc>:8090/configurar` — o al botón
-   "Configurar zonas y horarios" del visor en vivo. Ahí, por cada cámara: se
-   dibuja el polígono directo sobre el video en vivo (no hace falta subir
-   ningún snapshot a mano) y se agregan los horarios (días, hora de inicio/
-   fin, canal y destinatario de la alerta) por zona. Esto se guarda en este
-   mismo PC (`equipo_local/configuracion_local.sqlite3`) y **funciona
-   aunque se caiga internet** — la detección corre contra lo configurado
-   acá, no espera respuesta de la nube.
+   "Configurar zonas y horarios" del visor en vivo. Ahí, por cada cámara, se
+   elige el tipo de zona antes de dibujar (no hace falta subir ningún
+   snapshot a mano, el fondo es el video en vivo):
+   - **Polígono**: clic para ir marcando cada esquina; con 3 o más puntos,
+     "Cerrar y guardar zona".
+   - **Punto y radio**: para zonas que se recalculan solas si el objeto de
+     referencia se mueve (ej. "3 metros alrededor de la estiba"). Un solo
+     clic marca el centro (un clic nuevo lo mueve), "Cerrar y guardar zona"
+     pide el radio en metros. El círculo que se ve en pantalla solo es a
+     escala real si la cámara está calibrada (`px_por_metro`, calibración
+     que todavía se hace desde el dashboard cloud); si no está calibrada, la
+     zona se guarda igual — el círculo mostrado es solo aproximado
+     hasta calibrar.
+
+   Y se agregan los horarios (días, hora de inicio/fin, canal y destinatario
+   de la alerta) por zona. Esto se guarda en este mismo PC
+   (`equipo_local/configuracion_local.sqlite3`) y **funciona aunque se caiga
+   internet** — la detección corre contra lo configurado acá, no espera
+   respuesta de la nube.
 3. Lo que se configura acá se reporta solo hacia el dashboard (botón
    "Sincronizar con la nube ahora" en la página de configuración, o
    automático cada ~60s) — así se puede ver desde el dashboard sin tener
@@ -252,16 +264,28 @@ cámaras en el disco del propio PC (no en la nube — mismo criterio que el
 resto del proyecto: nunca sale video crudo a internet) y expone una páginita
 web local para verlas en vivo y revisar/borrar lo grabado.
 
+**No graba todo el tiempo, solo alrededor de un evento real** (una alerta
+disparada, no cualquier detección): mantiene en memoria los últimos
+`GRABACIONES_PRE_EVENTO_SEGUNDOS` de video (16s por defecto) sin escribir
+nada a disco, y al saltar una alerta abre el clip desde ahí — así el archivo
+ya incluye lo que pasó *antes* de la alerta — y sigue grabando
+`GRABACIONES_POST_EVENTO_SEGUNDOS` más (16s por defecto) después. Si la
+persona sigue en la zona y salta otra alerta mientras el clip todavía está
+abierto, el cierre se extiende en vez de cortar y abrir uno nuevo. Ver
+`equipo_local/grabador.py:GrabadorEventos`.
+
 ### Dónde quedan las grabaciones
 
 ```
 equipo_local/grabaciones/<id-de-la-cámara>/<YYYY-MM-DD>/HH-MM-SS.mp4
 ```
 
-Cada clip dura `GRABACIONES_DURACION_CLIP_MINUTOS` (1 hora por defecto) — así
-un archivo nunca crece indefinidamente y es fácil ubicar/borrar lo de un día
-puntual. La carpeta base se puede mover a otro disco con `GRABACIONES_DIR`
-(ej. un disco externo con más espacio).
+El nombre del archivo es la hora en que arrancó el clip (16s antes del
+evento, con los defaults). La carpeta base se puede mover a otro disco con
+`GRABACIONES_DIR` (ej. un disco externo con más espacio). Si una alerta se
+sostiene mucho tiempo (alguien parado en la zona), el clip se corta y
+reabre solo al llegar a `GRABACIONES_DURACION_MAXIMA_CLIP_MINUTOS` (1 hora
+por defecto), para que un solo archivo no crezca indefinidamente.
 
 **Retención automática**: una vez al día se borran solas las carpetas de
 fecha más viejas que `GRABACIONES_RETENCION_DIAS` (15 días por defecto) —
@@ -269,15 +293,15 @@ para que el disco no se llene solo. También se puede borrar manualmente por
 fecha (y opcionalmente por cámara) desde el visor web, con el botón
 "Eliminar por fecha".
 
-**Cálculo de espacio** (orientativo, con los defaults): la grabación usa la
-misma frecuencia de captura que la detección (`INTERVALO_DETECCION_SEGUNDOS`,
-~2.5 fps), no los 25-30fps del video original — así que el peso por cámara
-es bajo. Como referencia, a 3fps y calidad media, una cámara ronda **1-2 GB
-por día**; con 10 cámaras y 15 días de retención, calcula unos **150-300 GB**
-de uso simultáneo. Ajustar `GRABACIONES_RETENCION_DIAS` (menos días) o
-`GRABACIONES_FPS` (menos fps) si el disco del PC es más chico, o desactivar
-la grabación por completo con `GRABAR_VIDEO=false` si solo interesan los
-eventos/alertas.
+**Cálculo de espacio**: como ahora solo se grava alrededor de eventos reales
+(no todo el tiempo), el uso de disco depende de cuántas alertas dispara cada
+cámara por día, no de las horas que esté prendida — mucho más liviano que la
+grabación continua. Cada clip de un evento aislado son ~32s (16s antes + 16s
+después) a `GRABACIONES_FPS` (3 por defecto, misma frecuencia que la
+detección — `INTERVALO_DETECCION_SEGUNDOS`, no los 25-30fps del video
+original). Ajustar `GRABACIONES_RETENCION_DIAS` (menos días) si el disco del
+PC es más chico, o desactivar la grabación por completo con
+`GRABAR_VIDEO=false` si solo interesan los reportes/alertas sin video.
 
 ### Ver las cámaras en vivo y navegar las grabaciones
 

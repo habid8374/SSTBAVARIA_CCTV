@@ -67,12 +67,12 @@ def _sincronizador(monitores=None):
 
 class ApiCamarasTests(unittest.TestCase):
     def test_lista_las_camaras_activas(self):
-        monitor = MagicMock(id=1, nombre="Cam Bodega")
+        monitor = MagicMock(id=1, nombre="Cam Bodega", px_por_metro=50.0)
         app = crear_app(_sincronizador({1: monitor}), _ConfigDePrueba("/no/existe"))
         cliente = app.test_client()
         respuesta = cliente.get("/api/camaras")
         self.assertEqual(respuesta.status_code, 200)
-        self.assertEqual(respuesta.get_json(), [{"id": 1, "nombre": "Cam Bodega"}])
+        self.assertEqual(respuesta.get_json(), [{"id": 1, "nombre": "Cam Bodega", "px_por_metro": 50.0}])
 
     def test_sin_camaras_devuelve_lista_vacia(self):
         app = crear_app(_sincronizador(), _ConfigDePrueba("/no/existe"))

@@ -99,10 +99,20 @@ class Config:
     # terminaría creando la carpeta en el lugar equivocado.
     GRABACIONES_DIR = os.environ.get("GRABACIONES_DIR") or str(_CARPETA_EQUIPO_LOCAL / "grabaciones")
 
-    # Cada cuánto se cierra el clip actual y se abre uno nuevo — clips más
-    # cortos son más fáciles de indexar/borrar por fecha, pero generan más
-    # archivos. Una hora es un buen equilibrio para revisión manual.
-    GRABACIONES_DURACION_CLIP_MINUTOS = _entero("GRABACIONES_DURACION_CLIP_MINUTOS", 60)
+    # No se grava todo el tiempo: solo alrededor de un evento real (alerta
+    # disparada) — GrabadorEventos mantiene en memoria los últimos
+    # GRABACIONES_PRE_EVENTO_SEGUNDOS de video y, al saltar la alerta, arranca
+    # el clip desde ahí (queda el "antes" del evento) y sigue grabando
+    # GRABACIONES_POST_EVENTO_SEGUNDOS más (el "después"). Ver
+    # equipo_local/grabador.py:GrabadorEventos y camara.py.
+    GRABACIONES_PRE_EVENTO_SEGUNDOS = _entero("GRABACIONES_PRE_EVENTO_SEGUNDOS", 16)
+    GRABACIONES_POST_EVENTO_SEGUNDOS = _entero("GRABACIONES_POST_EVENTO_SEGUNDOS", 16)
+
+    # Si la alerta se sostiene mucho tiempo (alguien parado en la zona), el
+    # clip de un solo evento podría crecer indefinidamente — a los
+    # GRABACIONES_DURACION_MAXIMA_CLIP_MINUTOS se cierra y se abre uno nuevo
+    # sin perder frames, como si fuera el mismo evento partido en archivos.
+    GRABACIONES_DURACION_MAXIMA_CLIP_MINUTOS = _entero("GRABACIONES_DURACION_MAXIMA_CLIP_MINUTOS", 60)
 
     # FPS con el que se graba el clip — igual a la frecuencia real de
     # captura (1 / INTERVALO_DETECCION_SEGUNDOS), no a los 24-30fps del

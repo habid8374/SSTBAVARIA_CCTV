@@ -921,9 +921,10 @@ const TEMAS: Tema[] = [
         </Nota>
         <Sub>Ver las cámaras en vivo y las grabaciones</Sub>
         <P>
-          El equipo local también graba lo que ve cada cámara (con borrado automático de lo viejo) y levanta
-          su propia página web para verlo — completamente aparte del dashboard, para que el video nunca tenga
-          que subir a internet. Se accede desde un navegador <strong>en la misma red de la planta</strong>:
+          El equipo local también graba, pero no todo el tiempo: solo alrededor de eventos reales con alerta
+          (16 segundos antes y 16 después, por defecto), con borrado automático de lo viejo — y levanta su
+          propia página web para verlo, completamente aparte del dashboard, para que el video nunca tenga que
+          subir a internet. Se accede desde un navegador <strong>en la misma red de la planta</strong>:
         </P>
         <p className="rounded-md bg-zinc-100 px-3 py-2 font-mono text-xs text-corp-navy">
           http://sstbavaria-camaras.local:8090

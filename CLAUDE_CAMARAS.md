@@ -221,8 +221,15 @@ de esa configuración, no quien la define.
   `/configurar` y `/configurar/<camara_id>` — un editor de zonas
   (dibujadas con canvas sobre un frame en vivo real de la cámara, no un
   snapshot subido a mano) y horarios, servido por el mismo Flask del
-  visor. Solo zonas tipo Polígono por ahora — Punto y radio queda en el
-  almacenamiento/API pero sin UI de dibujo todavía (pendiente).
+  visor. Soporta ambos tipos de zona: Polígono (clic por vértice) y Punto
+  y radio (un clic marca el centro, se pide el radio en metros al
+  guardar). El círculo de Punto y radio se dibuja a escala real usando
+  `px_por_metro` — que `/api/camaras` expone leyéndolo de
+  `CamaraMonitor.px_por_metro`, ya sincronizado desde la nube en cada
+  ciclo de `obtener_reglas_activas` — y cae a un marcador aproximado si la
+  cámara todavía no está calibrada (la calibración en sí sigue siendo
+  solo desde el dashboard cloud, `calibrar_camara`, no está duplicada
+  acá).
 - **Sincronización hacia la nube**: `equipo_local/sincronizacion_config.py`
   — en cada ciclo de `main.py` (SincronizadorCamaras.sincronizar), empuja
   lo que cambió localmente hacia `POST
@@ -382,8 +389,10 @@ credenciales de Brevo o equipos locales — todo eso es solo Administrador.
      hace falta DVR/NVR, sirve cualquier PC/mini-PC común— con un instalador
      de un clic (`equipo_local/instalar.bat`/`instalar.sh`) pensado para
      alguien sin conocimientos técnicos. También
-     graba a disco lo que ve cada cámara (con retención automática y borrado
-     manual por fecha) y expone un visor web propio en esa red local
+     graba a disco, solo alrededor de eventos reales con alerta (16s antes +
+     16s después por defecto, no todo el tiempo — ver
+     `equipo_local/grabador.py:GrabadorEventos`), con retención automática y
+     borrado manual por fecha, y expone un visor web propio en esa red local
      (`http://<ip-del-pc>:8090`, o `http://sstbavaria-camaras.local:8090`
      por el anuncio mDNS/Bonjour) para ver las cámaras en vivo y revisar
      grabaciones — nunca sube video a internet, solo eventos con una foto

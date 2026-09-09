@@ -209,10 +209,17 @@ class UltimoFrameYGrabacionTests(unittest.TestCase):
             _camara_datos(),
             MagicMock(),
             MagicMock(),
-            _config(GRABAR_VIDEO=True, GRABACIONES_DIR="grabaciones", GRABACIONES_FPS=3, GRABACIONES_DURACION_CLIP_MINUTOS=60),
+            _config(
+                GRABAR_VIDEO=True,
+                GRABACIONES_DIR="grabaciones",
+                GRABACIONES_FPS=3,
+                GRABACIONES_PRE_EVENTO_SEGUNDOS=16,
+                GRABACIONES_POST_EVENTO_SEGUNDOS=16,
+                GRABACIONES_DURACION_MAXIMA_CLIP_MINUTOS=60,
+            ),
             fabrica_grabador=fabrica_grabador,
         )
-        fabrica_grabador.assert_called_once_with(1, "grabaciones", 3, 3600)
+        fabrica_grabador.assert_called_once_with(1, "grabaciones", 3, 16, 16, 3600)
 
     def test_grabar_video_desactivado_no_crea_grabador(self):
         fabrica_grabador = MagicMock()
@@ -232,7 +239,7 @@ class UltimoFrameYGrabacionTests(unittest.TestCase):
         grabador.cerrar.assert_called_once()
 
     def test_procesar_frame_completo_escribe_al_grabador(self):
-        """_loop_captura llama _actualizar_ultimo_frame + grabador.escribir_frame
+        """_loop_captura llama _actualizar_ultimo_frame + grabador.procesar_frame
         antes de _procesar_frame — se prueba acá el mismo orden sin cv2.VideoCapture real."""
         fabrica_grabador = MagicMock()
         grabador = fabrica_grabador.return_value
@@ -243,11 +250,37 @@ class UltimoFrameYGrabacionTests(unittest.TestCase):
         frame = np.zeros((10, 10, 3), dtype=np.uint8)
 
         monitor._actualizar_ultimo_frame(frame)
-        monitor._grabador.escribir_frame(frame)
+        monitor._grabador.procesar_frame(frame)
         monitor._procesar_frame(frame)
 
-        grabador.escribir_frame.assert_called_once_with(frame)
+        grabador.procesar_frame.assert_called_once_with(frame)
         self.assertIsNotNone(monitor.obtener_ultimo_frame_jpeg())
+
+    def test_evento_con_alerta_marca_el_evento_en_el_grabador(self):
+        fabrica_grabador = MagicMock()
+        grabador = fabrica_grabador.return_value
+        cliente_api = MagicMock(reportar_evento=MagicMock(return_value={"disparo_alerta": True}))
+        monitor = CamaraMonitor(
+            _camara_datos(), MagicMock(), cliente_api, _config(GRABAR_VIDEO=True), fabrica_grabador=fabrica_grabador,
+        )
+        frame = np.zeros((10, 10, 3), dtype=np.uint8)
+
+        monitor._reportar((50, 50), frame, {"id": 10, "nombre": "Zona Restringida"}, 0.9)
+
+        grabador.marcar_evento.assert_called_once()
+
+    def test_evento_sin_alerta_no_marca_el_evento_en_el_grabador(self):
+        fabrica_grabador = MagicMock()
+        grabador = fabrica_grabador.return_value
+        cliente_api = MagicMock(reportar_evento=MagicMock(return_value={"disparo_alerta": False}))
+        monitor = CamaraMonitor(
+            _camara_datos(), MagicMock(), cliente_api, _config(GRABAR_VIDEO=True), fabrica_grabador=fabrica_grabador,
+        )
+        frame = np.zeros((10, 10, 3), dtype=np.uint8)
+
+        monitor._reportar((50, 50), frame, {"id": 10, "nombre": "Zona Restringida"}, 0.9)
+
+        grabador.marcar_evento.assert_not_called()
 
 
 if __name__ == "__main__":

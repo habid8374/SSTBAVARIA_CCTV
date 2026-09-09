@@ -221,3 +221,112 @@ class GrabadorCamara:
         if self._escritor is not None:
             self._escritor.release()
             self._escritor = None
+
+
+class GrabadorEventos:
+    """Graba solo alrededor de un evento real (alerta disparada), no todo el
+    tiempo: mantiene en memoria un buffer con los últimos `pre_evento_segundos`
+    de frames (sin escribir nada a disco todavía) y, cuando `marcar_evento()`
+    se llama, abre un clip nuevo, vuelca ese buffer (así el clip arranca
+    `pre_evento_segundos` *antes* del momento del evento) y sigue grabando
+    `post_evento_segundos` más — si llega otro evento mientras ya está
+    grabando, extiende el cierre en vez de cortar y volver a abrir.
+
+    `procesar_frame()` se llama con cada frame capturado, evento o no —
+    alimenta el buffer y, si hay un clip abierto, también lo escribe.
+    `duracion_maxima_clip_segundos` evita un archivo gigante si el evento se
+    sostiene mucho tiempo (alguien parado en la zona): al llegar a ese tope,
+    cierra y abre un clip nuevo sin perder frames, como si fuera el mismo
+    evento partido en varios archivos."""
+
+    def __init__(
+        self,
+        camara_id,
+        base_dir,
+        fps,
+        pre_evento_segundos,
+        post_evento_segundos,
+        duracion_maxima_clip_segundos=None,
+        fabrica_escritor=None,
+    ):
+        self.camara_id = camara_id
+        self.base_dir = base_dir
+        self.fps = fps
+        self.pre_evento_segundos = pre_evento_segundos
+        self.post_evento_segundos = post_evento_segundos
+        self.duracion_maxima_clip_segundos = duracion_maxima_clip_segundos
+        self._fabrica_escritor = fabrica_escritor or self._crear_escritor_cv2
+        self._buffer = []  # [(timestamp, frame), ...] — solo el pre-evento, nunca se escribe solo
+        self._escritor = None
+        self._inicio_clip = None
+        self._tamano_frame = None
+        self._grabando_hasta = None
+
+    def procesar_frame(self, frame, ahora=None):
+        ahora = ahora if ahora is not None else time.monotonic()
+        self._buffer.append((ahora, frame))
+        limite = ahora - self.pre_evento_segundos
+        while self._buffer and self._buffer[0][0] < limite:
+            self._buffer.pop(0)
+
+        if self._grabando_hasta is None:
+            return
+        if ahora >= self._grabando_hasta:
+            self.cerrar()
+            return
+        self._escribir(frame, ahora)
+
+    def marcar_evento(self, ahora=None):
+        """Un evento real (con alerta) acaba de ocurrir: si no había un clip
+        abierto, lo abre y vuelca el buffer de pre-evento ya acumulado; si ya
+        estaba grabando, solo extiende cuánto falta para cerrar."""
+        ahora = ahora if ahora is not None else time.monotonic()
+        if self._grabando_hasta is None:
+            for timestamp, frame in self._buffer:
+                self._escribir(frame, timestamp)
+        self._grabando_hasta = max(self._grabando_hasta or 0, ahora + self.post_evento_segundos)
+
+    def _escribir(self, frame, ahora):
+        alto, ancho = frame.shape[:2]
+        clip_vencido = (
+            self.duracion_maxima_clip_segundos is not None
+            and self._inicio_clip is not None
+            and (ahora - self._inicio_clip) >= self.duracion_maxima_clip_segundos
+        )
+        cambio_tamano = self._tamano_frame is not None and self._tamano_frame != (ancho, alto)
+        if self._escritor is None or clip_vencido or cambio_tamano:
+            self._abrir_clip(ancho, alto, ahora)
+        if self._escritor is not None:
+            self._escritor.write(frame)
+
+    def _abrir_clip(self, ancho, alto, ahora):
+        self._cerrar_escritor()
+        ruta = ruta_clip(self.base_dir, self.camara_id, datetime.now())
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self._escritor = self._fabrica_escritor(str(ruta), ancho, alto)
+        except Exception:
+            logger.exception("No se pudo abrir el archivo de grabación %s", ruta)
+            self._escritor = None
+            return
+        self._tamano_frame = (ancho, alto)
+        self._inicio_clip = ahora
+
+    def _crear_escritor_cv2(self, ruta, ancho, alto):
+        import cv2
+
+        fourcc = cv2.VideoWriter_fourcc(*CODEC_CLIP)
+        return cv2.VideoWriter(ruta, fourcc, self.fps, (ancho, alto))
+
+    def _cerrar_escritor(self):
+        if self._escritor is not None:
+            self._escritor.release()
+            self._escritor = None
+        self._tamano_frame = None
+        self._inicio_clip = None
+
+    def cerrar(self):
+        """Cierra el clip activo, si hay uno — se llama sola al vencer
+        `post_evento_segundos` sin nuevos eventos, o al apagar el equipo."""
+        self._cerrar_escritor()
+        self._grabando_hasta = None
