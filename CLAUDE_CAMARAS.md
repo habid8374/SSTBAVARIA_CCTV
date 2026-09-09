@@ -257,6 +257,38 @@ bloquear en el backend la escritura de zonas/reglas de una cámara cuya
 `Camara.empresa` tenga algún `EquipoLocal` activo que ya las esté
 reportando).
 
+### Instrucciones de seguridad (bitácora de reglas en texto libre)
+
+El cliente pidió, además de las zonas dibujadas, poder anotar restricciones
+de seguridad que **todavía no sabemos automatizar** (ej. "las guardas no
+pueden estar abiertas mientras la máquina trabaja", "no tan cerca de un
+montacargas en movimiento") — para no perder la idea mientras se define
+cómo construirla, y para dejar el sistema abierto a más tipos de regla sin
+tener que adivinarlos todos de entrada.
+
+- `InstruccionSeguridad` (modelo nuevo): `texto` libre, `camara` opcional
+  (se puede escribir sin saber a qué cámara aplica todavía), `estado`
+  (Pendiente / Configurada / Requiere desarrollo aparte), `zona` opcional
+  (se enlaza una vez que sí se convierte en una zona real), `notas` para
+  el equipo técnico.
+- Endpoints dashboard: `dashboard/instrucciones-seguridad/` (lista/crea) y
+  `.../<id>/` (edita/borra) — cualquier Administrador u Operador puede
+  crear/editar (es solo dejarlo anotado, sin riesgo), borrar es solo
+  Administrador (`EsAdministradorParaEliminar`).
+- UI: tarjeta "Instrucciones de seguridad" arriba de todo en `ZonasView.tsx`
+  (no depende de qué cámara esté seleccionada) — texto libre + cámara
+  opcional + selector de estado por instrucción.
+
+**No es** un mecanismo de interpretación automática (no hay IA/NLU
+convirtiendo el texto en una zona) — es solo un registro para no perder
+requisitos mientras se van definiendo. Las que sí encajan en el modelo
+actual (una zona fija con un motivo, ej. "no pararse en el transportador")
+se convierten a mano en una zona real y se marcan `Configurada`; las que
+necesitan capacidades nuevas (detectar el estado de un objeto — guarda/
+puerta abierta o cerrada —, una condición de tiempo, o el estado de otra
+máquina vía sensor/PLC) quedan en `Requiere desarrollo aparte` hasta
+diseñarse.
+
 ## Funciones/servicios clave
 
 | Función | Responsabilidad |

@@ -7,7 +7,15 @@ from rest_framework import serializers
 from core.models import Empresa
 from core.validators import validar_tamano_archivo
 
-from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import (
+    Camara,
+    ConfiguracionNotificaciones,
+    EquipoLocal,
+    EventoDetectado,
+    InstruccionSeguridad,
+    ReglaAlerta,
+    ZonaRestringida,
+)
 
 
 class EventoEntradaSerializer(serializers.Serializer):
@@ -323,3 +331,29 @@ class EquipoLocalSerializer(serializers.ModelSerializer):
         if not equipo.ultima_conexion:
             return False
         return (timezone.now() - equipo.ultima_conexion) < timedelta(minutes=5)
+
+
+class InstruccionSeguridadSerializer(serializers.ModelSerializer):
+    """Bitácora de restricciones de seguridad escritas en texto simple —
+    ver InstruccionSeguridad. `camara`/`zona` son opcionales: se puede
+    anotar la instrucción antes de saber a qué cámara aplica o si ya se
+    convirtió en una zona real."""
+
+    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True, default=None)
+    zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
+
+    class Meta:
+        model = InstruccionSeguridad
+        fields = [
+            "id",
+            "camara",
+            "camara_nombre",
+            "texto",
+            "estado",
+            "zona",
+            "zona_nombre",
+            "notas",
+            "creada_en",
+            "actualizada_en",
+        ]
+        read_only_fields = ["creada_en", "actualizada_en"]

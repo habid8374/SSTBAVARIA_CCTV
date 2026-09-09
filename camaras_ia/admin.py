@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import (
+    Camara,
+    ConfiguracionNotificaciones,
+    EquipoLocal,
+    EventoDetectado,
+    InstruccionSeguridad,
+    ReglaAlerta,
+    ZonaRestringida,
+)
 
 
 class ReglaAlertaInline(admin.TabularInline):
@@ -64,3 +72,10 @@ class EventoDetectadoAdmin(admin.ModelAdmin):
     list_filter = ("estado", "disparo_alerta", "camara")
     date_hierarchy = "timestamp"
     readonly_fields = ("timestamp",)
+
+
+@admin.register(InstruccionSeguridad)
+class InstruccionSeguridadAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "camara", "estado", "zona", "creada_en")
+    list_filter = ("empresa", "estado")
+    search_fields = ("texto", "notas")

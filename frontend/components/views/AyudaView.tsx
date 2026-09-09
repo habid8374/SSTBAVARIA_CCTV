@@ -214,6 +214,23 @@ const TEMAS: Tema[] = [
           vigente). Si aparece <strong>dentro</strong> del horario configurado, se genera una alerta y se
           envía la notificación por el canal elegido.
         </P>
+        <Sub>Instrucciones de seguridad (arriba de todo, sin importar la cámara)</Sub>
+        <P>
+          Un cuadro de texto libre para anotar cualquier restricción de seguridad, aunque todavía no se sepa
+          cómo detectarla automáticamente — por ejemplo &quot;no pararse en el transportador&quot; o &quot;las
+          guardas no pueden estar abiertas mientras la máquina está trabajando&quot;. No convierte el texto en
+          una zona solo — es una lista para no perder la idea mientras el equipo técnico define cómo
+          construirla.
+        </P>
+        <Ul>
+          <li>Escribir la instrucción, opcionalmente elegir a qué cámara aplica (se puede dejar
+            &quot;Sin cámara asignada&quot; si todavía no se sabe), y <strong>Guardar</strong>.</li>
+          <li>Cada instrucción tiene un estado editable: <strong>Pendiente de revisar</strong> (recién anotada),{" "}
+            <strong>Ya configurada como zona</strong> (ya se convirtió en una zona real) o{" "}
+            <strong>Necesita desarrollo aparte</strong> (requiere una capacidad nueva, ej. detectar el estado de
+            un objeto en vez de solo personas).</li>
+          <li>Eliminar una instrucción es solo para Administrador.</li>
+        </Ul>
       </>
     ),
   },

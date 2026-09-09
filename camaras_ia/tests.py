@@ -12,7 +12,15 @@ from django.utils import timezone
 
 from core.models import Empresa
 
-from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import (
+    Camara,
+    ConfiguracionNotificaciones,
+    EquipoLocal,
+    EventoDetectado,
+    InstruccionSeguridad,
+    ReglaAlerta,
+    ZonaRestringida,
+)
 from .services import _regla_vigente, disparar_alerta, evaluar_zona_horario, punto_en_circulo, punto_en_poligono, punto_en_zona
 
 Usuario = get_user_model()
@@ -822,6 +830,67 @@ class DashboardEndpointsTests(TestCase):
         url = reverse("camaras_ia:zonas_detalle", args=[self.zona.pk])
         response = self.client.delete(url, **self._auth(self.admin))
         self.assertEqual(response.status_code, 204)
+
+    def test_operador_puede_crear_instruccion_de_seguridad(self):
+        response = self.client.post(
+            reverse("camaras_ia:instrucciones_seguridad_lista"),
+            {"texto": "No pararse en el transportador", "camara": self.camara.pk},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["estado"], "pendiente")
+        self.assertTrue(InstruccionSeguridad.objects.filter(texto="No pararse en el transportador").exists())
+
+    def test_crear_instruccion_sin_camara_es_valido(self):
+        response = self.client.post(
+            reverse("camaras_ia:instrucciones_seguridad_lista"),
+            {"texto": "No debe estar cerca de químicos"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(response.data["camara"])
+
+    def test_lista_instrucciones_incluye_nombres_de_camara_y_zona(self):
+        InstruccionSeguridad.objects.create(
+            empresa=self.empresa, camara=self.camara, zona=self.zona, texto="Ya configurada", estado="configurada"
+        )
+        response = self.client.get(reverse("camaras_ia:instrucciones_seguridad_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["camara_nombre"], "Cam 1")
+        self.assertEqual(response.data[0]["zona_nombre"], "Bodega")
+
+    def test_operador_puede_editar_estado_de_instruccion(self):
+        instruccion = InstruccionSeguridad.objects.create(empresa=self.empresa, texto="Algo por revisar")
+        response = self.client.patch(
+            reverse("camaras_ia:instrucciones_seguridad_detalle", args=[instruccion.pk]),
+            {"estado": "requiere_desarrollo", "notas": "Necesita detectar el estado de una guarda"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        instruccion.refresh_from_db()
+        self.assertEqual(instruccion.estado, "requiere_desarrollo")
+
+    def test_operador_no_puede_eliminar_instruccion(self):
+        instruccion = InstruccionSeguridad.objects.create(empresa=self.empresa, texto="Algo")
+        response = self.client.delete(
+            reverse("camaras_ia:instrucciones_seguridad_detalle", args=[instruccion.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(InstruccionSeguridad.objects.filter(pk=instruccion.pk).exists())
+
+    def test_admin_elimina_instruccion(self):
+        instruccion = InstruccionSeguridad.objects.create(empresa=self.empresa, texto="Algo")
+        response = self.client.delete(
+            reverse("camaras_ia:instrucciones_seguridad_detalle", args=[instruccion.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+
+    def test_instrucciones_sin_autenticar_devuelve_401(self):
+        response = self.client.get(reverse("camaras_ia:instrucciones_seguridad_lista"))
+        self.assertEqual(response.status_code, 401)
 
     def test_sin_autenticar_devuelve_401(self):
         response = self.client.get(reverse("camaras_ia:indicadores_dashboard"))

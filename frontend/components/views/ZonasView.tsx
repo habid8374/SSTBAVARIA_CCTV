@@ -8,15 +8,21 @@ import CirculoOverlay from "@/components/CirculoOverlay";
 import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
+  actualizarInstruccionSeguridad,
   actualizarRegla,
   actualizarZona,
   calibrarCamara,
+  crearInstruccionSeguridad,
   crearZona,
+  eliminarInstruccionSeguridad,
   eliminarRegla,
   eliminarZona,
   listarCamarasDashboard,
+  listarInstruccionesSeguridad,
   subirSnapshotReferencia,
   type CamaraDashboard,
+  type EstadoInstruccion,
+  type InstruccionSeguridad,
   type Rol,
   type TipoZona,
   type ZonaDashboard,
@@ -162,6 +168,8 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
         zonas y definir horarios de verdad. Lo que se ve abajo es un espejo de lectura — si editas algo acá, el
         equipo local lo puede volver a pisar en su próxima sincronización (cada ~60s).
       </div>
+      <InstruccionesSeguridadPanel token={token} camaras={camaras} esAdmin={esAdmin} />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
           Dibuja el polígono de la zona restringida sobre el encuadre fijo de la cámara, o marca un punto y un
@@ -499,6 +507,173 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
             <ZonaCard key={zona.id} zona={zona} token={token} esAdmin={esAdmin} onCambio={cargar} />
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+const ETIQUETA_ESTADO_INSTRUCCION: Record<EstadoInstruccion, string> = {
+  pendiente: "Pendiente de revisar",
+  configurada: "Ya configurada como zona",
+  requiere_desarrollo: "Necesita desarrollo aparte",
+};
+
+const ESTILO_ESTADO_INSTRUCCION: Record<EstadoInstruccion, string> = {
+  pendiente: "bg-amber-100 text-amber-700",
+  configurada: "bg-green-100 text-green-700",
+  requiere_desarrollo: "bg-zinc-100 text-zinc-600",
+};
+
+function InstruccionesSeguridadPanel({
+  token,
+  camaras,
+  esAdmin,
+}: {
+  token: string;
+  camaras: CamaraDashboard[] | null;
+  esAdmin: boolean;
+}) {
+  const [instrucciones, setInstrucciones] = useState<InstruccionSeguridad[] | null>(null);
+  const [texto, setTexto] = useState("");
+  const [camaraSeleccionada, setCamaraSeleccionada] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { confirmar } = useDialog();
+
+  function cargar() {
+    listarInstruccionesSeguridad(token)
+      .then(setInstrucciones)
+      .catch(() => setError("No se pudo cargar la lista de instrucciones."));
+  }
+
+  useEffect(cargar, [token]);
+
+  async function agregar(e: FormEvent) {
+    e.preventDefault();
+    if (!texto.trim()) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await crearInstruccionSeguridad(token, {
+        texto: texto.trim(),
+        camara: camaraSeleccionada ? Number(camaraSeleccionada) : undefined,
+      });
+      setTexto("");
+      setCamaraSeleccionada("");
+      cargar();
+    } catch {
+      setError("No se pudo guardar la instrucción.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function cambiarEstado(instruccion: InstruccionSeguridad, estado: EstadoInstruccion) {
+    try {
+      await actualizarInstruccionSeguridad(token, instruccion.id, { estado });
+      cargar();
+    } catch {
+      setError("No se pudo actualizar el estado.");
+    }
+  }
+
+  async function eliminar(instruccion: InstruccionSeguridad) {
+    const ok = await confirmar({
+      titulo: "Eliminar instrucción",
+      mensaje: `¿Eliminar "${instruccion.texto}"? Esta acción no se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminarInstruccionSeguridad(token, instruccion.id);
+      cargar();
+    } catch {
+      setError("No se pudo eliminar la instrucción.");
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-corp-border bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-corp-navy">Instrucciones de seguridad</h3>
+      <p className="mt-1 text-sm text-corp-muted">
+        Escribe acá cualquier restricción de seguridad, aunque todavía no sepamos cómo detectarla automáticamente
+        (ej. &quot;no pararse en el transportador&quot;, &quot;las guardas no pueden estar abiertas con la
+        máquina trabajando&quot;) — queda anotada para no perderla, y el equipo técnico la revisa.
+      </p>
+
+      <form onSubmit={agregar} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Ej: No debe estar cerca de la zona de químicos"
+          rows={2}
+          className="flex-1 rounded-md border border-corp-border px-3 py-1.5 text-sm"
+        />
+        <div className="flex gap-2">
+          <select
+            value={camaraSeleccionada}
+            onChange={(e) => setCamaraSeleccionada(e.target.value)}
+            className="rounded-md border border-corp-border px-3 py-1.5 text-sm"
+          >
+            <option value="">Sin cámara asignada</option>
+            {(camaras ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            disabled={guardando || !texto.trim()}
+            className="rounded-md bg-corp-navy px-3 py-1.5 text-sm font-medium text-white hover:bg-corp-navy/90 disabled:opacity-50"
+          >
+            Guardar
+          </button>
+        </div>
+      </form>
+
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+
+      {instrucciones && instrucciones.length > 0 && (
+        <ul className="mt-4 divide-y divide-corp-border">
+          {instrucciones.map((instruccion) => (
+            <li key={instruccion.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+              <div>
+                <p className="text-sm text-corp-navy">{instruccion.texto}</p>
+                <p className="text-xs text-corp-muted">
+                  {instruccion.camara_nombre ?? "Sin cámara asignada"}
+                  {instruccion.zona_nombre ? ` · zona "${instruccion.zona_nombre}"` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={instruccion.estado}
+                  onChange={(e) => cambiarEstado(instruccion, e.target.value as EstadoInstruccion)}
+                  className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium ${ESTILO_ESTADO_INSTRUCCION[instruccion.estado]}`}
+                >
+                  {(Object.keys(ETIQUETA_ESTADO_INSTRUCCION) as EstadoInstruccion[]).map((estado) => (
+                    <option key={estado} value={estado}>
+                      {ETIQUETA_ESTADO_INSTRUCCION[estado]}
+                    </option>
+                  ))}
+                </select>
+                {esAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => eliminar(instruccion)}
+                    className="rounded-md border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                  >
+                    Eliminar
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {instrucciones && instrucciones.length === 0 && (
+        <p className="mt-3 text-xs text-corp-muted">Todavía no hay instrucciones anotadas.</p>
       )}
     </div>
   );

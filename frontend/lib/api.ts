@@ -417,6 +417,62 @@ export function eliminarZona(token: string, id: number): Promise<void> {
   });
 }
 
+export type EstadoInstruccion = "pendiente" | "configurada" | "requiere_desarrollo";
+
+export type InstruccionSeguridad = {
+  id: number;
+  camara: number | null;
+  camara_nombre: string | null;
+  texto: string;
+  estado: EstadoInstruccion;
+  zona: number | null;
+  zona_nombre: string | null;
+  notas: string;
+  creada_en: string;
+  actualizada_en: string;
+};
+
+export type NuevaInstruccionSeguridad = {
+  texto: string;
+  camara?: number;
+};
+
+export function listarInstruccionesSeguridad(token: string): Promise<InstruccionSeguridad[]> {
+  return request<InstruccionSeguridad[]>("/api/camaras-ia/dashboard/instrucciones-seguridad/", {
+    headers: authHeaders(token),
+  });
+}
+
+export function crearInstruccionSeguridad(
+  token: string,
+  datos: NuevaInstruccionSeguridad
+): Promise<InstruccionSeguridad> {
+  return request<InstruccionSeguridad>("/api/camaras-ia/dashboard/instrucciones-seguridad/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarInstruccionSeguridad(
+  token: string,
+  id: number,
+  cambios: Partial<Pick<InstruccionSeguridad, "camara" | "texto" | "estado" | "zona" | "notas">>
+): Promise<InstruccionSeguridad> {
+  return request<InstruccionSeguridad>(`/api/camaras-ia/dashboard/instrucciones-seguridad/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarInstruccionSeguridad(token: string, id: number): Promise<void> {
+  return request<void>(`/api/camaras-ia/dashboard/instrucciones-seguridad/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
 export function crearRegla(token: string, datos: NuevaRegla): Promise<ReglaAlerta> {
   return request<ReglaAlerta>("/api/camaras-ia/dashboard/reglas/", {
     method: "POST",

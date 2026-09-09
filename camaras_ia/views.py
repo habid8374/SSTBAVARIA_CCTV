@@ -15,9 +15,17 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import Empresa
-from core.permissions import EsAdministrador, EsAdministradorOSoloLectura
+from core.permissions import EsAdministrador, EsAdministradorOSoloLectura, EsAdministradorParaEliminar
 
-from .models import Camara, ConfiguracionNotificaciones, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import (
+    Camara,
+    ConfiguracionNotificaciones,
+    EquipoLocal,
+    EventoDetectado,
+    InstruccionSeguridad,
+    ReglaAlerta,
+    ZonaRestringida,
+)
 from .serializers import (
     CamaraActivaSerializer,
     CamaraCalibracionSerializer,
@@ -27,6 +35,7 @@ from .serializers import (
     EquipoLocalSerializer,
     EventoDashboardSerializer,
     EventoEntradaSerializer,
+    InstruccionSeguridadSerializer,
     ReglaAlertaSerializer,
     SnapshotReferenciaSerializer,
     ZonaDashboardSerializer,
@@ -452,6 +461,36 @@ class EquipoLocalDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = EquipoLocal.objects.all()
     serializer_class = EquipoLocalSerializer
     permission_classes = [EsAdministradorOSoloLectura]
+
+
+class InstruccionSeguridadListaCrear(generics.ListCreateAPIView):
+    """Bitácora de restricciones de seguridad en texto libre (ver
+    InstruccionSeguridad) — cualquier Administrador u Operador puede
+    escribir una nueva (es solo dejarla anotada, no borra ni cambia nada),
+    eliminarlas requiere Administrador (ver InstruccionSeguridadDetalle)."""
+
+    serializer_class = InstruccionSeguridadSerializer
+    permission_classes = [EsAdministradorParaEliminar]
+
+    def get_queryset(self):
+        return InstruccionSeguridad.objects.select_related("camara", "zona").filter(
+            empresa=Empresa.objects.first()
+        )
+
+    def perform_create(self, serializer):
+        empresa = Empresa.objects.first()
+        if empresa is None:
+            empresa = Empresa.objects.create(nombre="Empresa")
+        serializer.save(empresa=empresa)
+
+
+class InstruccionSeguridadDetalle(generics.RetrieveUpdateDestroyAPIView):
+    """Editar el estado/notas de una instrucción, o eliminarla (solo
+    Administrador)."""
+
+    queryset = InstruccionSeguridad.objects.select_related("camara", "zona")
+    serializer_class = InstruccionSeguridadSerializer
+    permission_classes = [EsAdministradorParaEliminar]
 
 
 _EQUIPO_LOCAL_EXCLUIR_DEL_ZIP = {"venv", "__pycache__", "grabaciones", "tests", ".pytest_cache"}

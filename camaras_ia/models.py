@@ -229,6 +229,59 @@ class ReglaAlerta(models.Model):
         return self.nombre or f"Regla de {self.zona.nombre}"
 
 
+class InstruccionSeguridad(models.Model):
+    """Restricción de seguridad escrita en texto simple por el cliente —
+    captura cualquier regla ("no pararse en el transportador", "las guardas
+    no pueden estar abiertas con la máquina trabajando") aunque el sistema
+    todavía no sepa detectarla automáticamente.
+
+    No es un tipo de zona ni reemplaza el dibujo de polígonos — es una
+    bitácora: lo que sí se puede convertir en una zona real (una zona fija,
+    ej. "no pararse en el transportador") queda enlazado a ella vía `zona`;
+    lo que necesita una capacidad de visión nueva (detectar el estado de un
+    objeto como una guarda o una puerta, una condición de tiempo, etc.)
+    queda registrado con `estado=REQUIERE_DESARROLLO` para no perderse,
+    hasta que se decida cómo construirlo."""
+
+    class Estado(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente de revisar"
+        CONFIGURADA = "configurada", "Ya configurada como zona"
+        REQUIERE_DESARROLLO = "requiere_desarrollo", "Necesita desarrollo aparte"
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="instrucciones_seguridad")
+    camara = models.ForeignKey(
+        Camara,
+        on_delete=models.CASCADE,
+        related_name="instrucciones",
+        null=True,
+        blank=True,
+        help_text="Opcional — se puede escribir la instrucción antes de saber a qué cámara aplica.",
+    )
+    texto = models.TextField("instrucción")
+    estado = models.CharField(max_length=30, choices=Estado.choices, default=Estado.PENDIENTE)
+    zona = models.ForeignKey(
+        ZonaRestringida,
+        on_delete=models.SET_NULL,
+        related_name="instrucciones",
+        null=True,
+        blank=True,
+        help_text="Se enlaza acá una vez que la instrucción ya quedó configurada como zona real.",
+    )
+    notas = models.TextField(
+        "notas internas", blank=True, help_text="Para el equipo técnico: qué hace falta para automatizarla."
+    )
+    creada_en = models.DateTimeField(auto_now_add=True)
+    actualizada_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "instrucción de seguridad"
+        verbose_name_plural = "instrucciones de seguridad"
+        ordering = ["-creada_en"]
+
+    def __str__(self):
+        return self.texto[:60]
+
+
 def snapshot_upload_to(instance, filename):
     return f"eventos/{instance.camara_id}/{filename}"
 
