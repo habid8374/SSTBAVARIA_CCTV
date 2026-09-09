@@ -54,10 +54,20 @@ class Config:
     # (y la bandeja de correo) mientras la persona sigue parada ahí.
     COOLDOWN_ZONA_SEGUNDOS = _entero("COOLDOWN_ZONA_SEGUNDOS", 60)
 
-    # Ruta o nombre del modelo de ultralytics. "yolov8n.pt" (nano) se
-    # descarga solo la primera vez; para un PC más limitado puede apuntar a
-    # un modelo ya cuantizado/exportado a ONNX en disco.
-    MODELO_YOLO = os.environ.get("MODELO_YOLO", "yolov8n.pt")
+    # Ruta del modelo de ultralytics. Por defecto, una ruta absoluta dentro
+    # de esta misma carpeta (equipo_local/yolov8n.pt) — nunca un nombre
+    # suelto como "yolov8n.pt": ultralytics resuelve (y descarga, si falta)
+    # ese archivo relativo a la carpeta de trabajo del proceso, no a la
+    # carpeta del programa, y la carpeta de trabajo tiene que ser la carpeta
+    # *padre* de equipo_local (ver rutas.py) — en Windows, si esa carpeta
+    # padre es la raíz de un disco (ej. C:\), escribir ahí requiere permisos
+    # de administrador y la descarga automática falla con "Permission
+    # denied" incluso corriendo como usuario normal. Con la ruta absoluta,
+    # la descarga (solo la primera vez) y las cargas siguientes siempre caen
+    # en el mismo lugar sin importar desde dónde se arranque el programa.
+    # Para un PC más limitado puede apuntar a un modelo ya cuantizado/
+    # exportado a ONNX en disco.
+    MODELO_YOLO = os.environ.get("MODELO_YOLO") or str(_CARPETA_EQUIPO_LOCAL / "yolov8n.pt")
 
     # Timeout de las llamadas HTTP al backend.
     TIMEOUT_HTTP_SEGUNDOS = _entero("TIMEOUT_HTTP_SEGUNDOS", 10)

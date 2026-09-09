@@ -91,6 +91,24 @@ defecto**. Video en vivo confirmado en VLC — no hace falta tocar el campo
 `rtsp_url` explícito para esta cámara, con solo IP + usuario + contraseña
 alcanza.
 
+### 🐛 Bug real encontrado y corregido: el modelo YOLO no cargaba en Windows
+
+Instalando en sitio (PC con `C:\equipo_local`, corrido correctamente desde
+`C:\` como exige `-m equipo_local.main`): `DetectorPersonas` fallaba con
+`ConnectionError` / `Permission denied` al intentar descargar `yolov8n.pt`
+la primera vez. Causa: `Config.MODELO_YOLO` guardaba solo el nombre suelto
+`"yolov8n.pt"`, y ultralytics resuelve (y descarga, si falta) ese archivo
+relativo a la **carpeta de trabajo del proceso**, no a la carpeta del
+programa — y esa carpeta de trabajo es, por diseño (ver `rutas.py`), la
+carpeta *padre* de `equipo_local`, que en este caso era literalmente la
+raíz del disco (`C:\`). Escribir ahí sin ser Administrador falla siempre en
+Windows. Corregido en `config.py`: `MODELO_YOLO` ahora es una ruta absoluta
+por defecto (`equipo_local/yolov8n.pt`), así la descarga y las cargas
+siguientes caen siempre en el mismo lugar sin importar desde dónde se
+arranque el programa. Este mismo bug explica por qué la Tarea Programada de
+Windows tampoco arrancaba (moría con esa misma excepción no manejada antes
+de llegar a conectar con la nube).
+
 ### Pendiente de verificar con hardware real
 
 - Calidad real de la detección YOLOv8n con la cámara instalada: iluminación
