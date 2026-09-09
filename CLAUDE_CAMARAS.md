@@ -98,6 +98,21 @@ alcanza.
   resolución o hace falta el canal principal.
 - Calibración del escalado de coordenadas (frame RTSP → snapshot de
   referencia) con la resolución real del stream.
+- **Altavoz de disuasión (luz + sirena)**: el datasheet oficial de la
+  DH-P3B-PV confirma que trae "sound and light alarms to actively deter
+  intruders" incorporados, pero Dahua no publica API oficial para esa línea
+  de consumo. Investigación (ver `equipo_local/disuasion.py`): una
+  integración de Home Assistant de código abierto ampliamente usada con
+  cámaras Dahua (github.com/rroller/dahua) implementa el encendido remoto
+  de sirena/luz vía `GET /cgi-bin/coaxialControlIO.cgi?action=control&channel=1&info[0].Type=2&info[0].IO=1`
+  (`Type=1` luz, `Type=2` sirena, `IO=1` encender — la cámara la apaga sola
+  a los 10-15s), autenticando con HTTP Digest y las mismas credenciales
+  ONVIF ya guardadas en `Camara`. Quedó implementado y con tests
+  (`activar_disuasion()`, disparado desde `CamaraMonitor._reportar()` en
+  cada alerta real) pero **apagado por defecto**
+  (`ALTAVOZ_DISUASION_ACTIVO=false`) porque el endpoint no está confirmado
+  contra la Picoo B1 real — falta probarlo en sitio antes de prender el
+  flag en producción, mismo criterio que se usó con RTSP/calibración.
 
 <details>
 <summary>Investigación previa: Dahua Picoo A2 (evaluada, no comprada)</summary>

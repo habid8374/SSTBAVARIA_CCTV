@@ -282,6 +282,52 @@ class UltimoFrameYGrabacionTests(unittest.TestCase):
 
         grabador.marcar_evento.assert_not_called()
 
+    @patch("equipo_local.camara.disuasion.activar_disuasion")
+    def test_evento_con_alerta_y_altavoz_activo_dispara_la_disuasion(self, mock_activar):
+        cliente_api = MagicMock(reportar_evento=MagicMock(return_value={"disparo_alerta": True}))
+        datos = _camara_datos(ip="10.0.0.5", usuario_onvif="admin", password_onvif="clave123")
+        monitor = CamaraMonitor(
+            datos, MagicMock(), cliente_api,
+            _config(GRABAR_VIDEO=False, ALTAVOZ_DISUASION_ACTIVO=True, ALTAVOZ_DISUASION_CANAL=2),
+        )
+        frame = np.zeros((10, 10, 3), dtype=np.uint8)
+
+        monitor._reportar((50, 50), frame, {"id": 10, "nombre": "Zona Restringida"}, 0.9)
+
+        mock_activar.assert_called_once_with("10.0.0.5", "admin", "clave123", canal=2)
+
+    @patch("equipo_local.camara.disuasion.activar_disuasion")
+    def test_altavoz_desactivado_por_defecto_no_dispara_la_disuasion(self, mock_activar):
+        cliente_api = MagicMock(reportar_evento=MagicMock(return_value={"disparo_alerta": True}))
+        datos = _camara_datos(ip="10.0.0.5", usuario_onvif="admin", password_onvif="clave123")
+        monitor = CamaraMonitor(datos, MagicMock(), cliente_api, _config(GRABAR_VIDEO=False))
+
+        monitor._reportar((50, 50), np.zeros((10, 10, 3), dtype=np.uint8), {"id": 10, "nombre": "Zona"}, 0.9)
+
+        mock_activar.assert_not_called()
+
+    @patch("equipo_local.camara.disuasion.activar_disuasion")
+    def test_altavoz_activo_sin_credenciales_no_rompe_ni_llama_a_disuasion(self, mock_activar):
+        cliente_api = MagicMock(reportar_evento=MagicMock(return_value={"disparo_alerta": True}))
+        monitor = CamaraMonitor(
+            _camara_datos(), MagicMock(), cliente_api, _config(GRABAR_VIDEO=False, ALTAVOZ_DISUASION_ACTIVO=True),
+        )
+
+        monitor._reportar((50, 50), np.zeros((10, 10, 3), dtype=np.uint8), {"id": 10, "nombre": "Zona"}, 0.9)
+
+        mock_activar.assert_not_called()
+
+    @patch("equipo_local.camara.disuasion.activar_disuasion")
+    def test_error_al_activar_la_disuasion_no_rompe_el_reporte(self, mock_activar):
+        mock_activar.side_effect = Exception("timeout")
+        cliente_api = MagicMock(reportar_evento=MagicMock(return_value={"disparo_alerta": True}))
+        datos = _camara_datos(ip="10.0.0.5", usuario_onvif="admin", password_onvif="clave123")
+        monitor = CamaraMonitor(
+            datos, MagicMock(), cliente_api, _config(GRABAR_VIDEO=False, ALTAVOZ_DISUASION_ACTIVO=True),
+        )
+
+        monitor._reportar((50, 50), np.zeros((10, 10, 3), dtype=np.uint8), {"id": 10, "nombre": "Zona"}, 0.9)  # no debe lanzar
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -358,6 +358,36 @@ en la misma red — solo recomendable si esa red ya es de confianza (la
 consola arranca con una advertencia si quedan vacíos, para no pasarlo por
 alto). Para desactivar el visor por completo: `VISOR_WEB_ACTIVO=false`.
 
+## Altavoz de disuasión (luz + sirena) — experimental, apagado por defecto
+
+La Dahua Picoo B1 trae luz y sirena de "disuasión activa" incorporadas
+(confirmado en el datasheet oficial), pero Dahua no publica una API oficial
+para activarlas remotamente en esta línea de consumo. `equipo_local/disuasion.py`
+implementa un candidato investigado (usado por una integración de Home
+Assistant de código abierto con cámaras Dahua) que enciende sirena y/o luz
+vía `GET /cgi-bin/coaxialControlIO.cgi` con las mismas credenciales ONVIF ya
+configuradas — la propia cámara la apaga sola a los 10-15 segundos.
+
+**No está confirmado contra la Picoo B1 real** — por eso viene apagado
+(`ALTAVOZ_DISUASION_ACTIVO=false`). Antes de prenderlo en producción:
+
+1. Probar manualmente el endpoint contra la IP real de una cámara ya
+   registrada (mismo usuario/contraseña ONVIF que tiene en el dashboard):
+   ```bash
+   curl --digest -u admin:contraseña \
+     "http://<ip-de-la-camara>/cgi-bin/coaxialControlIO.cgi?action=control&channel=1&info[0].Type=2&info[0].IO=1"
+   ```
+   Si la sirena suena, el candidato sirve para esa cámara.
+2. Recién ahí, poner `ALTAVOZ_DISUASION_ACTIVO=true` en el `.env` — desde
+   ese momento, cada vez que una detección dispare una alerta real
+   (`disparo_alerta=true`, no cualquier detección), el equipo local también
+   enciende sirena y luz de esa cámara, sin esperar a que alguien lo haga a
+   mano desde la app DMSS.
+
+Si el endpoint no aplica a esta cámara/firmware, `equipo_local/disuasion.py`
+es el único lugar que hay que tocar para probar otro candidato — el resto
+(config, wiring en `CamaraMonitor`, tests) no cambia.
+
 ## Pruebas automatizadas
 
 ```bash

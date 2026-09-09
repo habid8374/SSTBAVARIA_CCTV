@@ -125,6 +125,14 @@ class Config:
     # corre una limpieza automática una vez al día.
     GRABACIONES_RETENCION_DIAS = _entero("GRABACIONES_RETENCION_DIAS", 15)
 
+    # --- Altavoz de disuasión (luz + sirena de la cámara) ---
+
+    # Apagado por defecto: el endpoint que usa (ver equipo_local/disuasion.py)
+    # es un CGI no documentado oficialmente por Dahua para la línea Picoo —
+    # confirmarlo contra una cámara real antes de prender esto en producción.
+    ALTAVOZ_DISUASION_ACTIVO = _booleano("ALTAVOZ_DISUASION_ACTIVO", False)
+    ALTAVOZ_DISUASION_CANAL = _entero("ALTAVOZ_DISUASION_CANAL", 1)
+
     # --- Visor web local (cámaras en vivo + grabaciones) ---
 
     # Si se desactiva, no se levanta el visor web (solo detección/grabación).

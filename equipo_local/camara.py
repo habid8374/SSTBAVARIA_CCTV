@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 import requests
 
+from . import disuasion
 from .geometria import escalar_punto, punto_en_zona
 from .grabador import GrabadorEventos
 
@@ -29,6 +30,9 @@ class CamaraMonitor:
         self.rtsp_url = camara_datos["rtsp_url"]
         self.zonas = camara_datos.get("zonas", [])
         self.px_por_metro = camara_datos.get("px_por_metro")
+        self.ip = camara_datos.get("ip")
+        self.usuario_onvif = camara_datos.get("usuario_onvif")
+        self.password_onvif = camara_datos.get("password_onvif")
         self._snapshot_referencia_url = camara_datos.get("snapshot_referencia")
         self.detector = detector
         self.cliente_api = cliente_api
@@ -57,6 +61,9 @@ class CamaraMonitor:
         self.rtsp_url = camara_datos["rtsp_url"]
         self.zonas = camara_datos.get("zonas", [])
         self.px_por_metro = camara_datos.get("px_por_metro")
+        self.ip = camara_datos.get("ip")
+        self.usuario_onvif = camara_datos.get("usuario_onvif")
+        self.password_onvif = camara_datos.get("password_onvif")
         if camara_datos.get("snapshot_referencia") != self._snapshot_referencia_url:
             self._snapshot_referencia_url = camara_datos.get("snapshot_referencia")
             self._tamano_referencia = None  # cambió la referencia, hay que releerla
@@ -179,7 +186,25 @@ class CamaraMonitor:
                 confianza,
                 resultado.get("disparo_alerta"),
             )
-            if resultado.get("disparo_alerta") and self._grabador is not None:
-                self._grabador.marcar_evento()
+            if resultado.get("disparo_alerta"):
+                if self._grabador is not None:
+                    self._grabador.marcar_evento()
+                if getattr(self.config, "ALTAVOZ_DISUASION_ACTIVO", False):
+                    self._activar_disuasion()
         except Exception:
             logger.exception("No se pudo reportar el evento de %s / %s", self.nombre, zona.get("nombre"))
+
+    def _activar_disuasion(self):
+        if not self.ip or not self.usuario_onvif:
+            logger.warning(
+                "ALTAVOZ_DISUASION_ACTIVO está prendido pero %s no tiene IP/credenciales ONVIF configuradas — "
+                "no se puede activar la sirena.", self.nombre,
+            )
+            return
+        try:
+            disuasion.activar_disuasion(
+                self.ip, self.usuario_onvif, self.password_onvif,
+                canal=getattr(self.config, "ALTAVOZ_DISUASION_CANAL", 1),
+            )
+        except Exception:
+            logger.exception("No se pudo activar la sirena/luz de disuasión de %s", self.nombre)
