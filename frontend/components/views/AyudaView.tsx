@@ -163,9 +163,10 @@ const TEMAS: Tema[] = [
         <Nota tipo="aviso">
           El equipo local (el PC de la planta) ahora hace de NVR: las zonas y horarios se dibujan y configuran
           ahí — entrando desde un navegador de la misma red a <Mono>http://&lt;ese-pc&gt;:8090/configurar</Mono>{" "}
-          — no en esta pantalla. Lo que se ve acá abajo es un espejo de lectura de esa configuración; si se
-          edita algo desde acá, el equipo local lo puede volver a pisar en su próxima sincronización (~60s).
-          Para configurar zonas/horarios de verdad, ver la sección <strong>Equipo local</strong> de esta Ayuda.
+          — no en esta pantalla. Lo que se ve acá abajo es un espejo de lectura de esa configuración; si una
+          empresa ya tiene un equipo local activo, el sistema ya no deja crear, editar ni eliminar zonas o
+          reglas desde acá (aparece un mensaje explicando por qué). Para configurar zonas/horarios de verdad,
+          ver la sección <strong>Equipo local</strong> de esta Ayuda.
         </Nota>
         <P>
           Acá se dibuja, sobre la foto de cada cámara, el área exacta donde no debería haber nadie (zona
@@ -180,6 +181,12 @@ const TEMAS: Tema[] = [
             puede cerrar la zona.</li>
           <li>Ponerle un nombre a la zona (ej. &quot;Zona de carga&quot;).</li>
         </Ol>
+        <Nota tipo="aviso">
+          Botón <strong>&quot;Eliminar snapshot&quot;</strong> (junto a &quot;+ Nueva zona&quot;): borra la
+          foto de referencia de esa cámara — útil para sacar una foto subida por error o de prueba. Las zonas
+          ya dibujadas no se pierden (siguen en el equipo local), pero acá dejan de verse sobre una foto hasta
+          subir una nueva.
+        </Nota>
         <Sub>Zona tipo &quot;Punto y radio&quot; (distancia real a algo que se mueve)</Sub>
         <P>
           Para reglas como &quot;nadie a menos de 3 metros de la estiba&quot;, cuando ese objeto se puede mover

@@ -376,6 +376,13 @@ export function subirSnapshotReferencia(
   });
 }
 
+export function eliminarSnapshotReferencia(token: string, camaraId: number): Promise<CamaraDashboard> {
+  return request<CamaraDashboard>(`/api/camaras-ia/dashboard/camaras/${camaraId}/snapshot-referencia/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
 export function crearZona(token: string, datos: NuevaZona): Promise<ZonaDashboard> {
   return request<ZonaDashboard>("/api/camaras-ia/dashboard/zonas/", {
     method: "POST",

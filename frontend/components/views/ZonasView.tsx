@@ -16,6 +16,7 @@ import {
   crearZona,
   eliminarInstruccionSeguridad,
   eliminarRegla,
+  eliminarSnapshotReferencia,
   eliminarZona,
   listarCamarasDashboard,
   listarInstruccionesSeguridad,
@@ -30,6 +31,7 @@ import {
 
 export default function ZonasView({ token, rol }: { token: string; rol: Rol | null }) {
   const esAdmin = rol === "administrador";
+  const { confirmar } = useDialog();
   const [camaras, setCamaras] = useState<CamaraDashboard[] | null>(null);
   const [camaraId, setCamaraId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
   const [nombreZona, setNombreZona] = useState("");
   const [guardandoZona, setGuardandoZona] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const [eliminandoReferencia, setEliminandoReferencia] = useState(false);
   const [calibrando, setCalibrando] = useState(false);
   const [puntosCalibracion, setPuntosCalibracion] = useState<number[][]>([]);
   const [distanciaCalibracion, setDistanciaCalibracion] = useState("");
@@ -159,6 +162,29 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
     }
   }
 
+  async function eliminarReferencia() {
+    if (!camara) return;
+    const ok = await confirmar({
+      titulo: "Eliminar snapshot de referencia",
+      mensaje:
+        camara.zonas.length > 0
+          ? `¿Eliminar el snapshot de "${camara.nombre}"? Ya tiene ${camara.zonas.length} zona(s) dibujada(s) sobre esta foto — se quedan igual en el equipo local, pero acá dejarás de verlas hasta subir una nueva.`
+          : `¿Eliminar el snapshot de "${camara.nombre}"?`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    setEliminandoReferencia(true);
+    try {
+      await eliminarSnapshotReferencia(token, camara.id);
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar el snapshot de referencia.");
+    } finally {
+      setEliminandoReferencia(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -259,6 +285,14 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                       className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
                     >
                       + Nueva zona
+                    </button>
+                    <button
+                      type="button"
+                      onClick={eliminarReferencia}
+                      disabled={eliminandoReferencia}
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:border-red-400 disabled:opacity-50"
+                    >
+                      {eliminandoReferencia ? "Eliminando…" : "Eliminar snapshot"}
                     </button>
                   </div>
                 )}
@@ -699,8 +733,8 @@ function ZonaCard({
     try {
       await actualizarZona(token, zona.id, { activa: !zona.activa });
       onCambio();
-    } catch {
-      setError("No se pudo actualizar la zona.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la zona.");
     }
   }
 
@@ -715,8 +749,8 @@ function ZonaCard({
     try {
       await eliminarZona(token, zona.id);
       onCambio();
-    } catch {
-      setError("No se pudo eliminar la zona.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar la zona.");
     }
   }
 
@@ -724,8 +758,8 @@ function ZonaCard({
     try {
       await eliminarRegla(token, reglaId);
       onCambio();
-    } catch {
-      setError("No se pudo eliminar la regla.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar la regla.");
     }
   }
 
@@ -733,8 +767,8 @@ function ZonaCard({
     try {
       await actualizarRegla(token, reglaId, { activa: !activa });
       onCambio();
-    } catch {
-      setError("No se pudo actualizar la regla.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la regla.");
     }
   }
 

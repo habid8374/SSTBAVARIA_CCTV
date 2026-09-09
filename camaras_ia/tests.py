@@ -739,6 +739,8 @@ class DashboardEndpointsTests(TestCase):
         self.assertEqual(len(response.data), 1)
 
     def test_admin_crea_zona(self):
+        self.equipo.activo = False
+        self.equipo.save()
         response = self.client.post(
             reverse("camaras_ia:zonas_lista"),
             {"camara": self.camara.pk, "nombre": "Nueva zona", "poligono": CUADRADO},
@@ -748,7 +750,43 @@ class DashboardEndpointsTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(ZonaRestringida.objects.filter(nombre="Nueva zona").exists())
 
+    def test_admin_no_puede_crear_zona_con_equipo_local_activo(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {"camara": self.camara.pk, "nombre": "Nueva zona", "poligono": CUADRADO},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertFalse(ZonaRestringida.objects.filter(nombre="Nueva zona").exists())
+
+    def test_admin_no_puede_editar_zona_con_equipo_local_activo(self):
+        response = self.client.patch(
+            reverse("camaras_ia:zonas_detalle", args=[self.zona.pk]),
+            {"nombre": "Renombrada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+
+    def test_admin_no_puede_crear_regla_con_equipo_local_activo(self):
+        response = self.client.post(
+            reverse("camaras_ia:reglas_lista"),
+            {
+                "zona": self.zona.pk,
+                "hora_inicio": "22:00",
+                "hora_fin": "06:00",
+                "dias_semana": [4, 5],
+                "destinatario": "seguridad@bavaria.com",
+            },
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+
     def test_admin_crea_zona_tipo_punto_radio(self):
+        self.equipo.activo = False
+        self.equipo.save()
         response = self.client.post(
             reverse("camaras_ia:zonas_lista"),
             {
@@ -805,7 +843,32 @@ class DashboardEndpointsTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_admin_elimina_snapshot_referencia(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.camara.snapshot_referencia = SimpleUploadedFile("ref.jpg", b"contenido-jpeg-falso")
+        self.camara.save()
+        url = reverse("camaras_ia:subir_snapshot_referencia", args=[self.camara.pk])
+        response = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIsNone(response.data["snapshot_referencia"])
+        self.camara.refresh_from_db()
+        self.assertFalse(self.camara.snapshot_referencia)
+
+    def test_operador_no_puede_eliminar_snapshot_referencia(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.camara.snapshot_referencia = SimpleUploadedFile("ref.jpg", b"contenido-jpeg-falso")
+        self.camara.save()
+        url = reverse("camaras_ia:subir_snapshot_referencia", args=[self.camara.pk])
+        response = self.client.delete(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
+        self.camara.refresh_from_db()
+        self.assertTrue(self.camara.snapshot_referencia)
+
     def test_admin_crea_regla_para_zona(self):
+        self.equipo.activo = False
+        self.equipo.save()
         response = self.client.post(
             reverse("camaras_ia:reglas_lista"),
             {
@@ -827,9 +890,17 @@ class DashboardEndpointsTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_admin_elimina_zona(self):
+        self.equipo.activo = False
+        self.equipo.save()
         url = reverse("camaras_ia:zonas_detalle", args=[self.zona.pk])
         response = self.client.delete(url, **self._auth(self.admin))
         self.assertEqual(response.status_code, 204)
+
+    def test_admin_no_puede_eliminar_zona_con_equipo_local_activo(self):
+        url = reverse("camaras_ia:zonas_detalle", args=[self.zona.pk])
+        response = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(ZonaRestringida.objects.filter(pk=self.zona.pk).exists())
 
     def test_operador_puede_crear_instruccion_de_seguridad(self):
         response = self.client.post(

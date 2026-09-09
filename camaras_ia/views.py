@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -355,12 +356,18 @@ class CamaraDetalleDashboard(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [EsAdministradorOSoloLectura]
 
 
-@api_view(["POST"])
+@api_view(["POST", "DELETE"])
 @permission_classes([EsAdministrador])
 def subir_snapshot_referencia(request, pk):
-    """Sube/reemplaza el encuadre de referencia de una cámara, sobre el que
-    se dibujan las zonas restringidas en el editor visual."""
+    """Sube/reemplaza (POST) o elimina (DELETE) el encuadre de referencia de
+    una cámara, sobre el que se dibujan las zonas restringidas en el editor
+    visual."""
     camara = get_object_or_404(Camara, pk=pk)
+    if request.method == "DELETE":
+        camara.snapshot_referencia.delete(save=False)
+        camara.snapshot_referencia = None
+        camara.save(update_fields=["snapshot_referencia"])
+        return Response(CamaraDashboardSerializer(camara, context={"request": request}).data)
     entrada = SnapshotReferenciaSerializer(data=request.data)
     entrada.is_valid(raise_exception=True)
     camara.snapshot_referencia = entrada.validated_data["snapshot_referencia"]
@@ -396,16 +403,41 @@ def calibrar_camara(request, pk):
     return Response(CamaraDashboardSerializer(camara, context={"request": request}).data)
 
 
+def _verificar_editable_por_dashboard(empresa):
+    """Bloquea la escritura de zonas/reglas desde el dashboard cuando la
+    empresa ya tiene un equipo local activo — ese equipo hace de NVR (ver
+    CLAUDE_CAMARAS.md) y reporta su propia configuración hacia acá; una
+    edición hecha desde el dashboard se perdería sola en el siguiente ciclo
+    de sincronización del equipo local (~60s), así que ni se permite."""
+    if EquipoLocal.objects.filter(empresa=empresa, activo=True).exists():
+        raise PermissionDenied(
+            "Esta empresa ya tiene un equipo local activo — las zonas y horarios se configuran ahí "
+            "(entra a http://<pc-de-planta>:8090/configurar), no desde el dashboard."
+        )
+
+
 class ZonaListaCrear(generics.ListCreateAPIView):
     queryset = ZonaRestringida.objects.select_related("camara").prefetch_related("reglas")
     serializer_class = ZonaDashboardSerializer
     permission_classes = [EsAdministradorOSoloLectura]
+
+    def perform_create(self, serializer):
+        _verificar_editable_por_dashboard(serializer.validated_data["camara"].empresa)
+        serializer.save()
 
 
 class ZonaDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = ZonaRestringida.objects.select_related("camara").prefetch_related("reglas")
     serializer_class = ZonaDashboardSerializer
     permission_classes = [EsAdministradorOSoloLectura]
+
+    def perform_update(self, serializer):
+        _verificar_editable_por_dashboard(serializer.instance.camara.empresa)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _verificar_editable_por_dashboard(instance.camara.empresa)
+        instance.delete()
 
 
 class ReglaListaCrear(generics.ListCreateAPIView):
@@ -419,11 +451,23 @@ class ReglaListaCrear(generics.ListCreateAPIView):
             qs = qs.filter(zona_id=zona_id)
         return qs
 
+    def perform_create(self, serializer):
+        _verificar_editable_por_dashboard(serializer.validated_data["zona"].camara.empresa)
+        serializer.save()
+
 
 class ReglaDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = ReglaAlerta.objects.select_related("zona")
     serializer_class = ReglaAlertaSerializer
     permission_classes = [EsAdministradorOSoloLectura]
+
+    def perform_update(self, serializer):
+        _verificar_editable_por_dashboard(serializer.instance.zona.camara.empresa)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _verificar_editable_por_dashboard(instance.zona.camara.empresa)
+        instance.delete()
 
 
 # --- Sección Sistema: credenciales Brevo + gestión de equipos locales ---

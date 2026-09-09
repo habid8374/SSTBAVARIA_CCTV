@@ -244,18 +244,17 @@ de esa configuración, no quien la define.
   monitor — así la detección corre 100% contra la configuración local,
   incluso si la sincronización hacia la nube falla (se reintenta sola).
 
-**Pendiente (no resuelto en esta ronda, dejar para la próxima)**: el
-dashboard cloud (endpoints `ZonaListaCrear`/`ZonaDetalle`/
-`ReglaListaCrear`/`ReglaDetalle`) todavía permite crear/editar zonas y
-reglas directamente — como la sincronización es de un solo sentido (local
-→ nube, nunca al revés), un cambio hecho ahí se pisa solo en el próximo
-ciclo de sincronización del equipo local (~60s). Se agregó un aviso bien
-visible en `ZonasView.tsx` y en el tema "Zonas y horarios" de
-`AyudaView.tsx` explicando que la edición real es en el equipo local, pero
-falta lo importante: volver esos endpoints de solo lectura (o, más simple,
-bloquear en el backend la escritura de zonas/reglas de una cámara cuya
-`Camara.empresa` tenga algún `EquipoLocal` activo que ya las esté
-reportando).
+**Resuelto**: como la sincronización es de un solo sentido (local → nube,
+nunca al revés), un cambio hecho en el dashboard cloud se pisaba solo en el
+próximo ciclo de sincronización del equipo local (~60s), sin avisar a
+quien lo editó. Además del aviso visible en `ZonasView.tsx` y en el tema
+"Zonas y horarios" de `AyudaView.tsx`, se bloqueó en el backend la
+escritura: `_verificar_editable_por_dashboard()` en `camaras_ia/views.py`
+revisa, en `perform_create`/`perform_update`/`perform_destroy` de
+`ZonaListaCrear`/`ZonaDetalle`/`ReglaListaCrear`/`ReglaDetalle`, si la
+`Camara.empresa` de la zona/regla tiene algún `EquipoLocal` activo — si lo
+tiene, responde `403 Forbidden` con un mensaje explicando dónde editar de
+verdad, en vez de aceptar un cambio que se iba a perder solo.
 
 ### Instrucciones de seguridad (bitácora de reglas en texto libre)
 
@@ -322,8 +321,9 @@ También la Fase 4 completa (ver más abajo):
   su zona dibujado encima (SVG) y un banner verde/rojo según si el último
   evento disparó alerta — el mismo estilo de las fotos de referencia del
   cliente (persona detectada en verde, alerta en rojo, zona en amarillo).
-- **Zonas y horarios**: editor visual — seleccionar cámara, subir su
-  snapshot de referencia, dibujar el polígono haciendo clic sobre la imagen
+- **Zonas y horarios**: editor visual — seleccionar cámara, subir (o
+  eliminar) su snapshot de referencia, dibujar el polígono haciendo clic
+  sobre la imagen
   (coordenadas en píxeles naturales de esa foto) — o, alternativa, marcar un
   punto y un radio en metros reales (ver "Zonas tipo Punto y radio" abajo)
   — y configurar sus reglas de horario (días, franja, canal, destinatario)
