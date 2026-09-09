@@ -1,12 +1,13 @@
 import unittest
 from unittest.mock import MagicMock
 
+from equipo_local.almacenamiento_local import AlmacenamientoLocal
 from equipo_local.cliente_api import ErrorApi
 from equipo_local.main import SincronizadorCamaras
 
 
-def _camara(id_, nombre="Cam"):
-    return {"id": id_, "nombre": nombre, "rtsp_url": "rtsp://x", "zonas": []}
+def _camara(id_, nombre="Cam", zonas=None):
+    return {"id": id_, "nombre": nombre, "rtsp_url": "rtsp://x", "zonas": zonas if zonas is not None else []}
 
 
 class SincronizadorCamarasTests(unittest.TestCase):
@@ -67,6 +68,64 @@ class SincronizadorCamarasTests(unittest.TestCase):
         for monitor in monitores:
             monitor.detener.assert_called_once()
         self.assertEqual(self.sincronizador.monitores, {})
+
+
+class SincronizadorCamarasConAlmacenamientoLocalTests(unittest.TestCase):
+    """Con `almacenamiento`, las zonas que ve cada monitor son las locales
+    (configuradas en el equipo, rol de NVR) — no las que manda la nube."""
+
+    def setUp(self):
+        self.cliente_api = MagicMock()
+        self.cliente_api.sincronizar_zonas.return_value = {"ids": [], "errores": []}
+        self.cliente_api.sincronizar_reglas.return_value = {"ids": [], "errores": []}
+        self.fabrica_monitor = MagicMock(side_effect=lambda *args, **kwargs: MagicMock())
+        self.almacenamiento = AlmacenamientoLocal(":memory:")
+        self.sincronizador = SincronizadorCamaras(
+            self.cliente_api, detector=MagicMock(), config=MagicMock(), fabrica_monitor=self.fabrica_monitor,
+            almacenamiento=self.almacenamiento,
+        )
+
+    def tearDown(self):
+        self.almacenamiento.cerrar()
+
+    def test_primera_vez_importa_las_zonas_que_ya_traia_la_nube(self):
+        zona_cloud = {"id": 5, "nombre": "Bodega", "tipo": "poligono", "poligono": [[0, 0], [1, 0], [1, 1]],
+                      "reglas": []}
+        self.cliente_api.obtener_reglas_activas.return_value = {"camaras": [_camara(1, zonas=[zona_cloud])]}
+        self.sincronizador.sincronizar()
+        camara_datos = self.fabrica_monitor.call_args[0][0]
+        self.assertEqual(len(camara_datos["zonas"]), 1)
+        self.assertEqual(camara_datos["zonas"][0]["nombre"], "Bodega")
+        self.assertEqual(camara_datos["zonas"][0]["cloud_id"], 5)
+
+    def test_zona_configurada_localmente_prevalece_sobre_la_de_la_nube(self):
+        self.almacenamiento.crear_zona(1, "Configurada en el equipo", poligono=[[0, 0], [1, 0], [1, 1]])
+        zona_cloud = {"id": 5, "nombre": "De la nube (vieja)", "tipo": "poligono",
+                      "poligono": [[0, 0], [1, 0], [1, 1]], "reglas": []}
+        self.cliente_api.obtener_reglas_activas.return_value = {"camaras": [_camara(1, zonas=[zona_cloud])]}
+        self.sincronizador.sincronizar()
+        camara_datos = self.fabrica_monitor.call_args[0][0]
+        self.assertEqual(len(camara_datos["zonas"]), 1)
+        self.assertEqual(camara_datos["zonas"][0]["nombre"], "Configurada en el equipo")
+
+    def test_sincroniza_config_local_pendiente_hacia_la_nube(self):
+        self.almacenamiento.crear_zona(1, "Nueva desde el equipo", poligono=[[0, 0], [1, 0], [1, 1]])
+        self.cliente_api.obtener_reglas_activas.return_value = {"camaras": [_camara(1)]}
+        self.cliente_api.sincronizar_zonas.return_value = {
+            "ids": [{"cliente_id": "1", "cloud_id": 77}], "errores": [],
+        }
+        self.sincronizador.sincronizar()
+        self.cliente_api.sincronizar_zonas.assert_called_once()
+        zonas = self.almacenamiento.listar_zonas_por_camara(1)
+        self.assertEqual(zonas[0]["cloud_id"], 77)
+
+    def test_sin_almacenamiento_se_comporta_como_antes(self):
+        sincronizador = SincronizadorCamaras(
+            self.cliente_api, detector=MagicMock(), config=MagicMock(), fabrica_monitor=self.fabrica_monitor,
+        )
+        self.cliente_api.obtener_reglas_activas.return_value = {"camaras": [_camara(1)]}
+        sincronizador.sincronizar()
+        self.cliente_api.sincronizar_zonas.assert_not_called()
 
 
 if __name__ == "__main__":

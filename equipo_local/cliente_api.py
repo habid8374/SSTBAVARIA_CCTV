@@ -43,3 +43,29 @@ class ClienteApi:
         except requests.RequestException as err:
             raise ErrorApi(f"No se pudo reportar el evento: {err}") from err
         return respuesta.json()
+
+    def sincronizar_zonas(self, zonas, eliminar=None):
+        """Reporta hacia la nube las zonas configuradas localmente (crear/
+        actualizar) y las que se hayan eliminado — ver
+        equipo_local/sincronizacion_config.py, que arma `zonas` a partir de
+        almacenamiento_local.AlmacenamientoLocal. Devuelve el JSON de
+        respuesta tal cual (ids asignados, errores, eliminadas)."""
+        url = f"{self.base_url}/api/camaras-ia/equipo-local/sincronizar-zonas/"
+        cuerpo = {"zonas": zonas, "eliminar": eliminar or []}
+        try:
+            respuesta = requests.post(url, json=cuerpo, headers=self._headers, timeout=self.timeout)
+            respuesta.raise_for_status()
+        except requests.RequestException as err:
+            raise ErrorApi(f"No se pudo sincronizar las zonas: {err}") from err
+        return respuesta.json()
+
+    def sincronizar_reglas(self, reglas, eliminar=None):
+        """Igual que sincronizar_zonas pero para las reglas de horario."""
+        url = f"{self.base_url}/api/camaras-ia/equipo-local/sincronizar-reglas/"
+        cuerpo = {"reglas": reglas, "eliminar": eliminar or []}
+        try:
+            respuesta = requests.post(url, json=cuerpo, headers=self._headers, timeout=self.timeout)
+            respuesta.raise_for_status()
+        except requests.RequestException as err:
+            raise ErrorApi(f"No se pudo sincronizar las reglas: {err}") from err
+        return respuesta.json()

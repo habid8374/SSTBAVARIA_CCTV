@@ -155,6 +155,13 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
 
   return (
     <div>
+      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <strong>Esto ahora se configura en el equipo local, no acá.</strong> El PC de la planta hace de NVR:
+        entra desde un navegador de la misma red a{" "}
+        <code className="rounded bg-amber-100 px-1">http://&lt;ese-pc&gt;:8090/configurar</code> para dibujar
+        zonas y definir horarios de verdad. Lo que se ve abajo es un espejo de lectura — si editas algo acá, el
+        equipo local lo puede volver a pisar en su próxima sincronización (cada ~60s).
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
           Dibuja el polígono de la zona restringida sobre el encuadre fijo de la cámara, o marca un punto y un

@@ -67,6 +67,23 @@ class Config:
 
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
+    # --- Configuración local de zonas/horarios (rol de NVR) ---
+
+    # Base de datos SQLite donde el equipo local guarda sus propias
+    # zonas restringidas y reglas de horario — acá es donde se configuran
+    # las alertas (ver visor_web.py, sección "Configurar"), no en el
+    # dashboard en la nube. Esa configuración se reporta hacia la nube
+    # (ver sincronizacion_config.py) solo para que el dashboard la pueda
+    # mostrar — la nube queda de solo lectura para esto.
+    ALMACENAMIENTO_LOCAL_DB = os.environ.get("ALMACENAMIENTO_LOCAL_DB") or str(
+        _CARPETA_EQUIPO_LOCAL / "configuracion_local.sqlite3"
+    )
+
+    # Cada cuánto se reporta hacia la nube la configuración local que haya
+    # cambiado (creaciones/ediciones/borrados de zonas y reglas) — no hace
+    # falta que sea instantáneo, es solo para que el dashboard la refleje.
+    INTERVALO_SINCRONIZAR_CONFIG_SEGUNDOS = _entero("INTERVALO_SINCRONIZAR_CONFIG_SEGUNDOS", 60)
+
     # --- Grabación en disco (para revisar después) ---
 
     # Si se desactiva, el equipo local solo detecta/reporta — no graba nada

@@ -160,6 +160,13 @@ const TEMAS: Tema[] = [
     titulo: "Zonas y horarios",
     contenido: (
       <>
+        <Nota tipo="aviso">
+          El equipo local (el PC de la planta) ahora hace de NVR: las zonas y horarios se dibujan y configuran
+          ahí — entrando desde un navegador de la misma red a <Mono>http://&lt;ese-pc&gt;:8090/configurar</Mono>{" "}
+          — no en esta pantalla. Lo que se ve acá abajo es un espejo de lectura de esa configuración; si se
+          edita algo desde acá, el equipo local lo puede volver a pisar en su próxima sincronización (~60s).
+          Para configurar zonas/horarios de verdad, ver la sección <strong>Equipo local</strong> de esta Ayuda.
+        </Nota>
         <P>
           Acá se dibuja, sobre la foto de cada cámara, el área exacta donde no debería haber nadie (zona
           restringida), y se configura cuándo eso dispara una alerta.
@@ -845,10 +852,17 @@ const TEMAS: Tema[] = [
         </Ul>
         <Sub>Paso 5 — Registrar las cámaras y sus zonas</Sub>
         <P>
-          Último paso, ya desde el dashboard (no en el PC): dar de alta cada cámara en la sección{" "}
-          <strong>Cámaras</strong> (IP, usuario/contraseña) y dibujar sus zonas restringidas en{" "}
-          <strong>Zonas y horarios</strong> — ver esos temas de esta Ayuda para el detalle.
+          Dos pasos, en dos lugares distintos:
         </P>
+        <Ol>
+          <li>Desde el dashboard, sección <strong>Cámaras</strong>: dar de alta cada cámara (IP, usuario/
+            contraseña) — esto es solo el dato de instalación física, no la vigilancia.</li>
+          <li>Desde el propio PC de la planta (no el dashboard): entrar a{" "}
+            <Mono>http://sstbavaria-camaras.local:8090/configurar</Mono> (o el botón &quot;Configurar zonas y
+            horarios&quot; del visor) y ahí, por cada cámara, dibujar sus zonas restringidas sobre el video en
+            vivo y definir los horarios que disparan alerta — ese es el equipo local haciendo de NVR, ver la
+            sección <strong>Zonas y horarios</strong> de esta Ayuda para el detalle.</li>
+        </Ol>
         <Sub>Alternativa: instalar sin Python (PC final compilado)</Sub>
         <P>
           Los pasos de arriba necesitan Python instalado en el PC final de la planta. Si se prefiere que ese

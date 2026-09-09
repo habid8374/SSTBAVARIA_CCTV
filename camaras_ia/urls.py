@@ -8,6 +8,16 @@ urlpatterns = [
     # Equipo local (autenticado por API key)
     path("eventos/", views.recibir_evento_camara, name="recibir_evento_camara"),
     path("reglas-activas/", views.obtener_reglas_activas, name="obtener_reglas_activas"),
+    path(
+        "equipo-local/sincronizar-zonas/",
+        views.sincronizar_zonas_equipo_local,
+        name="sincronizar_zonas_equipo_local",
+    ),
+    path(
+        "equipo-local/sincronizar-reglas/",
+        views.sincronizar_reglas_equipo_local,
+        name="sincronizar_reglas_equipo_local",
+    ),
     # Dashboard (autenticado por usuario/token)
     path("dashboard/indicadores/", views.indicadores_dashboard, name="indicadores_dashboard"),
     path("dashboard/eventos-por-zona/", views.eventos_por_zona, name="eventos_por_zona"),

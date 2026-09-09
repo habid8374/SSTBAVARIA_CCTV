@@ -17,16 +17,25 @@ tocarlo.
 
 1. Al arrancar, y cada `INTERVALO_SYNC_SEGUNDOS` (60s por defecto), pide al
    backend `GET /api/camaras-ia/reglas-activas/` — la lista de cámaras
-   activas de su empresa, cada una con su URL RTSP ya resuelta, su snapshot
-   de referencia y sus zonas (con el polígono en píxeles de esa referencia).
-2. Por cada cámara activa mantiene un hilo (`CamaraMonitor`) que:
+   activas de su empresa, cada una con su URL RTSP ya resuelta y su
+   snapshot de referencia (para escalar coordenadas). Las **zonas y
+   horarios no vienen de ahí** — este equipo hace de NVR, ver paso 2.
+2. Las zonas y horarios se leen de la base de datos local
+   (`configuracion_local.sqlite3`, ver [Configurar las cámaras (dashboard)
+   y las zonas/horarios (acá, en el
+   equipo)](#configurar-las-cámaras-dashboard-y-las-zonashorarios-acá-en-el-equipo)),
+   no de la nube. Si es la primera vez que arranca y esa base está vacía
+   para una cámara pero el dashboard ya tenía algo configurado (instalación
+   previa a esta versión), se importa una sola vez para no perder esa
+   configuración — a partir de ahí, la que manda es la local.
+3. Por cada cámara activa mantiene un hilo (`CamaraMonitor`) que:
    - Se conecta al stream RTSP y lee frames.
    - Cada `INTERVALO_DETECCION_SEGUNDOS` (0.4s por defecto — no hace falta
      analizar los 25-30 fps del video) corre el detector de personas.
    - Por cada persona detectada, escala su posición del tamaño del frame
-     RTSP al tamaño del snapshot de referencia (para que las coordenadas
-     coincidan con las de los polígonos de zona dibujados en el dashboard),
-     y revisa si cae dentro de alguna zona conocida.
+     RTSP al tamaño de referencia (para que las coordenadas coincidan con
+     las de los polígonos dibujados en `/configurar`), y revisa si cae
+     dentro de alguna zona local conocida.
    - Si cae dentro de una zona y ya pasó el `COOLDOWN_ZONA_SEGUNDOS` (60s
      por defecto) desde el último reporte de esa misma zona, reporta el
      evento: `POST /api/camaras-ia/eventos/` con el punto detectado y un
@@ -34,13 +43,15 @@ tocarlo.
    - Cada frame leído también se guarda a disco (si `GRABAR_VIDEO=true`,
      por defecto) y se cachea como "último frame" para el visor web en
      vivo — ver [Grabaciones y visor en vivo](#grabaciones-y-visor-en-vivo).
-3. El backend decide si el punto realmente cae en una zona activa con
-   horario vigente y dispara la alerta — acá no se duplica esa lógica, el
-   equipo local solo pre-filtra localmente para no gastar ancho de banda
-   subiendo snapshots de detecciones obviamente fuera de cualquier zona.
-4. Si una cámara se desactiva o se le borra alguna zona desde el dashboard,
-   el siguiente ciclo de sincronización lo refleja solo, sin reiniciar el
-   programa.
+4. El backend, con la configuración que este mismo equipo le reportó (ver
+   paso 5), confirma si el punto cae en una zona activa con horario vigente
+   y dispara la alerta.
+5. En cada ciclo de sincronización, además de leer la lista de cámaras
+   (paso 1), este equipo **reporta** hacia la nube las zonas/horarios que
+   cambiaron localmente (`POST
+   /api/camaras-ia/equipo-local/sincronizar-zonas/` y
+   `.../sincronizar-reglas/`) — así el dashboard puede mostrar esa
+   configuración, aunque no es de ahí de donde se edita.
 
 ## Requisitos del PC
 
@@ -83,9 +94,12 @@ instalado. Si no lo tiene, el instalador lo avisa con un link de descarga —
 en el instalador de Python hay que marcar la casilla *"Add python.exe to
 PATH"* antes de darle a Instalar, y después volver a correr `instalar.bat`.
 
-Sigue faltando un paso, que es del dashboard y no de este instalador: dar de
-alta cada cámara y dibujar sus zonas restringidas — ver [Configurar las
-cámaras y zonas](#configurar-las-cámaras-y-zonas-dashboard) abajo.
+Siguen faltando dos pasos, que no son de este instalador: dar de alta cada
+cámara desde el dashboard, y dibujar sus zonas restringidas acá mismo, en
+este equipo — ver [Configurar las cámaras (dashboard) y las zonas/horarios
+(acá, en el
+equipo)](#configurar-las-cámaras-dashboard-y-las-zonashorarios-acá-en-el-equipo)
+abajo.
 
 ## Instalación sin Python (versión compilada, Windows)
 
@@ -113,18 +127,39 @@ idéntico al de la instalación normal — la única diferencia es que el PC
 final no necesita Python. Si más adelante se actualiza el código, hay que
 volver a compilar en el PC de armado y repetir el paso 3-4 en el PC final.
 
-## Configurar las cámaras y zonas (dashboard)
+## Configurar las cámaras (dashboard) y las zonas/horarios (acá, en el equipo)
 
-1. Cada cámara desde el dashboard (sección **Cámaras**): IP, usuario/
-   contraseña ONVIF (se reutilizan como credenciales RTSP), y opcionalmente
-   una **URL RTSP** explícita si la cámara no es Dahua o no sigue el patrón
-   estándar (`rtsp://usuario:pass@ip:554/cam/realmonitor?channel=1&subtype=1`,
-   que es lo que se usa por defecto si el campo queda vacío — ver
+Esto se hace en dos lugares distintos a propósito — el equipo local hace de
+NVR: acá es donde se dice qué vigilar, no en la nube.
+
+1. **Dar de alta cada cámara desde el dashboard** (sección **Cámaras**): IP,
+   usuario/contraseña ONVIF (se reutilizan como credenciales RTSP), y
+   opcionalmente una **URL RTSP** explícita si la cámara no es Dahua o no
+   sigue el patrón estándar
+   (`rtsp://usuario:pass@ip:554/cam/realmonitor?channel=1&subtype=1`, que es
+   lo que se usa por defecto si el campo queda vacío — ver
    `Camara.rtsp_url_efectiva` en el backend, y la nota sobre la Dahua Picoo
-   A2 en `CLAUDE_CAMARAS.md`).
-2. Subir el **snapshot de referencia** y dibujar las **zonas restringidas**
-   de cada cámara desde el dashboard (sección Cámaras → Zonas y horarios) —
-   sin esto el equipo local no tiene contra qué comparar las detecciones.
+   A2 en `CLAUDE_CAMARAS.md`). Esto es lo único que sigue siendo del
+   dashboard: son datos de instalación física (IP en la red de la planta),
+   no de vigilancia.
+2. **Dibujar las zonas restringidas y definir sus horarios acá, en el
+   equipo local**: con el programa corriendo, entrar desde un navegador (en
+   la misma red) a `http://<este-pc>:8090/configurar` — o al botón
+   "Configurar zonas y horarios" del visor en vivo. Ahí, por cada cámara: se
+   dibuja el polígono directo sobre el video en vivo (no hace falta subir
+   ningún snapshot a mano) y se agregan los horarios (días, hora de inicio/
+   fin, canal y destinatario de la alerta) por zona. Esto se guarda en este
+   mismo PC (`equipo_local/configuracion_local.sqlite3`) y **funciona
+   aunque se caiga internet** — la detección corre contra lo configurado
+   acá, no espera respuesta de la nube.
+3. Lo que se configura acá se reporta solo hacia el dashboard (botón
+   "Sincronizar con la nube ahora" en la página de configuración, o
+   automático cada ~60s) — así se puede ver desde el dashboard sin tener
+   que entrar al PC de la planta, pero la nube es de **solo lectura** para
+   esto: no vuelve a bajar cambios, ni los pisa. Si un equipo local arranca
+   sin nada configurado localmente pero la cámara ya tenía zonas del
+   dashboard (instalaciones previas a este cambio), se importan solas la
+   primera vez para no perder esa configuración.
 
 ## Instalación manual / diagnóstico (avanzado)
 
@@ -308,11 +343,14 @@ python -m unittest discover -s equipo_local/tests -t .
 
 Cubren la geometría (punto-en-polígono, escalado de coordenadas), el cliente
 HTTP (mockeado), la lógica de cooldown/zona de `CamaraMonitor`, la
-reconciliación de cámaras activas de `SincronizadorCamaras`, la grabación en
+reconciliación de cámaras activas de `SincronizadorCamaras`, el
+almacenamiento local de zonas/reglas y su sincronización hacia la nube
+(`almacenamiento_local.py`/`sincronizacion_config.py`), la grabación en
 disco y retención (`grabador.py`, con un escritor de video inyectado en los
-tests), las rutas del visor web (`visor_web.py`, vía el test client de
-Flask) y el anuncio mDNS (`mdns.py`, con `Zeroconf`/`ServiceInfo` mockeados)
-— todo sin necesitar cámara, RTSP ni el modelo de IA reales. Lo que sí
+tests), las rutas del visor web y de configuración (`visor_web.py`, vía el
+test client de Flask) y el anuncio mDNS (`mdns.py`, con
+`Zeroconf`/`ServiceInfo` mockeados) — todo sin necesitar cámara, RTSP ni el
+modelo de IA reales. Lo que sí
 requiere hardware/red real para verificar (no se puede probar en este
 entorno de desarrollo): conexión RTSP real, calidad de la detección con la
 cámara instalada, que el offset de escalado de coordenadas quede bien

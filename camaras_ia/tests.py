@@ -459,6 +459,192 @@ class ObtenerReglasActivasViewTests(TestCase):
         self.assertEqual(response.data["camaras"][0]["zonas"], [])
 
 
+class SincronizarZonasEquipoLocalViewTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.otra_empresa = Empresa.objects.create(nombre="Otra Empresa")
+        self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.url = reverse("camaras_ia:sincronizar_zonas_equipo_local")
+
+    def test_sin_api_key_devuelve_401(self):
+        response = self.client.post(self.url, {"zonas": []}, content_type="application/json")
+        self.assertEqual(response.status_code, 401)
+
+    def test_crea_zona_nueva_y_devuelve_cloud_id(self):
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": None, "camara": self.camara.pk, "nombre": "Bodega",
+                        "tipo": "poligono", "poligono": CUADRADO, "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["errores"], [])
+        self.assertEqual(len(response.data["ids"]), 1)
+        self.assertEqual(response.data["ids"][0]["cliente_id"], "z-1")
+        zona = ZonaRestringida.objects.get(pk=response.data["ids"][0]["cloud_id"])
+        self.assertEqual(zona.nombre, "Bodega")
+        self.assertEqual(zona.camara, self.camara)
+
+    def test_actualiza_zona_existente_con_cloud_id(self):
+        zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Vieja", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": zona.pk, "camara": self.camara.pk, "nombre": "Renombrada",
+                        "tipo": "poligono", "poligono": CUADRADO, "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        zona.refresh_from_db()
+        self.assertEqual(zona.nombre, "Renombrada")
+
+    def test_camara_de_otra_empresa_devuelve_error_en_esa_entrada(self):
+        camara_ajena = Camara.objects.create(empresa=self.otra_empresa, nombre="Ajena", ip="10.0.0.9")
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": None, "camara": camara_ajena.pk, "nombre": "X",
+                        "tipo": "poligono", "poligono": CUADRADO, "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["ids"], [])
+        self.assertEqual(len(response.data["errores"]), 1)
+
+    def test_zona_poligono_con_menos_de_3_puntos_devuelve_error(self):
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": None, "camara": self.camara.pk, "nombre": "X",
+                        "tipo": "poligono", "poligono": [[0, 0], [1, 1]], "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["errores"]), 1)
+
+    def test_no_puede_actualizar_zona_de_otra_empresa_por_cloud_id_ajeno(self):
+        camara_ajena = Camara.objects.create(empresa=self.otra_empresa, nombre="Ajena", ip="10.0.0.9")
+        zona_ajena = ZonaRestringida.objects.create(camara=camara_ajena, nombre="Ajena", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": zona_ajena.pk, "camara": self.camara.pk, "nombre": "X",
+                        "tipo": "poligono", "poligono": CUADRADO, "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(len(response.data["errores"]), 1)
+
+    def test_eliminar_borra_zonas_por_cloud_id(self):
+        zona = ZonaRestringida.objects.create(camara=self.camara, nombre="A borrar", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"zonas": [], "eliminar": [zona.pk]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["eliminadas"], 1)
+        self.assertFalse(ZonaRestringida.objects.filter(pk=zona.pk).exists())
+
+    def test_eliminar_no_borra_zona_de_otra_empresa(self):
+        camara_ajena = Camara.objects.create(empresa=self.otra_empresa, nombre="Ajena", ip="10.0.0.9")
+        zona_ajena = ZonaRestringida.objects.create(camara=camara_ajena, nombre="Ajena", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"zonas": [], "eliminar": [zona_ajena.pk]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.data["eliminadas"], 0)
+        self.assertTrue(ZonaRestringida.objects.filter(pk=zona_ajena.pk).exists())
+
+
+class SincronizarReglasEquipoLocalViewTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.otra_empresa = Empresa.objects.create(nombre="Otra Empresa")
+        self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.url = reverse("camaras_ia:sincronizar_reglas_equipo_local")
+
+    def _regla_payload(self, **overrides):
+        payload = {
+            "cliente_id": "r-1",
+            "cloud_id": None,
+            "zona": self.zona.pk,
+            "nombre": "Turno noche",
+            "hora_inicio": "22:00:00",
+            "hora_fin": "06:00:00",
+            "dias_semana": [0, 1, 2, 3, 4],
+            "canal_notificacion": "correo",
+            "destinatario": "x@y.com",
+            "activa": True,
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_sin_api_key_devuelve_401(self):
+        response = self.client.post(self.url, {"reglas": []}, content_type="application/json")
+        self.assertEqual(response.status_code, 401)
+
+    def test_crea_regla_nueva_y_devuelve_cloud_id(self):
+        response = self.client.post(
+            self.url,
+            {"reglas": [self._regla_payload()]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["errores"], [])
+        regla = ReglaAlerta.objects.get(pk=response.data["ids"][0]["cloud_id"])
+        self.assertEqual(regla.zona, self.zona)
+        self.assertEqual(regla.destinatario, "x@y.com")
+
+    def test_actualiza_regla_existente(self):
+        regla = ReglaAlerta.objects.create(
+            zona=self.zona, hora_inicio=datetime.time(8, 0), hora_fin=datetime.time(17, 0),
+            dias_semana=[0], destinatario="viejo@x.com",
+        )
+        response = self.client.post(
+            self.url,
+            {"reglas": [self._regla_payload(cloud_id=regla.pk, destinatario="nuevo@x.com")]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        regla.refresh_from_db()
+        self.assertEqual(regla.destinatario, "nuevo@x.com")
+
+    def test_zona_de_otra_empresa_devuelve_error(self):
+        camara_ajena = Camara.objects.create(empresa=self.otra_empresa, nombre="Ajena", ip="10.0.0.9")
+        zona_ajena = ZonaRestringida.objects.create(camara=camara_ajena, nombre="Ajena", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"reglas": [self._regla_payload(zona=zona_ajena.pk)]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.data["ids"], [])
+        self.assertEqual(len(response.data["errores"]), 1)
+
+    def test_eliminar_borra_reglas_por_cloud_id(self):
+        regla = ReglaAlerta.objects.create(
+            zona=self.zona, hora_inicio=datetime.time(8, 0), hora_fin=datetime.time(17, 0),
+            dias_semana=[0], destinatario="x@y.com",
+        )
+        response = self.client.post(
+            self.url,
+            {"reglas": [], "eliminar": [regla.pk]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.data["eliminadas"], 1)
+        self.assertFalse(ReglaAlerta.objects.filter(pk=regla.pk).exists())
+
+
 class DashboardEndpointsTests(TestCase):
     def setUp(self):
         # El throttle de login cuenta por IP y el test client siempre usa la

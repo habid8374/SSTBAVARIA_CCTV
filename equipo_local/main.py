@@ -47,9 +47,11 @@ try:
     # corriendo compilado (ver rutas.py).
     load_dotenv(carpeta_base() / ".env")
 
+    from .almacenamiento_local import AlmacenamientoLocal
     from .camara import CamaraMonitor
     from .cliente_api import ClienteApi, ErrorApi
     from .config import Config
+    from .sincronizacion_config import importar_configuracion_desde_cloud, sincronizar_configuracion_local
 except Exception:
     logger.exception("Error importando una dependencia — el programa se detiene.")
     sys.exit(1)
@@ -58,13 +60,23 @@ except Exception:
 class SincronizadorCamaras:
     """Reconcilia los CamaraMonitor activos contra lo que devuelve el
     backend. Recibe `fabrica_monitor` para poder inyectar un doble de
-    CamaraMonitor en los tests, sin depender de cv2/ultralytics reales."""
+    CamaraMonitor en los tests, sin depender de cv2/ultralytics reales.
 
-    def __init__(self, cliente_api, detector, config, fabrica_monitor=CamaraMonitor):
+    `almacenamiento` (AlmacenamientoLocal) es lo que hace que este equipo
+    local sea el "NVR": si se pasa, las zonas/reglas que vigila cada
+    CamaraMonitor no son las que manda el backend en obtener_reglas_activas
+    — son las configuradas acá mismo (ver visor_web.py) — y en cada ciclo
+    se reporta esa configuración hacia la nube (ver sincronizacion_config.py)
+    para que el dashboard la pueda mostrar. Sin `almacenamiento` (None, el
+    default) se comporta como antes: las zonas vienen tal cual del backend
+    — así los tests que no les interesa esta parte no se ven afectados."""
+
+    def __init__(self, cliente_api, detector, config, fabrica_monitor=CamaraMonitor, almacenamiento=None):
         self.cliente_api = cliente_api
         self.detector = detector
         self.config = config
         self._fabrica_monitor = fabrica_monitor
+        self.almacenamiento = almacenamiento
         self.monitores = {}
 
     def sincronizar(self):
@@ -75,6 +87,12 @@ class SincronizadorCamaras:
             return
 
         camaras_actuales = {c["id"]: c for c in datos.get("camaras", [])}
+
+        if self.almacenamiento is not None:
+            for camara_id, camara_datos in camaras_actuales.items():
+                importar_configuracion_desde_cloud(self.almacenamiento, camara_id, camara_datos.get("zonas", []))
+                camara_datos["zonas"] = self.almacenamiento.listar_zonas_por_camara(camara_id)
+            sincronizar_configuracion_local(self.almacenamiento, self.cliente_api)
 
         for camara_id in list(self.monitores):
             if camara_id not in camaras_actuales:
@@ -108,7 +126,8 @@ def main():
 
     cliente_api = ClienteApi(Config.API_BASE_URL, Config.API_KEY, Config.TIMEOUT_HTTP_SEGUNDOS)
     detector = DetectorPersonas(Config.MODELO_YOLO, Config.CONFIANZA_MINIMA)
-    sincronizador = SincronizadorCamaras(cliente_api, detector, Config)
+    almacenamiento = AlmacenamientoLocal(Config.ALMACENAMIENTO_LOCAL_DB)
+    sincronizador = SincronizadorCamaras(cliente_api, detector, Config, almacenamiento=almacenamiento)
 
     anuncio_mdns = None
     if Config.VISOR_WEB_ACTIVO:
@@ -148,6 +167,7 @@ def main():
         from .mdns import dejar_de_anunciar
 
         dejar_de_anunciar(anuncio_mdns)
+    almacenamiento.cerrar()
     logger.info("Equipo local detenido.")
 
 

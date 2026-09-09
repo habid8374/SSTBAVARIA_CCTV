@@ -31,10 +31,13 @@ zona restringida durante un horario configurado, generando una alerta. Dos parte
 que no se mezclan:
 
 - **En el sitio (equipo local, junto a las cámaras)**: conexión a cámaras,
-  detección (propia de la cámara o modelo local), cruce zona+horario, control PTZ.
-- **En la nube (este backend)**: configuración de zonas/horarios, recepción de
-  eventos, historial, alertas, dashboard. **Nunca recibe video crudo, solo eventos
-  con una foto.**
+  detección (propia de la cámara o modelo local), grabación de video,
+  **configuración de zonas/horarios** (rol de NVR — ver "Equipo local como
+  NVR" abajo) y cruce zona+horario para decidir si dispara alerta.
+- **En la nube (este backend)**: recepción de eventos, historial, alertas,
+  dashboard — y un espejo de solo lectura de la configuración de
+  zonas/horarios (para poder verla sin entrar al PC de la planta). **Nunca
+  recibe video crudo, solo eventos con una foto.**
 
 ## Cámara de referencia
 
@@ -198,6 +201,61 @@ juntar y etiquetar fotos reales del sitio y entrenar un modelo aparte
 COCO), sin garantía de buena precisión sin muchas fotos de entrenamiento.
 Marcar el punto a mano es la opción que ya funciona hoy con la
 infraestructura existente.
+
+### Equipo local como NVR (zonas/horarios se configuran en sitio, no en la nube)
+
+Decisión de arquitectura (cambio deliberado sobre el diseño original, donde
+la nube era la fuente de verdad): el cliente pidió que el equipo local haga
+el papel de NVR — cada zona/horario se configura físicamente en el PC del
+sitio (`equipo_local/`, sección **Configurar** del visor web, puerto 8090),
+no en el dashboard cloud. La nube pasa a ser un **espejo de solo lectura**
+de esa configuración, no quien la define.
+
+- **Almacenamiento**: `equipo_local/almacenamiento_local.py` — SQLite
+  propio del equipo (`configuracion_local.sqlite3`, junto al programa),
+  independiente de la base de datos del backend. Cada zona/regla local
+  tiene un `cloud_id` (None hasta que se sincroniza por primera vez) y
+  marcas de tiempo (`actualizada_en`/`sincronizada_en`) para saber qué hay
+  pendiente de subir sin necesitar un flag "sucio" aparte.
+- **UI de configuración**: `equipo_local/visor_web.py`, rutas
+  `/configurar` y `/configurar/<camara_id>` — un editor de zonas
+  (dibujadas con canvas sobre un frame en vivo real de la cámara, no un
+  snapshot subido a mano) y horarios, servido por el mismo Flask del
+  visor. Solo zonas tipo Polígono por ahora — Punto y radio queda en el
+  almacenamiento/API pero sin UI de dibujo todavía (pendiente).
+- **Sincronización hacia la nube**: `equipo_local/sincronizacion_config.py`
+  — en cada ciclo de `main.py` (SincronizadorCamaras.sincronizar), empuja
+  lo que cambió localmente hacia `POST
+  /api/camaras-ia/equipo-local/sincronizar-zonas/` y
+  `.../sincronizar-reglas/` (`camaras_ia/views.py`), que hacen upsert por
+  `cloud_id` sobre los mismos modelos `ZonaRestringida`/`ReglaAlerta` de
+  siempre — no hubo que crear modelos nuevos en el backend, la nube sigue
+  guardando lo mismo, solo que ahora se lo escriben en vez de definirlo.
+- **Migración de lo ya configurado**: si un equipo local arranca sin nada
+  en su base local para una cámara, `sincronizacion_config.py:
+  importar_configuracion_desde_cloud` importa lo que ya existía en el
+  dashboard (de `obtener_reglas_activas`) para no perder configuración
+  previa — a partir de ahí, la edición local es la que manda.
+- **Detección**: `CamaraMonitor` (equipo_local/camara.py) no cambió — sigue
+  recibiendo un dict `camara_datos["zonas"]`. Lo que cambió es quién arma
+  ese dict: antes venía tal cual de `obtener_reglas_activas`, ahora
+  `SincronizadorCamaras.sincronizar()` lo sobrescribe con
+  `almacenamiento.listar_zonas_por_camara(camara_id)` antes de pasarlo al
+  monitor — así la detección corre 100% contra la configuración local,
+  incluso si la sincronización hacia la nube falla (se reintenta sola).
+
+**Pendiente (no resuelto en esta ronda, dejar para la próxima)**: el
+dashboard cloud (endpoints `ZonaListaCrear`/`ZonaDetalle`/
+`ReglaListaCrear`/`ReglaDetalle`) todavía permite crear/editar zonas y
+reglas directamente — como la sincronización es de un solo sentido (local
+→ nube, nunca al revés), un cambio hecho ahí se pisa solo en el próximo
+ciclo de sincronización del equipo local (~60s). Se agregó un aviso bien
+visible en `ZonasView.tsx` y en el tema "Zonas y horarios" de
+`AyudaView.tsx` explicando que la edición real es en el equipo local, pero
+falta lo importante: volver esos endpoints de solo lectura (o, más simple,
+bloquear en el backend la escritura de zonas/reglas de una cámara cuya
+`Camara.empresa` tenga algún `EquipoLocal` activo que ya las esté
+reportando).
 
 ## Funciones/servicios clave
 

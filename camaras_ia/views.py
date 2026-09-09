@@ -127,6 +127,118 @@ def obtener_reglas_activas(request):
     )
 
 
+_CAMPOS_ZONA_SINCRONIZABLES = ("nombre", "tipo", "poligono", "centro_x", "centro_y", "radio_metros", "activa")
+_CAMPOS_REGLA_SINCRONIZABLES = (
+    "nombre",
+    "hora_inicio",
+    "hora_fin",
+    "dias_semana",
+    "canal_notificacion",
+    "destinatario",
+    "activa",
+)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])  # se autentica con su propia API key, no con el login de usuario
+def sincronizar_zonas_equipo_local(request):
+    """El equipo local es ahora quien configura las zonas restringidas (rol
+    de NVR, ver equipo_local/almacenamiento_local.py) — acá las reporta para
+    que el dashboard las pueda mostrar. La nube queda de solo lectura para
+    esto: no se valida horario ni se decide nada acá, solo se guarda un
+    espejo. Cada zona trae un `cliente_id` (id local del equipo, opaco para
+    la nube) y, si ya se sincronizó antes, su `cloud_id`; sin `cloud_id` se
+    crea una fila nueva y se devuelve el id asignado para que el equipo
+    local lo guarde. `eliminar` es una lista de cloud_id a borrar."""
+    equipo = _equipo_desde_api_key(request)
+    if equipo is None:
+        return Response({"detail": "API key inválida o inactiva."}, status=status.HTTP_401_UNAUTHORIZED)
+
+    ids_resultado = []
+    errores = []
+    for entrada in request.data.get("zonas", []):
+        cliente_id = entrada.get("cliente_id")
+        camara = Camara.objects.filter(pk=entrada.get("camara"), empresa=equipo.empresa).first()
+        if camara is None:
+            errores.append({"cliente_id": cliente_id, "detail": "Cámara inválida o de otra empresa."})
+            continue
+
+        instancia = None
+        cloud_id = entrada.get("cloud_id")
+        if cloud_id:
+            instancia = ZonaRestringida.objects.filter(pk=cloud_id, camara__empresa=equipo.empresa).first()
+            if instancia is None:
+                errores.append({"cliente_id": cliente_id, "detail": "Zona no encontrada para actualizar."})
+                continue
+
+        payload = {campo: entrada[campo] for campo in _CAMPOS_ZONA_SINCRONIZABLES if campo in entrada}
+        payload["camara"] = camara.pk
+        serializer = ZonaDashboardSerializer(instance=instancia, data=payload)
+        if not serializer.is_valid():
+            errores.append({"cliente_id": cliente_id, "detail": serializer.errors})
+            continue
+        zona = serializer.save()
+        ids_resultado.append({"cliente_id": cliente_id, "cloud_id": zona.pk})
+
+    eliminar_ids = request.data.get("eliminar", [])
+    eliminadas = 0
+    if eliminar_ids:
+        eliminadas, _ = ZonaRestringida.objects.filter(pk__in=eliminar_ids, camara__empresa=equipo.empresa).delete()
+
+    equipo.ultima_conexion = timezone.now()
+    equipo.save(update_fields=["ultima_conexion"])
+
+    return Response({"ids": ids_resultado, "errores": errores, "eliminadas": eliminadas})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])  # se autentica con su propia API key, no con el login de usuario
+def sincronizar_reglas_equipo_local(request):
+    """Igual que sincronizar_zonas_equipo_local pero para las reglas de
+    horario de cada zona — ver ese docstring."""
+    equipo = _equipo_desde_api_key(request)
+    if equipo is None:
+        return Response({"detail": "API key inválida o inactiva."}, status=status.HTTP_401_UNAUTHORIZED)
+
+    ids_resultado = []
+    errores = []
+    for entrada in request.data.get("reglas", []):
+        cliente_id = entrada.get("cliente_id")
+        zona = ZonaRestringida.objects.filter(pk=entrada.get("zona"), camara__empresa=equipo.empresa).first()
+        if zona is None:
+            errores.append({"cliente_id": cliente_id, "detail": "Zona inválida o de otra empresa."})
+            continue
+
+        instancia = None
+        cloud_id = entrada.get("cloud_id")
+        if cloud_id:
+            instancia = ReglaAlerta.objects.filter(pk=cloud_id, zona__camara__empresa=equipo.empresa).first()
+            if instancia is None:
+                errores.append({"cliente_id": cliente_id, "detail": "Regla no encontrada para actualizar."})
+                continue
+
+        payload = {campo: entrada[campo] for campo in _CAMPOS_REGLA_SINCRONIZABLES if campo in entrada}
+        payload["zona"] = zona.pk
+        serializer = ReglaAlertaSerializer(instance=instancia, data=payload)
+        if not serializer.is_valid():
+            errores.append({"cliente_id": cliente_id, "detail": serializer.errors})
+            continue
+        regla = serializer.save()
+        ids_resultado.append({"cliente_id": cliente_id, "cloud_id": regla.pk})
+
+    eliminar_ids = request.data.get("eliminar", [])
+    eliminadas = 0
+    if eliminar_ids:
+        eliminadas, _ = ReglaAlerta.objects.filter(
+            pk__in=eliminar_ids, zona__camara__empresa=equipo.empresa
+        ).delete()
+
+    equipo.ultima_conexion = timezone.now()
+    equipo.save(update_fields=["ultima_conexion"])
+
+    return Response({"ids": ids_resultado, "errores": errores, "eliminadas": eliminadas})
+
+
 # --- Endpoints del dashboard (usuario autenticado por token, no equipo local) ---
 
 
