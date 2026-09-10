@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
   calificarCapacitacion,
   descargarCertificadoCapacitacion,
+  eliminarRegistroCapacitacion,
   exportarCapacitacionesAprobadasExcel,
   iniciarCapacitacion,
   listarContratistas,
@@ -41,6 +43,8 @@ function EstadoBadge({ registro }: { registro: RegistroCapacitacion }) {
 
 export default function CapacitacionView({ token, rol }: { token: string; rol: Rol | null }) {
   const esInterno = rol !== "contratista";
+  const esAdmin = rol === "administrador";
+  const { confirmar } = useDialog();
   const [paso, setPaso] = useState<Paso>("reporte");
   const [registros, setRegistros] = useState<RegistroCapacitacion[] | null>(null);
   const [contratistas, setContratistas] = useState<EmpresaContratista[] | null>(null);
@@ -51,6 +55,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
   const [error, setError] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
   const [descargandoCertificado, setDescargandoCertificado] = useState<number | null>(null);
+  const [eliminando, setEliminando] = useState<number | null>(null);
 
   function cargarRegistros() {
     listarRegistrosCapacitacion(token)
@@ -94,6 +99,33 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
     } finally {
       setDescargandoCertificado(null);
     }
+  }
+
+  async function eliminar(registro: RegistroCapacitacion) {
+    const ok = await confirmar({
+      titulo: "Eliminar capacitación",
+      mensaje: `¿Eliminar el registro de "${registro.nombres}"? Esta acción no se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    setEliminando(registro.id);
+    try {
+      await eliminarRegistroCapacitacion(token, registro.id);
+      cargarRegistros();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar el registro.");
+    } finally {
+      setEliminando(null);
+    }
+  }
+
+  // Si alguien se quedó a medias en la evaluación (cerró la pestaña, se le
+  // fue la conexión), retoma directo en las preguntas — sin hacerlo ver de
+  // nuevo el video ni volver a diligenciar el registro.
+  function continuarEvaluacion(registro: RegistroCapacitacion) {
+    setRegistroActivo(registro);
+    setPaso("evaluacion");
   }
 
   if (paso === "registro") {
@@ -201,16 +233,37 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
                   </td>
                   <td className="px-4 py-2.5">{new Date(r.iniciado_en).toLocaleDateString("es-CO")}</td>
                   <td className="px-4 py-2.5 text-right">
-                    {r.estado === "aprobado" && (
-                      <button
-                        type="button"
-                        onClick={() => descargarCertificado(r.id)}
-                        disabled={descargandoCertificado === r.id}
-                        className="text-xs font-medium text-corp-blue hover:underline disabled:opacity-60"
-                      >
-                        {descargandoCertificado === r.id ? "Descargando…" : "Certificado"}
-                      </button>
-                    )}
+                    <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
+                      {r.estado === "aprobado" && (
+                        <button
+                          type="button"
+                          onClick={() => descargarCertificado(r.id)}
+                          disabled={descargandoCertificado === r.id}
+                          className="text-xs font-medium text-corp-blue hover:underline disabled:opacity-60"
+                        >
+                          {descargandoCertificado === r.id ? "Descargando…" : "Certificado"}
+                        </button>
+                      )}
+                      {r.estado === "en_curso" && (
+                        <button
+                          type="button"
+                          onClick={() => continuarEvaluacion(r)}
+                          className="text-xs font-medium text-corp-blue hover:underline"
+                        >
+                          Continuar evaluación
+                        </button>
+                      )}
+                      {esAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => eliminar(r)}
+                          disabled={eliminando === r.id}
+                          className="text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
+                        >
+                          {eliminando === r.id ? "Eliminando…" : "Eliminar"}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

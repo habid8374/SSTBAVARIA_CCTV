@@ -344,7 +344,13 @@ class ActividadMetodo(models.Model):
     probabilidad_con = models.FloatField("probabilidad (con mitigación)", default=0)
     frecuencia_con = models.FloatField("frecuencia (con mitigación)", default=0)
     impacto_con = models.FloatField("impacto (con mitigación)", default=0)
-    permisos_requeridos = models.JSONField(default=list, blank=True)
+    requiere_permiso_trabajo = models.BooleanField(
+        "requiere permiso de trabajo general",
+        default=False,
+        help_text="El permiso de trabajo general (uno solo, distinto de los certificados de apoyo de la "
+        "lista de abajo — LOTO, alturas, espacio confinado, etc.).",
+    )
+    permisos_requeridos = models.JSONField("certificados de apoyo requeridos", default=list, blank=True)
     epp_requerido = models.JSONField("EPP requerido", default=list, blank=True)
     tarea_sif = models.BooleanField("tarea SIF", default=False)
     altura_trabajo_metros = models.FloatField(
@@ -535,16 +541,19 @@ class CursoSafetyAcademy(models.Model):
 
 
 class PermisoTrabajo(models.Model):
-    """Catálogo editable de permisos de trabajo/certificados requeridos —
-    reemplaza la lista fija PERMISOS_TRABAJO."""
+    """Catálogo editable de certificados de apoyo requeridos por actividad
+    (LOTO, alturas, espacio confinado, etc.) — distinto del permiso de
+    trabajo general (ActividadMetodo.requiere_permiso_trabajo), que es uno
+    solo. El nombre del modelo se conserva por compatibilidad con datos y
+    código existentes; reemplaza la lista fija PERMISOS_TRABAJO."""
 
     nombre = models.CharField(max_length=200, unique=True)
     activo = models.BooleanField(default=True)
     orden = models.PositiveIntegerField(default=0)
 
     class Meta:
-        verbose_name = "permiso de trabajo"
-        verbose_name_plural = "permisos de trabajo"
+        verbose_name = "certificado de apoyo"
+        verbose_name_plural = "certificados de apoyo"
         ordering = ["orden", "nombre"]
 
     def __str__(self):

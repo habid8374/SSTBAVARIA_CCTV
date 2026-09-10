@@ -19,6 +19,8 @@ type OpcionesPedirTexto = {
   textoCancelar?: string;
   /** Si es false, no deja confirmar con el campo vacío. Por defecto true (ej. observaciones opcionales). */
   opcional?: boolean;
+  /** Precarga el campo (ej. renombrar algo ya existente) en vez de arrancar vacío. */
+  valorInicial?: string;
 };
 
 type EstadoDialogo =
@@ -51,7 +53,7 @@ export default function DialogProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pedirTexto = useCallback((opciones: OpcionesPedirTexto) => {
-    setValorTexto("");
+    setValorTexto(opciones.valorInicial ?? "");
     return new Promise<string | null>((resolver) => {
       setEstado({ tipo: "texto", opciones, resolver });
     });

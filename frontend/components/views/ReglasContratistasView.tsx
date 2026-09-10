@@ -138,7 +138,7 @@ function DiasAlerta({ token }: { token: string }) {
 }
 
 function Cursos({ token }: { token: string }) {
-  const { confirmar } = useDialog();
+  const { confirmar, pedirTexto } = useDialog();
   const [cursos, setCursos] = useState<CursoSafetyAcademy[] | null>(null);
   const [clave, setClave] = useState("");
   const [etiqueta, setEtiqueta] = useState("");
@@ -179,6 +179,22 @@ function Cursos({ token }: { token: string }) {
       cargar();
     } catch {
       setError("No se pudo actualizar el curso.");
+    }
+  }
+
+  async function editar(curso: CursoSafetyAcademy) {
+    const nuevaEtiqueta = await pedirTexto({
+      titulo: "Editar nombre del curso",
+      valorInicial: curso.etiqueta,
+      textoConfirmar: "Guardar",
+      opcional: false,
+    });
+    if (nuevaEtiqueta === null || nuevaEtiqueta.trim() === curso.etiqueta) return;
+    try {
+      await actualizarCurso(token, curso.id, { etiqueta: nuevaEtiqueta.trim() });
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo editar el curso.");
     }
   }
 
@@ -225,6 +241,9 @@ function Cursos({ token }: { token: string }) {
               <button type="button" onClick={() => alternarObligatorio(c)} className="text-corp-blue hover:underline">
                 {c.obligatorio ? "Quitar obligatoriedad" : "Marcar obligatorio"}
               </button>
+              <button type="button" onClick={() => editar(c)} className="text-corp-blue hover:underline">
+                Editar
+              </button>
               <button type="button" onClick={() => alternarActivo(c)} className="text-corp-blue hover:underline">
                 {c.activo ? "Desactivar" : "Activar"}
               </button>
@@ -261,7 +280,7 @@ function Cursos({ token }: { token: string }) {
 }
 
 function Permisos({ token }: { token: string }) {
-  const { confirmar } = useDialog();
+  const { confirmar, pedirTexto } = useDialog();
   const [permisos, setPermisos] = useState<PermisoTrabajo[] | null>(null);
   const [nombre, setNombre] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -294,6 +313,22 @@ function Permisos({ token }: { token: string }) {
     }
   }
 
+  async function editar(permiso: PermisoTrabajo) {
+    const nuevoNombre = await pedirTexto({
+      titulo: "Editar certificado de apoyo",
+      valorInicial: permiso.nombre,
+      textoConfirmar: "Guardar",
+      opcional: false,
+    });
+    if (nuevoNombre === null || nuevoNombre.trim() === permiso.nombre) return;
+    try {
+      await actualizarPermisoTrabajo(token, permiso.id, { nombre: nuevoNombre.trim() });
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo editar el permiso.");
+    }
+  }
+
   async function eliminar(permiso: PermisoTrabajo) {
     const ok = await confirmar({
       titulo: "Eliminar permiso de trabajo",
@@ -312,7 +347,12 @@ function Permisos({ token }: { token: string }) {
 
   return (
     <div className="rounded-xl border border-corp-border bg-white p-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-corp-navy">Permisos de trabajo / certificados requeridos</h3>
+      <h3 className="text-sm font-semibold text-corp-navy">Certificados de apoyo requeridos</h3>
+      <p className="mt-1 text-sm text-corp-muted">
+        Distinto del permiso de trabajo general (un único permiso por actividad, ver más abajo en Declaración
+        de Método): este catálogo son los certificados de apoyo específicos según el tipo de riesgo (alturas,
+        LOTO, espacio confinado, etc.).
+      </p>
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       <div className="mt-3 space-y-2">
         {permisos?.map((p) => (
@@ -322,6 +362,9 @@ function Permisos({ token }: { token: string }) {
           >
             <span className={p.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{p.nombre}</span>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <button type="button" onClick={() => editar(p)} className="text-corp-blue hover:underline">
+                Editar
+              </button>
               <button type="button" onClick={() => alternarActivo(p)} className="text-corp-blue hover:underline">
                 {p.activo ? "Desactivar" : "Activar"}
               </button>
@@ -334,7 +377,7 @@ function Permisos({ token }: { token: string }) {
       </div>
       <form onSubmit={agregar} className="mt-4 flex flex-wrap items-end gap-3">
         <label className="flex-1 space-y-1.5">
-          <span className="text-sm font-medium text-corp-navy">Nombre del permiso</span>
+          <span className="text-sm font-medium text-corp-navy">Nombre del certificado de apoyo</span>
           <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={INPUT} />
         </label>
         <button
@@ -349,7 +392,7 @@ function Permisos({ token }: { token: string }) {
 }
 
 function EquiposEpp({ token }: { token: string }) {
-  const { confirmar } = useDialog();
+  const { confirmar, pedirTexto } = useDialog();
   const [equipos, setEquipos] = useState<EquipoProteccionPersonal[] | null>(null);
   const [nombre, setNombre] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -382,6 +425,22 @@ function EquiposEpp({ token }: { token: string }) {
     }
   }
 
+  async function editar(epp: EquipoProteccionPersonal) {
+    const nuevoNombre = await pedirTexto({
+      titulo: "Editar equipo de protección personal",
+      valorInicial: epp.nombre,
+      textoConfirmar: "Guardar",
+      opcional: false,
+    });
+    if (nuevoNombre === null || nuevoNombre.trim() === epp.nombre) return;
+    try {
+      await actualizarEquipoEpp(token, epp.id, { nombre: nuevoNombre.trim() });
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo editar el EPP.");
+    }
+  }
+
   async function eliminar(epp: EquipoProteccionPersonal) {
     const ok = await confirmar({
       titulo: "Eliminar equipo de protección personal",
@@ -410,6 +469,9 @@ function EquiposEpp({ token }: { token: string }) {
           >
             <span className={e.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{e.nombre}</span>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <button type="button" onClick={() => editar(e)} className="text-corp-blue hover:underline">
+                Editar
+              </button>
               <button type="button" onClick={() => alternarActivo(e)} className="text-corp-blue hover:underline">
                 {e.activo ? "Desactivar" : "Activar"}
               </button>

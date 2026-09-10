@@ -55,11 +55,11 @@ def _normalizar(texto):
 # declaración real que el cliente suba marcaría esos permisos como "no
 # reconocidos" aunque sí estén marcados con X en el archivo.
 _ALIAS_PERMISOS_ZBS_A_LEGACY = {
-    "Permiso LOTO / bloqueo y etiquetado de energías": ["Trabajos de LOTOTO"],
-    "Permiso de trabajo en alturas / protección contra caídas": ["Trabajos en Altura > 1.8 m"],
-    "Permiso de trabajo en espacios confinados": ["Espacio Confinado"],
-    "Permiso de trabajo eléctrico": ["Subestaciones (sistemas eléctricos vivos)"],
-    "Permiso de manejo de sustancias peligrosas": ["Sustancias Peligrosas a Granel"],
+    "Certificado de apoyo LOTO / bloqueo y etiquetado de energías": ["Trabajos de LOTOTO"],
+    "Certificado de apoyo en alturas / protección contra caídas": ["Trabajos en Altura > 1.8 m"],
+    "Certificado de apoyo en espacios confinados": ["Espacio Confinado"],
+    "Certificado de apoyo en trabajo eléctrico": ["Subestaciones (sistemas eléctricos vivos)"],
+    "Certificado de apoyo en manejo de sustancias peligrosas": ["Sustancias Peligrosas a Granel"],
 }
 ALIAS_PERMISOS_LEGACY = {
     _normalizar(nombre_legacy): nombre_actual
@@ -273,6 +273,10 @@ def parsear_excel_declaracion(archivo):
                 "probabilidad_con": _numero(COL_P_CON),
                 "frecuencia_con": _numero(COL_F_CON),
                 "impacto_con": _numero(COL_I_CON),
+                # El Excel del cliente no trae una celda propia para el permiso de
+                # trabajo general (distinto del listado de certificados de apoyo) —
+                # queda sin marcar hasta que se complete a mano.
+                "requiere_permiso_trabajo": False,
                 "permisos_requeridos": list(permisos_marcados),
                 "epp_requerido": list(epp_marcados),
                 "tarea_sif": str(_resolver_merge(hoja, fila, COL_SIF, mapa_merges) or "").strip().upper() == "SI",

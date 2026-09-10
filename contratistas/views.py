@@ -830,6 +830,7 @@ def declaracion_pdf(request, pk):
                 "impacto_con": actividad.impacto_con,
                 "riesgo_con": actividad.riesgo_con,
                 "nivel_con": nivel_con,
+                "requiere_permiso_trabajo": actividad.requiere_permiso_trabajo,
                 "permisos_requeridos": actividad.permisos_requeridos,
                 "tarea_sif": actividad.tarea_sif,
             }
@@ -1060,6 +1061,22 @@ class RegistroCapacitacionLista(generics.ListAPIView):
             filtro = self.request.query_params.get("contratista")
             if filtro:
                 qs = qs.filter(contratista_id=filtro)
+        return qs
+
+
+class RegistroCapacitacionDetalle(generics.DestroyAPIView):
+    """Eliminar un intento de inducción — para limpiar duplicados o pruebas
+    del reporte. Solo Administrador, igual que el resto de eliminaciones de
+    datos de cumplimiento (ver EsAdministradorParaEliminar)."""
+
+    serializer_class = RegistroCapacitacionSerializer
+    permission_classes = [EsPersonalInternoOSoloLectura, EsAdministradorParaEliminar]
+
+    def get_queryset(self):
+        qs = RegistroCapacitacion.objects.select_related("contratista", "trabajador")
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            qs = qs.filter(contratista_id=contratista_id)
         return qs
 
 

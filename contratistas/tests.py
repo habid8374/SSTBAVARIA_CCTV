@@ -136,8 +136,57 @@ class CatalogosTests(ApiTestsBase):
         response = self.client.get(reverse("contratistas:catalogos"), **self._auth(self.operador))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data["cursos_safety_academy"]), 7)
-        self.assertIn("Permiso de trabajo en alturas / protección contra caídas", response.data["permisos_trabajo"])
+        self.assertIn("Certificado de apoyo en alturas / protección contra caídas", response.data["permisos_trabajo"])
         self.assertEqual(len(response.data["roles_firma"]), 5)
+
+
+class EditarCatalogosTests(ApiTestsBase):
+    """Renombrar (no solo activar/desactivar/eliminar) un ítem de los
+    catálogos de Reglas de contratistas — el backend ya soportaba PATCH vía
+    RetrieveUpdateDestroyAPIView; esto fija el contrato del que depende el
+    botón "Editar" del frontend."""
+
+    def test_renombra_permiso_de_trabajo(self):
+        from .models import PermisoTrabajo
+
+        permiso = PermisoTrabajo.objects.first()
+        response = self.client.patch(
+            reverse("contratistas:permisos_detalle", args=[permiso.pk]),
+            {"nombre": "Certificado de apoyo renombrado"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        permiso.refresh_from_db()
+        self.assertEqual(permiso.nombre, "Certificado de apoyo renombrado")
+
+    def test_renombra_equipo_epp(self):
+        from .models import EquipoProteccionPersonal
+
+        epp = EquipoProteccionPersonal.objects.first()
+        response = self.client.patch(
+            reverse("contratistas:equipos_epp_detalle", args=[epp.pk]),
+            {"nombre": "EPP renombrado"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        epp.refresh_from_db()
+        self.assertEqual(epp.nombre, "EPP renombrado")
+
+    def test_renombra_curso_safety_academy(self):
+        from .models import CursoSafetyAcademy
+
+        curso = CursoSafetyAcademy.objects.first()
+        response = self.client.patch(
+            reverse("contratistas:cursos_detalle", args=[curso.pk]),
+            {"etiqueta": "Curso renombrado"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        curso.refresh_from_db()
+        self.assertEqual(curso.etiqueta, "Curso renombrado")
 
 
 class IndicadoresTests(ApiTestsBase):
@@ -1292,7 +1341,7 @@ class AlertasAutomaticasTests(ApiTestsBase):
             declaracion=declaracion,
             orden=0,
             secuencia="Subir al techo",
-            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
+            permisos_requeridos=["Certificado de apoyo en alturas / protección contra caídas"],
             epp_requerido=["Casco de seguridad"],
         )
         alertas = generar_alertas(declaracion)
@@ -1306,7 +1355,7 @@ class AlertasAutomaticasTests(ApiTestsBase):
             declaracion=declaracion,
             orden=0,
             secuencia="Subir al techo",
-            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
+            permisos_requeridos=["Certificado de apoyo en alturas / protección contra caídas"],
             epp_requerido=["Otros: Equipo contra caídas (Arnés de seguridad, línea retráctil, doble gancho)"],
         )
         alertas = generar_alertas(declaracion)
@@ -1435,7 +1484,7 @@ class AlertasAutomaticasTests(ApiTestsBase):
             orden=0,
             secuencia="Trabajo en techo alto",
             altura_trabajo_metros=4.5,
-            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
+            permisos_requeridos=["Certificado de apoyo en alturas / protección contra caídas"],
         )
         alertas = generar_alertas(declaracion)
         self.assertIn("altura_sobre_4m_requiere_zbs", [a["codigo"] for a in alertas])
@@ -1528,7 +1577,7 @@ class AlertasAutomaticasTests(ApiTestsBase):
             declaracion=declaracion,
             orden=0,
             secuencia="Subir al techo",
-            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
+            permisos_requeridos=["Certificado de apoyo en alturas / protección contra caídas"],
         )
         url = reverse("contratistas:declaraciones_alertas", args=[declaracion.pk])
         response = self.client.get(url, **self._auth(self.operador))
@@ -1555,7 +1604,8 @@ class DeclaracionMetodoTests(ApiTestsBase):
                     "probabilidad_con": 3,
                     "frecuencia_con": 3,
                     "impacto_con": 1,
-                    "permisos_requeridos": ["Permiso de trabajo en alturas / protección contra caídas"],
+                    "requiere_permiso_trabajo": True,
+                    "permisos_requeridos": ["Certificado de apoyo en alturas / protección contra caídas"],
                     "tarea_sif": True,
                 },
                 {
@@ -1578,6 +1628,8 @@ class DeclaracionMetodoTests(ApiTestsBase):
         self.assertEqual(len(response.data["actividades"]), 2)
         self.assertEqual(response.data["actividades"][0]["riesgo_sin"], 54)
         self.assertEqual(response.data["actividades"][0]["nivel_riesgo_sin"]["clave"], "posible")
+        self.assertTrue(response.data["actividades"][0]["requiere_permiso_trabajo"])
+        self.assertFalse(response.data["actividades"][1]["requiere_permiso_trabajo"])
 
         declaracion = DeclaracionMetodo.objects.get(pk=declaracion_id)
         self.assertEqual(declaracion.actividades.count(), 2)
@@ -1742,7 +1794,7 @@ class DeclaracionMetodoTests(ApiTestsBase):
             probabilidad_sin=6,
             frecuencia_sin=3,
             impacto_sin=3,
-            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
+            permisos_requeridos=["Certificado de apoyo en alturas / protección contra caídas"],
             epp_requerido=["Casco de seguridad"],
         )
         FirmaMetodo.objects.create(
@@ -1964,11 +2016,11 @@ def _construir_excel_declaracion_prueba():
     hoja["D14"], hoja["E14"], hoja["F14"] = 3, 3, 3
     hoja["H14"] = "Medidas de prueba"
     hoja["I14"], hoja["J14"], hoja["K14"] = 1, 1, 1
-    hoja["M14"] = "Permiso de trabajo en alturas / protección contra caídas"
+    hoja["M14"] = "Certificado de apoyo en alturas / protección contra caídas"
     hoja["N14"] = "SI"
 
     hoja_fpe = libro.create_sheet("Firmas,Permisos, EPP")
-    hoja_fpe["I4"] = "Permiso de trabajo en alturas / protección contra caídas"
+    hoja_fpe["I4"] = "Certificado de apoyo en alturas / protección contra caídas"
     hoja_fpe["K4"] = "X"
     hoja_fpe["L4"] = "Casco de seguridad"
     hoja_fpe["N4"] = "X"
@@ -2013,7 +2065,7 @@ class ImportarExcelDeclaracionTests(ApiTestsBase):
         actividad = response.data["actividades"][0]
         self.assertEqual(actividad["secuencia"], "1. Actividad de prueba")
         self.assertEqual(actividad["descripcion_riesgo"], "Riesgo de prueba")
-        self.assertEqual(actividad["permisos_requeridos"], ["Permiso de trabajo en alturas / protección contra caídas"])
+        self.assertEqual(actividad["permisos_requeridos"], ["Certificado de apoyo en alturas / protección contra caídas"])
         self.assertEqual(actividad["epp_requerido"], ["Casco de seguridad"])
         self.assertTrue(actividad["tarea_sif"])
         self.assertEqual(response.data["avisos"], [])
@@ -2055,7 +2107,7 @@ class ImportarExcelDeclaracionTests(ApiTestsBase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(
             response.data["actividades"][0]["permisos_requeridos"],
-            ["Permiso de trabajo en alturas / protección contra caídas"],
+            ["Certificado de apoyo en alturas / protección contra caídas"],
         )
         self.assertEqual(response.data["avisos"], [])
 
@@ -2101,8 +2153,8 @@ class ImportarExcelDeclaracionTests(ApiTestsBase):
         self.assertEqual(response.status_code, 200, response.data)
         permisos = response.data["actividades"][0]["permisos_requeridos"]
         epp = response.data["actividades"][0]["epp_requerido"]
-        self.assertIn("Permiso LOTO / bloqueo y etiquetado de energías", permisos)
-        self.assertNotIn("Permiso de trabajo en alturas / protección contra caídas", permisos)
+        self.assertIn("Certificado de apoyo LOTO / bloqueo y etiquetado de energías", permisos)
+        self.assertNotIn("Certificado de apoyo en alturas / protección contra caídas", permisos)
         self.assertIn("Casco de seguridad", epp)
         self.assertNotIn("Gafas de seguridad", epp)
 
@@ -2871,4 +2923,45 @@ class CapacitacionTests(ApiTestsBase):
         filas = list(libro.active.iter_rows(values_only=True))
         nombres_exportados = [fila[1] for fila in filas[1:]]
         self.assertEqual(nombres_exportados, ["De Scepsa"])
-        self.assertTrue(registro_id)
+
+    def test_admin_elimina_registro(self):
+        registro = RegistroCapacitacion.objects.create(contratista=self.contratista, nombres="Para borrar")
+        response = self.client.delete(
+            reverse("contratistas:capacitacion_registro_detalle", args=[registro.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(RegistroCapacitacion.objects.filter(pk=registro.pk).exists())
+
+    def test_operador_no_puede_eliminar_registro(self):
+        registro = RegistroCapacitacion.objects.create(contratista=self.contratista, nombres="Para borrar")
+        response = self.client.delete(
+            reverse("contratistas:capacitacion_registro_detalle", args=[registro.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(RegistroCapacitacion.objects.filter(pk=registro.pk).exists())
+
+    def test_portal_contratista_no_puede_eliminar_registro(self):
+        registro = RegistroCapacitacion.objects.create(contratista=self.contratista, nombres="Para borrar")
+        response = self.client.delete(
+            reverse("contratistas:capacitacion_registro_detalle", args=[registro.pk]),
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(RegistroCapacitacion.objects.filter(pk=registro.pk).exists())
+
+    def test_portal_contratista_no_puede_eliminar_registro_de_otra_empresa(self):
+        otro = EmpresaContratista.objects.create(empresa=self.empresa, nombre="OTRA SAS")
+        registro_ajeno = RegistroCapacitacion.objects.create(contratista=otro, nombres="De otra empresa")
+        response = self.client.delete(
+            reverse("contratistas:capacitacion_registro_detalle", args=[registro_ajeno.pk]),
+            **self._auth(self.portal_user),
+        )
+        self.assertIn(response.status_code, (403, 404))
+        self.assertTrue(RegistroCapacitacion.objects.filter(pk=registro_ajeno.pk).exists())
+
+    def test_eliminar_requiere_autenticacion(self):
+        registro = RegistroCapacitacion.objects.create(contratista=self.contratista, nombres="Para borrar")
+        response = self.client.delete(
+            reverse("contratistas:capacitacion_registro_detalle", args=[registro.pk])
+        )
+        self.assertEqual(response.status_code, 401)

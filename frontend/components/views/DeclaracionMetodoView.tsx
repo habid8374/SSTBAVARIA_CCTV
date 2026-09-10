@@ -273,6 +273,7 @@ function actividadVacia(orden: number): ActividadForm {
     probabilidad_con: 1,
     frecuencia_con: 3,
     impacto_con: 1,
+    requiere_permiso_trabajo: false,
     permisos_requeridos: [],
     epp_requerido: [],
     tarea_sif: false,
@@ -473,6 +474,7 @@ function FormularioDeclaracion({
               ...a,
               altura_trabajo_metros: a.altura_trabajo_metros ?? null,
               profundidad_excavacion_metros: a.profundidad_excavacion_metros ?? null,
+              requiere_permiso_trabajo: a.requiere_permiso_trabajo ?? false,
               clave: clave(),
             }))
           : [actividadVacia(0)]
@@ -553,6 +555,7 @@ function FormularioDeclaracion({
         probabilidad_con: a.probabilidad_con,
         frecuencia_con: a.frecuencia_con,
         impacto_con: a.impacto_con,
+        requiere_permiso_trabajo: a.requiere_permiso_trabajo,
         permisos_requeridos: a.permisos_requeridos,
         epp_requerido: a.epp_requerido,
         tarea_sif: a.tarea_sif,
@@ -948,10 +951,22 @@ function FormularioDeclaracion({
                     </Campo>
                   </div>
 
+                  <label className="mt-4 flex items-center gap-2 text-sm text-corp-navy">
+                    <input
+                      type="checkbox"
+                      checked={actividad.requiere_permiso_trabajo}
+                      onChange={(e) => actualizarActividad(indice, { requiere_permiso_trabajo: e.target.checked })}
+                      className="h-4 w-4 rounded border-corp-border accent-corp-blue"
+                    />
+                    ¿Requiere permiso de trabajo general?
+                  </label>
+
                   <div className="mt-4">
-                    <span className="text-sm font-medium text-corp-navy">
-                      Permisos de trabajo / certificados requeridos
-                    </span>
+                    <span className="text-sm font-medium text-corp-navy">Certificados de apoyo requeridos</span>
+                    <p className="mt-0.5 text-xs text-corp-muted">
+                      Distinto del permiso de trabajo general de arriba — marca los certificados específicos
+                      según el tipo de riesgo (alturas, LOTO, espacio confinado, etc.).
+                    </p>
                     <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                       {catalogos.permisos_trabajo.map((permiso) => (
                         <label key={permiso} className="flex items-center gap-2 text-sm text-corp-navy">

@@ -82,8 +82,9 @@
     <div class="clear"></div>
 
     {% if actividad.medidas_mitigacion %}<p><strong>Medidas de mitigación:</strong> {{ actividad.medidas_mitigacion }}</p>{% endif %}
+    {% if actividad.requiere_permiso_trabajo %}<p class="permisos"><strong>Requiere permiso de trabajo general.</strong></p>{% endif %}
     {% if actividad.permisos_requeridos %}
-    <p class="permisos"><strong>Permisos requeridos:</strong> {{ actividad.permisos_requeridos|join:", " }}</p>
+    <p class="permisos"><strong>Certificados de apoyo requeridos:</strong> {{ actividad.permisos_requeridos|join:", " }}</p>
     {% endif %}
     {% if actividad.tarea_sif %}<p class="sif">⚠ Tarea SIF — potencial de lesión seria o fatal</p>{% endif %}
   </div>

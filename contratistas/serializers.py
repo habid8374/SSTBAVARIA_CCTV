@@ -278,6 +278,7 @@ class ActividadMetodoSerializer(serializers.ModelSerializer):
             "impacto_con",
             "riesgo_con",
             "nivel_riesgo_con",
+            "requiere_permiso_trabajo",
             "permisos_requeridos",
             "epp_requerido",
             "tarea_sif",

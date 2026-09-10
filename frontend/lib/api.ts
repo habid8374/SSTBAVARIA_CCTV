@@ -1229,6 +1229,7 @@ export type ActividadMetodo = {
   impacto_con: number;
   riesgo_con: number;
   nivel_riesgo_con: NivelRiesgo;
+  requiere_permiso_trabajo: boolean;
   permisos_requeridos: string[];
   epp_requerido: string[];
   tarea_sif: boolean;
@@ -1677,6 +1678,13 @@ export function listarRegistrosCapacitacion(
 ): Promise<RegistroCapacitacion[]> {
   const query = contratistaId ? `?contratista=${contratistaId}` : "";
   return request<RegistroCapacitacion[]>(`/api/contratistas/capacitacion/registros/${query}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export function eliminarRegistroCapacitacion(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/capacitacion/registros/${id}/`, {
+    method: "DELETE",
     headers: authHeaders(token),
   });
 }

@@ -18,7 +18,7 @@ reglas simplemente no aplican (no se asume nada en su ausencia)."""
 
 from .models import nivel_riesgo
 
-PERMISO_ALTURA = "Permiso de trabajo en alturas / protección contra caídas"
+PERMISO_ALTURA = "Certificado de apoyo en alturas / protección contra caídas"
 PERMISO_EXCAVACION = "Excavaciones o Demolición"
 EPP_CONTRA_CAIDAS = "Otros: Equipo contra caídas (Arnés de seguridad, línea retráctil, doble gancho)"
 ROL_SEGURIDAD_PLANTA = "seguridad_planta"

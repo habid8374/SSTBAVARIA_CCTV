@@ -89,7 +89,8 @@ def _hoja_declaracion(hoja, declaracion, actividades):
         "I (con)",
         "R (con)",
         "Nivel (con)",
-        "Permisos de trabajo requeridos",
+        "Permiso de trabajo general",
+        "Certificados de apoyo requeridos",
         "EPP requerido",
         "Tarea SIF",
     ]
@@ -115,6 +116,7 @@ def _hoja_declaracion(hoja, declaracion, actividades):
             actividad["impacto_con"],
             actividad["riesgo_con"],
             nivel_con,
+            "Sí" if actividad["requiere_permiso_trabajo"] else "No",
             ", ".join(actividad["permisos_requeridos"]),
             ", ".join(actividad["epp_requerido"]),
             "Sí" if actividad["tarea_sif"] else "No",
@@ -125,7 +127,7 @@ def _hoja_declaracion(hoja, declaracion, actividades):
             celda.border = BORDE_CELDA
         fila += 1
 
-    anchos = [28, 26, 30, 7, 7, 7, 7, 12, 30, 7, 7, 7, 7, 12, 26, 22, 9]
+    anchos = [28, 26, 30, 7, 7, 7, 7, 12, 30, 7, 7, 7, 7, 12, 14, 26, 22, 9]
     for indice, ancho in enumerate(anchos, start=1):
         hoja.column_dimensions[get_column_letter(indice)].width = ancho
     hoja.freeze_panes = hoja.cell(row=fila_tabla_inicio, column=1)
@@ -319,6 +321,7 @@ def generar_excel_declaracion(declaracion):
                 "frecuencia_con": actividad.frecuencia_con,
                 "impacto_con": actividad.impacto_con,
                 "riesgo_con": actividad.riesgo_con,
+                "requiere_permiso_trabajo": actividad.requiere_permiso_trabajo,
                 "permisos_requeridos": actividad.permisos_requeridos,
                 "epp_requerido": actividad.epp_requerido,
                 "tarea_sif": actividad.tarea_sif,

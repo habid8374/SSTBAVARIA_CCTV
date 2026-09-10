@@ -343,9 +343,11 @@ const TEMAS: Tema[] = [
           <li>Una fila por actividad, con el riesgo <strong>sin</strong> medidas de mitigación y{" "}
             <strong>con</strong> ellas aplicadas — el nivel de riesgo (bajo/medio/alto/crítico) se calcula
             solo según el puntaje.</li>
-          <li>Permisos de trabajo requeridos por actividad (altura, caliente, espacio confinado, etc.).</li>
+          <li>¿Requiere permiso de trabajo general? — un único permiso por actividad, distinto de los
+            certificados de apoyo de abajo.</li>
+          <li>Certificados de apoyo requeridos por actividad (altura, caliente, espacio confinado, etc.).</li>
           <li>Equipo de protección personal (EPP) requerido por actividad (casco, gafas, arnés, etc.) — se
-            marca igual que los permisos de trabajo, con casillas por actividad.</li>
+            marca igual que los certificados de apoyo, con casillas por actividad.</li>
           <li>Altura de trabajo y profundidad de excavación por actividad (metros) — campos opcionales, sin
             obligación de diligenciarlos, que habilitan alertas automáticas más precisas cuando se llenan
             (ver el tema &quot;Alertas automáticas&quot; más abajo).</li>
@@ -357,8 +359,8 @@ const TEMAS: Tema[] = [
           Al crear una declaración nueva (antes de guardarla por primera vez) aparece un botón{" "}
           <strong>&quot;Importar desde Excel&quot;</strong> para subir el libro de Excel que ya usa el cliente
           para diligenciar declaraciones de método a mano. El sistema lee el archivo y precarga
-          automáticamente los datos generales, la secuencia de actividades y sus riesgos, los permisos de
-          trabajo y el EPP marcados. Después de importar, <strong>toda la información queda editable</strong>{" "}
+          automáticamente los datos generales, la secuencia de actividades y sus riesgos, los certificados de
+          apoyo y el EPP marcados. Después de importar, <strong>toda la información queda editable</strong>{" "}
           — se revisa y se ajusta lo que haga falta, igual que si se hubiera escrito a mano, y{" "}
           <strong>no se guarda nada hasta hacer clic en &quot;Crear declaración&quot;</strong>.
         </P>
@@ -375,8 +377,8 @@ const TEMAS: Tema[] = [
           que quedó cargado en el formulario.
         </P>
         <P>
-          En una declaración importada, la tabla larga con el detalle de cada actividad (Kinney, permisos,
-          EPP) <strong>queda oculta por defecto</strong> — en su lugar se ve solo un resumen (cuántas
+          En una declaración importada, la tabla larga con el detalle de cada actividad (Kinney, certificados
+          de apoyo, EPP) <strong>queda oculta por defecto</strong> — en su lugar se ve solo un resumen (cuántas
           actividades se importaron) con un enlace <strong>&quot;Ver detalle de actividades&quot;</strong>{" "}
           para desplegarla si hace falta corregir algo puntual. Así lo que queda a la vista de una vez es lo
           que de verdad hay que revisar: Datos generales, Alertas automáticas, Firmas electrónicas y el
@@ -425,8 +427,8 @@ const TEMAS: Tema[] = [
         <P>
           Al abrir una declaración para revisarla, el personal de SST/interventoría ve un panel amarillo
           con alertas automáticas cuando alguna actividad no cumple con reglas tomadas de los procedimientos
-          de seguridad del cliente (SOP &quot;Safety to Sustain&quot;) — por ejemplo, un permiso de trabajo
-          en altura marcado sin el EPP contra caídas correspondiente, una excavación sin medidas de
+          de seguridad del cliente (SOP &quot;Safety to Sustain&quot;) — por ejemplo, un certificado de
+          apoyo en alturas marcado sin el EPP contra caídas correspondiente, una excavación sin medidas de
           mitigación detalladas, un riesgo que sigue alto después de mitigar, o una tarea SIF sin firma de
           Seguridad de Planta. Cada alerta cita de qué procedimiento sale y trae un botón <strong>&quot;Usar
           como motivo de rechazo&quot;</strong> que solo copia un texto sugerido al campo Observaciones —{" "}
@@ -437,7 +439,8 @@ const TEMAS: Tema[] = [
         <P>
           Si en una actividad se diligencian los campos opcionales de altura de trabajo o profundidad de
           excavación (en metros), se habilitan alertas adicionales con los umbrales exactos de las SOP: más
-          de 1.8 m sin el permiso de altura marcado, más de 4 m (exige aprobación previa de Zone Safety),
+          de 1.8 m sin el certificado de apoyo en alturas marcado, más de 4 m (exige aprobación previa de Zone
+          Safety),
           más de 1.2 m de excavación (exige salida de emergencia), más de 1.3 m (exige retén exterior) y más
           de 5 m (exige andamiaje). Si esos campos quedan vacíos, esas alertas puntuales simplemente no
           aplican — no se asume nada en su ausencia.
@@ -584,6 +587,17 @@ const TEMAS: Tema[] = [
             documento, trabajador vinculado, calificación y fecha de aprobación. El personal interno exporta
             todas las empresas; el portal de contratistas, solo la suya.</li>
         </Ul>
+        <Sub>Continuar una evaluación a medias, y eliminar registros</Sub>
+        <Ul>
+          <li>Una fila <strong>En curso</strong> (alguien que se quedó a medias — se le fue la conexión, cerró
+            la pestaña) tiene un enlace <strong>&quot;Continuar evaluación&quot;</strong> que lleva directo a
+            las preguntas, sin tener que volver a diligenciar el registro ni ver el video de nuevo. Como las
+            respuestas no se guardan hasta enviar la evaluación completa, hay que responder las 10 preguntas
+            otra vez.</li>
+          <li>El enlace <strong>&quot;Eliminar&quot;</strong> (solo visible para el rol Administrador) borra el
+            registro por completo — para limpiar duplicados o pruebas. Es una acción irreversible; pide
+            confirmación antes de borrar.</li>
+        </Ul>
         <Nota tipo="aviso">
           El video y las 10 preguntas de la evaluación se pueden editar desde el admin de Django (Sistema →
           Configuración de capacitación / Preguntas de capacitación) sin tocar código.
@@ -669,12 +683,13 @@ const TEMAS: Tema[] = [
         <Sub>Reglas de contratistas</Sub>
         <P>
           Catálogos que antes estaban fijos en el código, ahora editables acá: los <strong>cursos Safety
-          Academy</strong> que aparecen al registrar un trabajador, los <strong>permisos de trabajo /
-          certificados requeridos</strong> y el <strong>equipo de protección personal (EPP)</strong> que
+          Academy</strong> que aparecen al registrar un trabajador, los <strong>certificados de apoyo
+          requeridos</strong> y el <strong>equipo de protección personal (EPP)</strong> que
           aparecen en las actividades de una declaración de método, y
           los <strong>días de alerta de vencimiento</strong> (a cuántos días de vencer una planilla se
           considera &quot;por vencer&quot; en el banner de Contratistas), y el <strong>correo para avisos
-          de revisión pendiente</strong>. Se pueden desactivar sin borrar el historial de
+          de revisión pendiente</strong>. Cada ítem se puede editar (renombrar), desactivar sin borrar el
+          historial de
           trabajadores/actividades que ya los tenían marcados.
         </P>
         <Sub>Aviso al radicar/enviar (no solo al aprobar/rechazar)</Sub>
