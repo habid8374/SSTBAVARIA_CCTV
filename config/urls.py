@@ -7,18 +7,11 @@ from django.urls import include, path
 # Vercel) en vez del backend mismo — así se puede ir y volver entre los dos.
 admin.site.site_url = settings.FRONTEND_URL
 
-def _sentry_debug(request):
-    """Ruta temporal solo para verificar que Sentry recibe errores del
-    backend en producción — se borra apenas se confirme en el dashboard."""
-    1 / 0
-
-
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("core.urls")),
     path("api/camaras-ia/", include("camaras_ia.urls")),
     path("api/contratistas/", include("contratistas.urls")),
-    path("sentry-debug/", _sentry_debug),
 ]
 
 # Sirve media/ (snapshots) también fuera de DEBUG — el disco de Railway no
