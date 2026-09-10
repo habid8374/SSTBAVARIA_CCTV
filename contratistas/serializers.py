@@ -3,6 +3,8 @@ from rest_framework import serializers
 
 from core.models import Empresa
 
+from .portal_usuarios import crear_usuario_portal_si_hace_falta, tiene_usuario_portal
+
 from .models import (
     ActividadMetodo,
     AutorizacionIngreso,
@@ -145,12 +147,26 @@ class TrabajadorSerializer(serializers.ModelSerializer):
                     )
                 }
             )
+        contratista = datos.get("contratista") or getattr(self.instance, "contratista", None)
+        if self.instance is None and contratista and not tiene_usuario_portal(contratista):
+            if not contratista.contacto_correo:
+                raise serializers.ValidationError(
+                    {
+                        "contratista": (
+                            "Esta empresa contratista todavía no tiene acceso al portal y no tiene "
+                            "correo de contacto registrado — complétalo primero (en Contratistas) para "
+                            "poder enviarle las credenciales del portal al registrar este trabajador."
+                        )
+                    }
+                )
         return datos
 
     def create(self, validated_data):
         if validated_data.get("autorizacion_datos"):
             validated_data["autorizacion_datos_en"] = timezone.now()
-        return super().create(validated_data)
+        trabajador = super().create(validated_data)
+        crear_usuario_portal_si_hace_falta(trabajador.contratista)
+        return trabajador
 
     def update(self, instance, validated_data):
         if validated_data.get("autorizacion_datos") and not instance.autorizacion_datos:

@@ -824,6 +824,17 @@ class RegistroAuditoriaTests(ApiTestsBase):
 
 
 class TrabajadorTests(ApiTestsBase):
+    def setUp(self):
+        super().setUp()
+        # self.trabajador (de ApiTestsBase) ya existe sin haber pasado por el
+        # login de portal automático (se creó directo por ORM) — para que
+        # estos tests puedan seguir registrando trabajadores nuevos sin
+        # toparse con la validación de "falta correo de contacto", se le
+        # da correo de contacto de una vez. El flujo de alta automática del
+        # usuario de portal se prueba aparte, en AltaUsuarioPortalTests.
+        self.contratista.contacto_correo = "contacto@contratista.com"
+        self.contratista.save(update_fields=["contacto_correo"])
+
     def test_cursos_pendientes_lista_obligatorios_incompletos(self):
         from .models import CursoSafetyAcademy
 
@@ -979,6 +990,97 @@ class TrabajadorTests(ApiTestsBase):
             **self._auth(self.operador),
         )
         self.assertEqual(len(response.data), 1)
+
+
+class AltaUsuarioPortalTests(ApiTestsBase):
+    """Al registrar el primer trabajador de una empresa contratista sin
+    acceso al portal, se le crea el login solo — ver
+    contratistas/portal_usuarios.py."""
+
+    def setUp(self):
+        super().setUp()
+        # self.contratista ya trae un trabajador (self.trabajador, de
+        # ApiTestsBase) creado directo por ORM, así que todavía no tiene
+        # usuario de portal — es el escenario real: una empresa contratista
+        # que ya tenía trabajadores antes de que existiera esta función.
+        self.contratista.contacto_correo = ""
+        self.contratista.save(update_fields=["contacto_correo"])
+
+    def _crear_trabajador(self, **overrides):
+        datos = {
+            "contratista": self.contratista.pk,
+            "nombres": "Luis Alfonso",
+            "apellidos": "Estepa Patiño",
+            "documento": "80431911",
+            "autorizacion_datos": True,
+        }
+        datos.update(overrides)
+        return self.client.post(
+            reverse("contratistas:trabajadores_lista"),
+            datos,
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+
+    def test_sin_correo_de_contacto_devuelve_400(self):
+        response = self._crear_trabajador()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("contratista", response.data)
+        self.assertFalse(Trabajador.objects.filter(documento="80431911").exists())
+
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_crea_usuario_de_portal_y_envia_credenciales(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        self.contratista.contacto_correo = "contacto@scepsa.com"
+        self.contratista.save(update_fields=["contacto_correo"])
+
+        response = self._crear_trabajador()
+        self.assertEqual(response.status_code, 201, response.data)
+        mock_urlopen.assert_called_once()
+
+        usuario = Usuario.objects.get(username="scepsa-colombia-sas@sst-cctv.com")
+        self.assertEqual(usuario.perfil.rol, PerfilUsuario.Rol.CONTRATISTA)
+        self.assertEqual(usuario.perfil.contratista_id, self.contratista.pk)
+
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_no_duplica_usuario_si_ya_tiene_uno(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        self.contratista.contacto_correo = "contacto@scepsa.com"
+        self.contratista.save(update_fields=["contacto_correo"])
+
+        primero = self._crear_trabajador(documento="80431911")
+        self.assertEqual(primero.status_code, 201, primero.data)
+        self.assertEqual(mock_urlopen.call_count, 1)
+
+        segundo = self._crear_trabajador(documento="80431912")
+        self.assertEqual(segundo.status_code, 201, segundo.data)
+        self.assertEqual(mock_urlopen.call_count, 1)
+        self.assertEqual(
+            Usuario.objects.filter(perfil__contratista=self.contratista, perfil__rol="contratista").count(), 1
+        )
+
+    def test_si_ya_tiene_usuario_de_portal_no_exige_correo(self):
+        portal_user = Usuario.objects.create_user("scepsa-colombia-sas@sst-cctv.com", password="clave12345")
+        portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        portal_user.perfil.contratista = self.contratista
+        portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+        response = self._crear_trabajador()
+        self.assertEqual(response.status_code, 201, response.data)
+
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_username_evita_colision(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        Usuario.objects.create_user("scepsa-colombia-sas@sst-cctv.com", password="clave12345")
+        self.contratista.contacto_correo = "contacto@scepsa.com"
+        self.contratista.save(update_fields=["contacto_correo"])
+
+        response = self._crear_trabajador()
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(Usuario.objects.filter(username="scepsa-colombia-sas2@sst-cctv.com").exists())
 
 
 class RadicacionSeguridadSocialTests(ApiTestsBase):
