@@ -47,7 +47,28 @@ def _normalizar(texto):
     return "".join(c for c in texto if not unicodedata.combining(c))
 
 
-def _emparejar_catalogo(etiqueta_cruda, nombres_catalogo):
+# El catálogo de Permisos de trabajo se renombró (ver migración
+# 0022_reemplazar_permisos_trabajo_zbs) para usar los títulos de las
+# políticas ZBS Safety vigentes. La plantilla de Excel que ya usa el
+# cliente es un archivo externo que no controlamos y sigue trayendo los
+# textos ANTERIORES en sus columnas fijas — sin este mapa, cada
+# declaración real que el cliente suba marcaría esos permisos como "no
+# reconocidos" aunque sí estén marcados con X en el archivo.
+_ALIAS_PERMISOS_ZBS_A_LEGACY = {
+    "Permiso LOTO / bloqueo y etiquetado de energías": ["Trabajos de LOTOTO"],
+    "Permiso de trabajo en alturas / protección contra caídas": ["Trabajos en Altura > 1.8 m"],
+    "Permiso de trabajo en espacios confinados": ["Espacio Confinado"],
+    "Permiso de trabajo eléctrico": ["Subestaciones (sistemas eléctricos vivos)"],
+    "Permiso de manejo de sustancias peligrosas": ["Sustancias Peligrosas a Granel"],
+}
+ALIAS_PERMISOS_LEGACY = {
+    _normalizar(nombre_legacy): nombre_actual
+    for nombre_actual, nombres_legacy in _ALIAS_PERMISOS_ZBS_A_LEGACY.items()
+    for nombre_legacy in nombres_legacy
+}
+
+
+def _emparejar_catalogo(etiqueta_cruda, nombres_catalogo, alias_legacy=None):
     """Busca en el catálogo (ya normalizado) el nombre que mejor corresponda
     al texto libre del Excel. None si no encuentra nada razonable."""
     if not etiqueta_cruda or not etiqueta_cruda.strip():
@@ -61,6 +82,11 @@ def _emparejar_catalogo(etiqueta_cruda, nombres_catalogo):
     for nombre_original, nombre_normalizado in nombres_catalogo:
         if nombre_normalizado and (nombre_normalizado in normalizada or normalizada in nombre_normalizado):
             return nombre_original
+    if alias_legacy and normalizada in alias_legacy:
+        nombre_actual = alias_legacy[normalizada]
+        for nombre_original, _ in nombres_catalogo:
+            if nombre_original == nombre_actual:
+                return nombre_original
     return None
 
 
@@ -150,7 +176,7 @@ def parsear_excel_declaracion(archivo):
             marcada = hoja_fpe.cell(row=fila, column=11).value  # columna K
             if not _celda_marcada(marcada):
                 continue
-            emparejado = _emparejar_catalogo(str(etiqueta), permisos_catalogo)
+            emparejado = _emparejar_catalogo(str(etiqueta), permisos_catalogo, ALIAS_PERMISOS_LEGACY)
             if emparejado:
                 permisos_marcados.append(emparejado)
             else:

@@ -1895,6 +1895,47 @@ class ImportarExcelDeclaracionTests(ApiTestsBase):
         self.assertTrue(actividad["tarea_sif"])
         self.assertEqual(response.data["avisos"], [])
 
+    def test_reconoce_permiso_con_nombre_legacy_del_excel_del_cliente(self):
+        """La plantilla de Excel real del cliente trae los nombres ANTERIORES
+        del catálogo de permisos (antes de la migración 0022) — el
+        importador debe seguir reconociéndolos vía el mapa de alias, sin
+        marcarlos como "no reconocidos"."""
+        import io
+
+        from openpyxl import Workbook
+
+        libro = Workbook()
+        hoja = libro.active
+        hoja.title = "Declaración de Método"
+        hoja["B3"] = "Planta Prueba"
+        hoja["A6"] = "GERENTE DE PROYECTO: Juan Perez"
+        hoja["C7"] = "FECHA DE ELABORACIÓN: 15/03/2026\n\nDURACIÓN (EN DÍAS): 5"
+        hoja["H7"] = "DESCRIBA EL TRABAJO A REALIZAR: Trabajo de prueba"
+        hoja["A14"] = "1. Actividad de prueba"
+        hoja["C14"] = "Riesgo de prueba"
+        hoja["D14"], hoja["E14"], hoja["F14"] = 3, 3, 3
+        hoja["I14"], hoja["J14"], hoja["K14"] = 1, 1, 1
+
+        hoja_fpe = libro.create_sheet("Firmas,Permisos, EPP")
+        hoja_fpe["I4"] = "Trabajos en Altura > 1.8 m"
+        hoja_fpe["K4"] = "X"
+
+        buffer = io.BytesIO()
+        libro.save(buffer)
+        buffer.seek(0)
+
+        response = self.client.post(
+            reverse("contratistas:declaraciones_importar_excel"),
+            {"archivo": self._archivo(buffer.read())},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(
+            response.data["actividades"][0]["permisos_requeridos"],
+            ["Permiso de trabajo en alturas / protección contra caídas"],
+        )
+        self.assertEqual(response.data["avisos"], [])
+
     def test_portal_contratista_tambien_puede_importar(self):
         portal_user = Usuario.objects.create_user("portal_import_test", "portal_import@x.com", "clave12345")
         portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
