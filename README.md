@@ -544,6 +544,7 @@ creado ahí.
    | `BREVO_REMITENTE_EMAIL` | correo remitente verificado en Brevo (Settings → Senders) — también configurable desde el dashboard |
    | `BREVO_REMITENTE_NOMBRE` | nombre que aparece como remitente, ej. `SST Bavaria — Cámaras IA` — también configurable desde el dashboard |
    | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL` | Cloudflare R2 para que los archivos subidos (`media/`) sobrevivan a los despliegues — ver la sección "Almacenamiento de archivos (`media/`) en Cloudflare R2" más abajo. Sin estas 4 variables, cae a disco local (se pierde en cada deploy) |
+   | `SENTRY_DSN` | opcional — monitoreo de errores con [Sentry](https://sentry.io). DSN del proyecto (Settings → Projects → tu proyecto → Client Keys (DSN)). Sin esta variable, Sentry simplemente no se activa |
 
 4. Railway detecta `railway.json` (build con Nixpacks) y corre
    automáticamente `migrate`, `collectstatic` y levanta `gunicorn` según el

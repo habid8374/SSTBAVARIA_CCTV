@@ -37,6 +37,23 @@ if not SECRET_KEY:
             "La variable de entorno SECRET_KEY es obligatoria cuando DEBUG=False."
         )
 
+# Monitoreo de errores con Sentry (https://sentry.io) — captura excepciones
+# no manejadas del backend con su traceback completo. Sin SENTRY_DSN
+# configurado, sentry_sdk simplemente no se inicializa (mismo patrón que
+# Brevo/VAPID/R2 más abajo: opcional, nunca rompe el arranque en local).
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "development" if DEBUG else "production"),
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        send_default_pii=False,
+    )
+
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("ALLOWED_HOSTS", "").split(",")
