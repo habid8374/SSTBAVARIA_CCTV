@@ -635,77 +635,6 @@ function FormularioDeclaracion({
         </div>
       )}
 
-      {!esContratista && alertas.length > 0 && (
-        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">
-            Alertas automáticas ({alertas.length}) — revísalas antes de decidir, no reemplazan tu criterio.
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-3 border-b border-amber-200 pb-2">
-            <label className="flex items-center gap-1.5 text-xs font-medium">
-              <input
-                type="checkbox"
-                checked={alertas.length > 0 && alertas.every((a) => alertasSeleccionadas.has(claveAlerta(a)))}
-                onChange={(e) =>
-                  setAlertasSeleccionadas(e.target.checked ? new Set(alertas.map(claveAlerta)) : new Set())
-                }
-                className="h-4 w-4 rounded border-amber-400 accent-amber-700"
-              />
-              Seleccionar todas
-            </label>
-            <button
-              type="button"
-              onClick={agregarSeleccionadasComoMotivo}
-              disabled={alertasSeleccionadas.size === 0}
-              className="rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Agregar seleccionadas al motivo de rechazo ({alertasSeleccionadas.size})
-            </button>
-          </div>
-          <ul className="mt-2 space-y-3">
-            {alertas.map((alerta, indice) => {
-              const clave = claveAlerta(alerta);
-              const yaAplicada = alertasAplicadas.has(clave);
-              return (
-              <li key={`${clave}-${indice}`} className="rounded-md border border-amber-200 bg-white/60 p-3">
-                <div className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={alertasSeleccionadas.has(clave)}
-                    onChange={(e) => alternarSeleccionAlerta(alerta, e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-amber-400 accent-amber-700"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium">{alerta.titulo}</p>
-                    <p className="mt-1 text-amber-800">{alerta.mensaje}</p>
-                    <p className="mt-1 text-xs text-amber-700">Fuente: {alerta.fuente}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => usarComoMotivoRechazo(alerta)}
-                        disabled={yaAplicada}
-                        className="rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Usar como motivo de rechazo
-                      </button>
-                      {yaAplicada && (
-                        <span className="text-xs font-semibold text-emerald-700">✓ Agregada al motivo de rechazo</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <NotasDeAlerta
-                  notas={notasAlertas.filter(
-                    (n) => n.codigo_alerta === alerta.codigo && n.actividad_orden === alerta.actividad_orden
-                  )}
-                  onAgregar={(texto) => agregarNotaAlerta(alerta, texto)}
-                />
-              </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
       {!declaracion && (
         <div className="mt-4 rounded-2xl border border-dashed border-corp-blue bg-corp-blue-light/30 p-5">
           <h3 className="text-base font-semibold text-corp-navy">Importar desde Excel (opcional)</h3>
@@ -1081,6 +1010,77 @@ function FormularioDeclaracion({
           </>
           )}
         </div>
+
+        {!esContratista && alertas.length > 0 && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold">
+              Alertas automáticas ({alertas.length}) — revísalas antes de decidir, no reemplazan tu criterio.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3 border-b border-amber-200 pb-2">
+              <label className="flex items-center gap-1.5 text-xs font-medium">
+                <input
+                  type="checkbox"
+                  checked={alertas.length > 0 && alertas.every((a) => alertasSeleccionadas.has(claveAlerta(a)))}
+                  onChange={(e) =>
+                    setAlertasSeleccionadas(e.target.checked ? new Set(alertas.map(claveAlerta)) : new Set())
+                  }
+                  className="h-4 w-4 rounded border-amber-400 accent-amber-700"
+                />
+                Seleccionar todas
+              </label>
+              <button
+                type="button"
+                onClick={agregarSeleccionadasComoMotivo}
+                disabled={alertasSeleccionadas.size === 0}
+                className="rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Agregar seleccionadas al motivo de rechazo ({alertasSeleccionadas.size})
+              </button>
+            </div>
+            <ul className="mt-2 space-y-3">
+              {alertas.map((alerta, indice) => {
+                const clave = claveAlerta(alerta);
+                const yaAplicada = alertasAplicadas.has(clave);
+                return (
+                <li key={`${clave}-${indice}`} className="rounded-md border border-amber-200 bg-white/60 p-3">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={alertasSeleccionadas.has(clave)}
+                      onChange={(e) => alternarSeleccionAlerta(alerta, e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-amber-400 accent-amber-700"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium">{alerta.titulo}</p>
+                      <p className="mt-1 text-amber-800">{alerta.mensaje}</p>
+                      <p className="mt-1 text-xs text-amber-700">Fuente: {alerta.fuente}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => usarComoMotivoRechazo(alerta)}
+                          disabled={yaAplicada}
+                          className="rounded-lg border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Usar como motivo de rechazo
+                        </button>
+                        {yaAplicada && (
+                          <span className="text-xs font-semibold text-emerald-700">✓ Agregada al motivo de rechazo</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <NotasDeAlerta
+                    notas={notasAlertas.filter(
+                      (n) => n.codigo_alerta === alerta.codigo && n.actividad_orden === alerta.actividad_orden
+                    )}
+                    onAgregar={(texto) => agregarNotaAlerta(alerta, texto)}
+                  />
+                </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {error && (
           <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
