@@ -738,6 +738,9 @@ const TEMAS: Tema[] = [
         <Ul>
           <li><strong>+ Nuevo usuario</strong>: usuario, correo, contraseña y rol inicial.</li>
           <li>Cambiar el rol de un usuario existente con el desplegable de la tabla.</li>
+          <li><strong>Editar</strong>: nombres, apellidos y correo — y, si hace falta restablecerle la
+            contraseña a alguien (la olvidó, se le comparte por error), un campo de nueva contraseña opcional
+            en el mismo formulario. El nombre de usuario (con el que inicia sesión) no se puede cambiar.</li>
           <li><strong>Desactivar</strong> en vez de eliminar, para revocar el acceso sin perder su historial
             de acciones.</li>
         </Ul>

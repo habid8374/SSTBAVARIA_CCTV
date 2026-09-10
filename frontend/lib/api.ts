@@ -166,7 +166,7 @@ export function actualizarUsuario(
   id: number,
   cambios: Partial<
     Pick<UsuarioGestionado, "rol" | "is_active" | "first_name" | "last_name" | "email" | "contratista">
-  >
+  > & { password?: string }
 ): Promise<UsuarioGestionado> {
   return request<UsuarioGestionado>(`/api/auth/usuarios/${id}/`, {
     method: "PATCH",

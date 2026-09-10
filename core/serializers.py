@@ -24,13 +24,21 @@ def _validar_contratista_segun_rol(datos):
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
-    """Lectura y edición (rol, activo, nombre) de un usuario existente."""
+    """Lectura y edición (rol, activo, nombre, correo, contraseña) de un
+    usuario existente. El username no se puede cambiar — es el
+    identificador con el que la persona inicia sesión."""
 
     rol = serializers.ChoiceField(source="perfil.rol", choices=PerfilUsuario.Rol.choices)
     contratista = serializers.PrimaryKeyRelatedField(
         source="perfil.contratista", queryset=EmpresaContratista.objects.all(), required=False, allow_null=True
     )
     contratista_nombre = serializers.SerializerMethodField()
+    password = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        help_text="Opcional — solo se cambia si se envía. Para restablecer la contraseña de alguien.",
+    )
 
     class Meta:
         model = Usuario
@@ -44,6 +52,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             "rol",
             "contratista",
             "contratista_nombre",
+            "password",
             "date_joined",
         ]
         read_only_fields = ["id", "username", "date_joined"]
@@ -51,6 +60,13 @@ class UsuarioSerializer(serializers.ModelSerializer):
     def get_contratista_nombre(self, usuario):
         perfil = getattr(usuario, "perfil", None)
         return perfil.contratista.nombre if perfil and perfil.contratista else None
+
+    def validate_password(self, valor):
+        # Vacío = "no cambiar la contraseña" — solo se valida si de verdad
+        # se está mandando una nueva.
+        if valor:
+            validate_password(valor)
+        return valor
 
     def validate(self, datos):
         perfil_data = datos.get("perfil")
@@ -62,6 +78,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         perfil_data = validated_data.pop("perfil", None)
+        password = validated_data.pop("password", None)
         instance = super().update(instance, validated_data)
         if perfil_data:
             if "rol" in perfil_data:
@@ -69,6 +86,9 @@ class UsuarioSerializer(serializers.ModelSerializer):
             if "contratista" in perfil_data:
                 instance.perfil.contratista = perfil_data["contratista"]
             instance.perfil.save(update_fields=["rol", "contratista"])
+        if password:
+            instance.set_password(password)
+            instance.save(update_fields=["password"])
         return instance
 
 

@@ -23,6 +23,7 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [eligiendoEmpresaPara, setEligiendoEmpresaPara] = useState<UsuarioGestionado | null>(null);
+  const [editando, setEditando] = useState<UsuarioGestionado | null>(null);
   const { confirmar } = useDialog();
 
   function cargar() {
@@ -155,6 +156,13 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
+                        onClick={() => setEditando(usuario)}
+                        className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy transition hover:border-corp-blue"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
                         disabled={esUsuarioActual}
                         onClick={() => alternarActivo(usuario)}
                         className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy transition hover:border-corp-blue disabled:opacity-40"
@@ -199,6 +207,18 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
           contratistas={contratistas}
           onCerrar={() => setEligiendoEmpresaPara(null)}
           onElegir={(contratistaId) => asignarComoContratista(eligiendoEmpresaPara, contratistaId)}
+        />
+      )}
+
+      {editando && (
+        <FormularioEditarUsuario
+          token={token}
+          usuario={editando}
+          onCerrar={() => setEditando(null)}
+          onGuardado={() => {
+            setEditando(null);
+            cargar();
+          }}
         />
       )}
     </div>
@@ -256,6 +276,112 @@ function FormularioElegirEmpresa({
             Guardar
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function FormularioEditarUsuario({
+  token,
+  usuario,
+  onCerrar,
+  onGuardado,
+}: {
+  token: string;
+  usuario: UsuarioGestionado;
+  onCerrar: () => void;
+  onGuardado: () => void;
+}) {
+  const [firstName, setFirstName] = useState(usuario.first_name);
+  const [lastName, setLastName] = useState(usuario.last_name);
+  const [email, setEmail] = useState(usuario.email);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setEnviando(true);
+    try {
+      await actualizarUsuario(token, usuario.id, {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        ...(password ? { password } : {}),
+      });
+      onGuardado();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar los cambios.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 className="text-lg font-semibold text-corp-navy">Editar usuario</h2>
+        <p className="mt-1 text-sm text-corp-muted">{usuario.username}</p>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <Campo label="Nombres">
+            <input
+              value={firstName}
+              onChange={(event) => setFirstName(event.target.value)}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+          <Campo label="Apellidos">
+            <input
+              value={lastName}
+              onChange={(event) => setLastName(event.target.value)}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+          <Campo label="Correo">
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+          <Campo label="Nueva contraseña (opcional)">
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Déjalo en blanco para no cambiarla"
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+
+          {error && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-corp-muted hover:bg-zinc-100"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={enviando}
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+            >
+              {enviando ? "Guardando…" : "Guardar cambios"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

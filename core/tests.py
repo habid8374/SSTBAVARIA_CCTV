@@ -250,6 +250,96 @@ class UsuarioManagementTests(TestCase):
         self.operador.refresh_from_db()
         self.assertEqual(self.operador.perfil.rol, PerfilUsuario.Rol.ADMINISTRADOR)
 
+    def test_admin_edita_nombre_y_correo(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.operador.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"first_name": "Ana", "last_name": "Ríos", "email": "ana@x.com"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.operador.refresh_from_db()
+        self.assertEqual(self.operador.first_name, "Ana")
+        self.assertEqual(self.operador.last_name, "Ríos")
+        self.assertEqual(self.operador.email, "ana@x.com")
+
+    def test_admin_no_puede_cambiar_el_username(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.operador.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"username": "otro_nombre"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.operador.refresh_from_db()
+        self.assertEqual(self.operador.username, "operador1")
+
+    def test_admin_restablece_la_contrasena_de_otro_usuario(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.operador.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"password": "nueva-clave-larga-456"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.operador.refresh_from_db()
+        self.assertTrue(self.operador.check_password("nueva-clave-larga-456"))
+
+    def test_password_vacia_no_cambia_la_contrasena_actual(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.operador.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"first_name": "Ana", "password": ""},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.operador.refresh_from_db()
+        self.assertTrue(self.operador.check_password("clave12345"))
+
+    def test_contrasena_debil_devuelve_400(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.operador.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"password": "123"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.operador.refresh_from_db()
+        self.assertTrue(self.operador.check_password("clave12345"))
+
+    def test_password_no_se_expone_en_la_respuesta(self):
+        token = self._token(self.admin)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.operador.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"password": "nueva-clave-larga-456"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertNotIn("password", response.data)
+
+    def test_operador_no_puede_editar_usuarios(self):
+        token = self._token(self.operador)
+        detalle_url = reverse("core:usuarios_detalle", args=[self.admin.pk])
+        response = self.client.patch(
+            detalle_url,
+            {"first_name": "Hackeado"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 403)
+
     def test_admin_no_puede_desactivar_su_propia_cuenta(self):
         token = self._token(self.admin)
         detalle_url = reverse("core:usuarios_detalle", args=[self.admin.pk])
