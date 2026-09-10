@@ -90,10 +90,15 @@ def _emparejar_catalogo(etiqueta_cruda, nombres_catalogo, alias_legacy=None):
     return None
 
 
+_MARCAS_AFIRMATIVAS = {"X", "SI", "SÍ"}
+
+
 def _celda_marcada(valor):
-    """True si la celda de al lado de un ítem de catálogo trae 'X' (marcado)
-    — cualquier otra cosa (vacío, 'NA', etc.) cuenta como no marcado."""
-    return isinstance(valor, str) and valor.strip().upper() == "X"
+    """True si la celda de al lado de un ítem de catálogo trae una marca
+    afirmativa. La plantilla real del cliente usa 'SI'/'NA' (no 'X') para
+    esto — se aceptan ambas convenciones; cualquier otra cosa (vacío,
+    'NA', etc.) cuenta como no marcado."""
+    return isinstance(valor, str) and valor.strip().upper() in _MARCAS_AFIRMATIVAS
 
 
 def _extraer_regex(texto, patron, grupo=1):

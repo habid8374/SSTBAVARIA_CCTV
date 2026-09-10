@@ -46,6 +46,25 @@ def _alerta(codigo, actividad, titulo, mensaje, motivo_sugerido, fuente):
     }
 
 
+def _deduplicar(alertas):
+    """Una 'Secuencia de Actividades' del Excel real del cliente suele traer
+    varias filas de riesgo (una por cada peligro de su matriz Kinney) — al
+    importar, cada fila queda como una ActividadMetodo aparte pero
+    comparte secuencia/técnicas/permisos con sus filas hermanas, así que
+    una misma condición puede generar la misma alerta una vez por fila en
+    vez de una vez por tarea real. Se conserva solo la primera aparición
+    de cada (código, mensaje)."""
+    vistos = set()
+    resultado = []
+    for alerta in alertas:
+        clave = (alerta["codigo"], alerta["mensaje"])
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        resultado.append(alerta)
+    return resultado
+
+
 def generar_alertas(declaracion):
     """Devuelve una lista de alertas (dict) para las actividades de la
     declaración dada. Es de solo lectura — no modifica nada."""
@@ -212,4 +231,4 @@ def generar_alertas(declaracion):
                 )
             )
 
-    return alertas
+    return _deduplicar(alertas)
