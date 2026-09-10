@@ -22,6 +22,7 @@ from core.models import PerfilUsuario
 logger = logging.getLogger("contratistas.portal_usuarios")
 
 DOMINIO_USUARIOS_PORTAL = "sst-cctv.com"
+URL_PORTAL = "https://sst-cctv.com"
 
 
 def tiene_usuario_portal(contratista):
@@ -63,6 +64,7 @@ def crear_usuario_portal_si_hace_falta(contratista):
         "para radicar seguridad social y gestionar la Declaración de Método de sus trabajadores.</p>"
         f"<p><strong>Usuario:</strong> {username}<br>"
         f"<strong>Contraseña:</strong> {contrasena}</p>"
+        f"<p><strong>Portal:</strong> <a href=\"{URL_PORTAL}\">{URL_PORTAL}</a></p>"
         "<p>Por seguridad, cambia la contraseña después de tu primer ingreso.</p>"
     )
     try:
