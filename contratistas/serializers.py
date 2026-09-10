@@ -54,10 +54,32 @@ class EmpresaContratistaSerializer(serializers.ModelSerializer):
     def get_trabajadores_count(self, contratista):
         return contratista.trabajadores.count()
 
+    def update(self, instance, validated_data):
+        contratista = super().update(instance, validated_data)
+        # Una empresa que ya existía sin correo de contacto (de antes de que
+        # esto existiera) y recién ahora lo completa — aprovechar para darle
+        # login de una vez, igual que si lo hubiera tenido desde el alta.
+        if contratista.contacto_correo:
+            crear_usuario_portal_si_hace_falta(contratista)
+        return contratista
+
 
 class EmpresaContratistaCrearSerializer(serializers.ModelSerializer):
     """Alta de una empresa contratista. La empresa cliente dueña se asigna sola,
-    igual que CamaraCrearSerializer en camaras_ia."""
+    igual que CamaraCrearSerializer en camaras_ia.
+
+    El correo de contacto es obligatorio acá (aunque el modelo lo permite en
+    blanco, para no romper datos viejos) porque al crear la empresa se le da
+    de una vez su login del portal — así, si su primera Declaración de
+    Método queda rechazada antes de registrar ningún trabajador, ya tiene
+    cómo entrar a corregirla en vez de quedar sin acceso."""
+
+    def validate_contacto_correo(self, valor):
+        if not valor:
+            raise serializers.ValidationError(
+                "Hace falta el correo de contacto — se usa para enviarle a la empresa el acceso al portal."
+            )
+        return valor
 
     class Meta:
         model = EmpresaContratista
@@ -74,12 +96,15 @@ class EmpresaContratistaCrearSerializer(serializers.ModelSerializer):
             "capacitacion_habilitada_manual",
         ]
         read_only_fields = ["id"]
+        extra_kwargs = {"contacto_correo": {"required": True}}
 
     def create(self, validated_data):
         empresa = Empresa.objects.first()
         if empresa is None:
             empresa = Empresa.objects.create(nombre="Empresa")
-        return EmpresaContratista.objects.create(empresa=empresa, **validated_data)
+        contratista = EmpresaContratista.objects.create(empresa=empresa, **validated_data)
+        crear_usuario_portal_si_hace_falta(contratista)
+        return contratista
 
 
 class RadicacionResumenSerializer(serializers.ModelSerializer):

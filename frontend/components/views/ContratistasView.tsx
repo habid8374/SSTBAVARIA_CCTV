@@ -669,10 +669,17 @@ function FormularioContratista({
           <Campo label="Contacto — correo">
             <input
               type="email"
+              required={!contratista}
               value={contactoCorreo}
               onChange={(e) => setContactoCorreo(e.target.value)}
               className={INPUT}
             />
+            {!contratista && (
+              <p className="mt-1 text-xs text-corp-muted">
+                Se usa para enviarle a la empresa su acceso al portal apenas se crea — así ya puede entrar si
+                le rechazan una Declaración de Método antes de tener trabajadores registrados.
+              </p>
+            )}
           </Campo>
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Responsable SST — nombre">

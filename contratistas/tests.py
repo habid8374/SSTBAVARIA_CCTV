@@ -740,11 +740,25 @@ class EmpresaContratistaTests(ApiTestsBase):
     def test_crear(self):
         response = self.client.post(
             reverse("contratistas:empresas_lista"),
+            {
+                "nombre": "Gestión y Control Integral del Riesgo SAS",
+                "nit": "900123456-1",
+                "contacto_correo": "contacto@gestioncontrol.com",
+            },
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(EmpresaContratista.objects.count(), 2)
+
+    def test_crear_sin_correo_de_contacto_devuelve_400(self):
+        response = self.client.post(
+            reverse("contratistas:empresas_lista"),
             {"nombre": "Gestión y Control Integral del Riesgo SAS", "nit": "900123456-1"},
             **self._auth(self.operador),
         )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(EmpresaContratista.objects.count(), 2)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("contacto_correo", response.data)
+        self.assertEqual(EmpresaContratista.objects.count(), 1)
 
     def test_operador_no_puede_eliminar_empresa(self):
         url = reverse("contratistas:empresas_detalle", args=[self.contratista.pk])
@@ -763,7 +777,11 @@ class RegistroAuditoriaTests(ApiTestsBase):
     def test_crear_empresa_queda_registrado(self):
         self.client.post(
             reverse("contratistas:empresas_lista"),
-            {"nombre": "Gestión y Control Integral del Riesgo SAS", "nit": "900123456-1"},
+            {
+                "nombre": "Gestión y Control Integral del Riesgo SAS",
+                "nit": "900123456-1",
+                "contacto_correo": "contacto@gestioncontrol.com",
+            },
             **self._auth(self.operador),
         )
         registro = RegistroAuditoria.objects.filter(modelo="EmpresaContratista", accion="creado").latest("fecha")
@@ -821,7 +839,7 @@ class RegistroAuditoriaTests(ApiTestsBase):
     def test_admin_puede_ver_y_filtrar_auditoria(self):
         self.client.post(
             reverse("contratistas:empresas_lista"),
-            {"nombre": "Otra Contratista SAS"},
+            {"nombre": "Otra Contratista SAS", "contacto_correo": "contacto@otra.com"},
             **self._auth(self.admin),
         )
         response = self.client.get(
@@ -853,7 +871,7 @@ class RegistroAuditoriaTests(ApiTestsBase):
 
         self.client.post(
             reverse("contratistas:empresas_lista"),
-            {"nombre": "Otra Contratista SAS"},
+            {"nombre": "Otra Contratista SAS", "contacto_correo": "contacto@otra.com"},
             **self._auth(self.admin),
         )
         response = self.client.get(
@@ -1130,6 +1148,67 @@ class AltaUsuarioPortalTests(ApiTestsBase):
         response = self._crear_trabajador()
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(Usuario.objects.filter(username="scepsa-colombia-sas2@sst-cctv.com").exists())
+
+
+class AltaUsuarioPortalAlCrearContratistaTests(ApiTestsBase):
+    """El login de portal ya no espera al primer trabajador — se crea desde
+    el alta de la EmpresaContratista, para que si su primera Declaración de
+    Método queda rechazada antes de registrar personal, ya tenga cómo
+    entrar a corregirla."""
+
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_crear_contratista_con_correo_crea_login_de_una_vez(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        response = self.client.post(
+            reverse("contratistas:empresas_lista"),
+            {"nombre": "Nueva Contratista SAS", "contacto_correo": "contacto@nueva.com"},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        mock_urlopen.assert_called_once()
+
+        nueva = EmpresaContratista.objects.get(nombre="Nueva Contratista SAS")
+        usuario = Usuario.objects.get(username="nueva-contratista-sas@sst-cctv.com")
+        self.assertEqual(usuario.perfil.rol, PerfilUsuario.Rol.CONTRATISTA)
+        self.assertEqual(usuario.perfil.contratista_id, nueva.pk)
+
+    def test_crear_contratista_sin_correo_devuelve_400(self):
+        response = self.client.post(
+            reverse("contratistas:empresas_lista"),
+            {"nombre": "Nueva Contratista SAS"},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("contacto_correo", response.data)
+        self.assertFalse(EmpresaContratista.objects.filter(nombre="Nueva Contratista SAS").exists())
+
+    @override_settings(BREVO_API_KEY="clave-de-prueba")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_completar_correo_de_una_contratista_vieja_le_crea_el_login(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        # self.contratista (de ApiTestsBase) es el caso real de una empresa
+        # que ya existía sin correo de contacto, de antes de este cambio.
+        self.assertEqual(self.contratista.contacto_correo, "")
+
+        response = self.client.patch(
+            reverse("contratistas:empresas_detalle", args=[self.contratista.pk]),
+            {"contacto_correo": "ahora-si@scepsa.com"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_urlopen.assert_called_once()
+        self.assertTrue(Usuario.objects.filter(username="scepsa-colombia-sas@sst-cctv.com").exists())
+
+    def test_editar_otro_campo_sin_correo_no_falla(self):
+        response = self.client.patch(
+            reverse("contratistas:empresas_detalle", args=[self.contratista.pk]),
+            {"contacto_nombre": "Nuevo contacto"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
 
 
 class RadicacionSeguridadSocialTests(ApiTestsBase):

@@ -297,6 +297,12 @@ const TEMAS: Tema[] = [
           <li><strong>Radicación de seguridad social</strong>: por cada trabajador y mes, se sube el
             comprobante de pago (PDF o foto) con número de planilla y fecha de vencimiento.</li>
         </Ol>
+        <Nota>
+          Al crear una empresa contratista, el correo de contacto es obligatorio — con él se le crea de una
+          vez su acceso al portal (usuario y contraseña, enviados por correo), para que ya pueda entrar a
+          radicar o a corregir una Declaración de Método rechazada aunque todavía no tenga ningún trabajador
+          registrado. Es un login por empresa, no por persona.
+        </Nota>
         <Sub>Aprobar o rechazar una radicación</Sub>
         <P>
           Desde el panel de radicaciones de un trabajador, botones <strong>Aprobar</strong>/
