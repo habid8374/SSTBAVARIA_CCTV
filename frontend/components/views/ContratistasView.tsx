@@ -12,6 +12,7 @@ import {
   crearContratista,
   crearRadicacion,
   crearTrabajador,
+  eliminarTrabajador,
   exportarRadicacionesExcel,
   listarContratistas,
   listarRadicaciones,
@@ -312,6 +313,12 @@ function PanelContratista({
   const [formulario, setFormulario] = useState<"nuevo" | Trabajador | null>(null);
   const [catalogos, setCatalogos] = useState<Catalogos | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState<number | null>(null);
+  const { confirmar } = useDialog();
+  // El portal de contratistas gana esta escritura solo cuando su empresa ya
+  // está habilitada (Declaración de Método aprobada, o habilitación manual)
+  // — antes de eso no tiene sentido que registre personal ni radique.
+  const puedeGestionarPersonal = esInterno || contratista.capacitacion_habilitada;
 
   function cargar() {
     listarTrabajadores(token, contratista.id)
@@ -328,6 +335,27 @@ function PanelContratista({
   }, [token]);
 
   const trabajador = trabajadores?.find((t) => t.id === seleccionado) ?? null;
+
+  async function eliminar(t: Trabajador) {
+    const ok = await confirmar({
+      titulo: "Eliminar trabajador",
+      mensaje: `¿Eliminar a ${t.nombres} ${t.apellidos}? También se borran sus radicaciones de seguridad social. Esta acción no se puede deshacer — úsala solo si hubo un error al cargarlo.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    setEliminando(t.id);
+    try {
+      await eliminarTrabajador(token, t.id);
+      if (seleccionado === t.id) setSeleccionado(null);
+      cargar();
+      onCambioTrabajadores();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar el trabajador.");
+    } finally {
+      setEliminando(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -358,7 +386,7 @@ function PanelContratista({
       <div>
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-semibold text-corp-navy">Trabajadores</h4>
-          {esInterno && (
+          {puedeGestionarPersonal && (
             <button
               type="button"
               onClick={() => setFormulario("nuevo")}
@@ -368,6 +396,13 @@ function PanelContratista({
             </button>
           )}
         </div>
+
+        {!esInterno && !contratista.capacitacion_habilitada && (
+          <p className="mt-2 text-xs text-corp-muted">
+            Todavía no puedes registrar trabajadores ni radicar seguridad social — se habilita cuando tengas
+            una Declaración de Método aprobada.
+          </p>
+        )}
 
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
 
@@ -428,9 +463,19 @@ function PanelContratista({
                         <button
                           type="button"
                           onClick={() => setFormulario(t)}
-                          className="text-xs font-semibold text-corp-blue hover:underline"
+                          className="mr-3 text-xs font-semibold text-corp-blue hover:underline"
                         >
                           Editar
+                        </button>
+                      )}
+                      {(esAdmin || (!esInterno && contratista.capacitacion_habilitada)) && (
+                        <button
+                          type="button"
+                          onClick={() => eliminar(t)}
+                          disabled={eliminando === t.id}
+                          className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-60"
+                        >
+                          {eliminando === t.id ? "Eliminando…" : "Eliminar"}
                         </button>
                       )}
                     </td>
@@ -442,7 +487,9 @@ function PanelContratista({
         )}
       </div>
 
-      {trabajador && <PanelRadicaciones token={token} trabajador={trabajador} esInterno={esInterno} />}
+      {trabajador && (
+        <PanelRadicaciones token={token} trabajador={trabajador} esInterno={esInterno} puedeRadicar={puedeGestionarPersonal} />
+      )}
 
       {formulario && catalogos && (
         <FormularioTrabajador
@@ -466,10 +513,12 @@ function PanelRadicaciones({
   token,
   trabajador,
   esInterno,
+  puedeRadicar,
 }: {
   token: string;
   trabajador: Trabajador;
   esInterno: boolean;
+  puedeRadicar: boolean;
 }) {
   const [radicaciones, setRadicaciones] = useState<RadicacionSeguridadSocial[] | null>(null);
   const [formulario, setFormulario] = useState(false);
@@ -511,7 +560,7 @@ function PanelRadicaciones({
         <h4 className="text-sm font-semibold text-corp-navy">
           Seguridad social — {trabajador.apellidos} {trabajador.nombres}
         </h4>
-        {esInterno && (
+        {puedeRadicar && (
           <button
             type="button"
             onClick={() => setFormulario(true)}

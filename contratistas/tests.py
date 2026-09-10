@@ -2547,9 +2547,12 @@ class AutorizacionIngresoTests(ApiTestsBase):
 
 class PortalContratistaTests(ApiTestsBase):
     """El rol Contratista ve y opera solo dentro de su propia empresa: lee
-    su contratista/trabajadores/radicaciones/autorizaciones, pero solo
-    Declaración de Método le permite escribir — y únicamente para enviar o
-    subsanar, nunca para aprobarse o rechazarse a sí mismo."""
+    su contratista/trabajadores/radicaciones/autorizaciones, y puede escribir
+    Declaración de Método (para enviar o subsanar, nunca para aprobarse o
+    rechazarse a sí mismo) siempre; registrar trabajadores y radicar su
+    seguridad social solo una vez que su empresa está habilitada
+    (EmpresaContratista.capacitacion_habilitada — Declaración de Método
+    aprobada, o habilitación manual)."""
 
     def setUp(self):
         super().setUp()
@@ -2585,10 +2588,66 @@ class PortalContratistaTests(ApiTestsBase):
         ids = [fila["id"] for fila in response.data]
         self.assertEqual(ids, [self.trabajador.pk])
 
-    def test_no_puede_crear_trabajador(self):
+    def test_no_puede_crear_trabajador_sin_declaracion_aprobada(self):
         response = self.client.post(
             reverse("contratistas:trabajadores_lista"),
-            {"contratista": self.contratista.pk, "nombres": "X", "apellidos": "Y", "documento": "1"},
+            {
+                "contratista": self.contratista.pk,
+                "nombres": "X",
+                "apellidos": "Y",
+                "documento": "1",
+                "autorizacion_datos": True,
+            },
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_puede_crear_trabajador_con_declaracion_aprobada(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        response = self.client.post(
+            reverse("contratistas:trabajadores_lista"),
+            {
+                "contratista": self.otro_contratista.pk,  # intenta suplantar otra empresa
+                "nombres": "X",
+                "apellidos": "Y",
+                "documento": "80999999",
+                "autorizacion_datos": True,
+            },
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["contratista"], self.contratista.pk)
+
+    def test_no_puede_radicar_sin_declaracion_aprobada(self):
+        response = self.client.post(
+            reverse("contratistas:radicaciones_lista"),
+            {"trabajador": self.trabajador.pk, "anio": 2026, "mes": "AGOSTO"},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_puede_radicar_con_declaracion_aprobada(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        response = self.client.post(
+            reverse("contratistas:radicaciones_lista"),
+            {"trabajador": self.trabajador.pk, "anio": 2026, "mes": "AGOSTO"},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["estado"], "pendiente")
+
+    def test_no_puede_radicar_para_trabajador_de_otra_empresa(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        response = self.client.post(
+            reverse("contratistas:radicaciones_lista"),
+            {"trabajador": self.otro_trabajador.pk, "anio": 2026, "mes": "AGOSTO"},
             content_type="application/json",
             **self._auth(self.portal_user),
         )
@@ -2721,6 +2780,60 @@ class PortalContratistaTests(ApiTestsBase):
             **self._auth(self.portal_user),
         )
         self.assertEqual(response.status_code, 201, response.data)
+
+
+class EliminarTrabajadorTests(ApiTestsBase):
+    """Poder deshacer un trabajador mal cargado — ver TrabajadorDetalle."""
+
+    def setUp(self):
+        super().setUp()
+        self.portal_user = Usuario.objects.create_user("portal_scepsa", "portal@scepsa.com", "clave12345")
+        self.portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        self.portal_user.perfil.contratista = self.contratista
+        self.portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+    def test_admin_elimina_trabajador(self):
+        response = self.client.delete(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Trabajador.objects.filter(pk=self.trabajador.pk).exists())
+
+    def test_operador_no_puede_eliminar_trabajador(self):
+        response = self.client.delete(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Trabajador.objects.filter(pk=self.trabajador.pk).exists())
+
+    def test_portal_sin_declaracion_aprobada_no_puede_eliminar(self):
+        response = self.client.delete(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.portal_user)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Trabajador.objects.filter(pk=self.trabajador.pk).exists())
+
+    def test_portal_con_declaracion_aprobada_elimina_su_propio_trabajador(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        response = self.client.delete(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.portal_user)
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Trabajador.objects.filter(pk=self.trabajador.pk).exists())
+
+    def test_portal_no_puede_eliminar_trabajador_de_otra_empresa(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        otro_contratista = EmpresaContratista.objects.create(empresa=self.empresa, nombre="OTRA SAS")
+        otro_trabajador = Trabajador.objects.create(
+            contratista=otro_contratista, nombres="Pedro", apellidos="Ruiz", documento="1122334455"
+        )
+        response = self.client.delete(
+            reverse("contratistas:trabajadores_detalle", args=[otro_trabajador.pk]), **self._auth(self.portal_user)
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Trabajador.objects.filter(pk=otro_trabajador.pk).exists())
 
 
 class CapacitacionTests(ApiTestsBase):

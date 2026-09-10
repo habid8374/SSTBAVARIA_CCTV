@@ -74,7 +74,9 @@ const TEMAS: Tema[] = [
             escribir. Puede crear, editar, enviar a revisión y firmar como Supervisor de Seguridad del
             Contratista.</li>
           <li><strong>Contratistas</strong>: ve los datos de su propia empresa y sus trabajadores (EPS/ARL/AFP,
-            radicaciones de seguridad social) — de solo lectura, no puede editar ni cargar radicaciones.</li>
+            radicaciones de seguridad social). Puede registrar trabajadores nuevos, eliminar uno que quedó mal
+            cargado y radicar su seguridad social — pero solo una vez que su empresa tiene una Declaración de
+            Método aprobada (o fue habilitada manualmente); antes de eso queda de solo lectura.</li>
           <li><strong>Autorización de Ingreso</strong>: ve sus autorizaciones de ingreso vigentes y puede
             descargar el PDF — de solo lectura.</li>
           <li><strong>Capacitación</strong>: puede registrar y hacer la inducción de sus visitantes/trabajadores
@@ -303,6 +305,17 @@ const TEMAS: Tema[] = [
           radicar o a corregir una Declaración de Método rechazada aunque todavía no tenga ningún trabajador
           registrado. Es un login por empresa, no por persona.
         </Nota>
+        <Sub>Qué puede hacer el portal de contratistas por su cuenta</Sub>
+        <P>
+          Registrar trabajadores nuevos, eliminar uno que quedó mal cargado y radicar su propia seguridad
+          social se habilita para el portal recién cuando esa empresa tiene una{" "}
+          <strong>Declaración de Método aprobada</strong> (o fue habilitada manualmente — la misma casilla
+          &quot;Habilitar capacitación manualmente&quot; de la ficha de la empresa, que también abre la
+          inducción previa a ingreso). Antes de eso, esas acciones quedan solo para el personal interno; el
+          portal ve un aviso explicando por qué no puede todavía. Eliminar un trabajador (propio, o cualquiera
+          si eres Administrador) es irreversible y también borra sus radicaciones — pensado para corregir un
+          error de carga, no para dar de baja personal activo.
+        </P>
         <Sub>Aprobar o rechazar una radicación</Sub>
         <P>
           Desde el panel de radicaciones de un trabajador, botones <strong>Aprobar</strong>/

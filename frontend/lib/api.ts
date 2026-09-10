@@ -1028,6 +1028,13 @@ export function actualizarTrabajador(
   });
 }
 
+export function eliminarTrabajador(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/trabajadores/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
 export type EstadoRadicacion = "pendiente" | "aprobada" | "rechazada";
 
 export type RadicacionSeguridadSocial = {

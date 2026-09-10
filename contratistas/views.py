@@ -11,6 +11,7 @@ from rest_framework.response import Response
 
 from core.models import PerfilUsuario
 from core.permissions import (
+    EsAdministrador,
     EsAdministradorOSoloLectura,
     EsAdministradorParaEliminar,
     EsPersonalInterno,
@@ -377,9 +378,20 @@ class EmpresaContratistaDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAP
 # --- Trabajadores ---
 
 
+def _exigir_contratista_habilitado(contratista, mensaje):
+    """El portal de contratistas gana escritura sobre trabajadores/radicaciones
+    solo cuando su empresa ya está habilitada (Declaración de Método aprobada,
+    o habilitación manual) — el mismo interruptor que ya abre la capacitación
+    previa a ingreso (EmpresaContratista.capacitacion_habilitada): si el
+    trabajo de esa empresa todavía no está autorizado, tampoco tiene sentido
+    que registre personal ni radique seguridad social por su cuenta."""
+    if not contratista.capacitacion_habilitada:
+        raise PermissionDenied(mensaje)
+
+
 class TrabajadorListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
     serializer_class = TrabajadorSerializer
-    permission_classes = [EsPersonalInternoOSoloLectura]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = Trabajador.objects.select_related("contratista").prefetch_related("radicaciones")
@@ -392,10 +404,33 @@ class TrabajadorListaDashboard(AuditoriaMixin, generics.ListCreateAPIView):
                 qs = qs.filter(contratista_id=filtro)
         return qs
 
+    def create(self, request, *args, **kwargs):
+        contratista_id = _contratista_de(request)
+        if contratista_id is None:
+            return super().create(request, *args, **kwargs)
+        # Se fuerza el contratista ANTES de validar (no en perform_create,
+        # que corre después) — TrabajadorSerializer.validate() ya mira el
+        # contratista para decidir si hace falta correo de contacto, y debe
+        # ver el de verdad, no uno que el cliente del portal haya mandado
+        # (por error o intentando suplantar otra empresa).
+        contratista = get_object_or_404(EmpresaContratista, pk=contratista_id)
+        _exigir_contratista_habilitado(
+            contratista,
+            "Todavía no puedes registrar trabajadores — se habilita cuando tengas una Declaración de "
+            "Método aprobada.",
+        )
+        datos = request.data.copy()
+        datos["contratista"] = contratista_id
+        serializer = self.get_serializer(data=datos)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
 
 class TrabajadorDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TrabajadorSerializer
-    permission_classes = [EsPersonalInternoOSoloLectura, EsAdministradorParaEliminar]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = Trabajador.objects.select_related("contratista")
@@ -403,6 +438,23 @@ class TrabajadorDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
         if contratista_id is not None:
             qs = qs.filter(contratista_id=contratista_id)
         return qs
+
+    def perform_update(self, serializer):
+        if _contratista_de(self.request) is not None:
+            raise PermissionDenied("Esta acción es solo para el personal de SST/interventoría.")
+        super().perform_update(serializer)
+
+    def perform_destroy(self, instance):
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            _exigir_contratista_habilitado(
+                instance.contratista,
+                "Todavía no puedes eliminar trabajadores — se habilita cuando tengas una Declaración de "
+                "Método aprobada.",
+            )
+        elif not EsAdministrador().has_permission(self.request, self):
+            raise PermissionDenied("Se requiere rol de administrador para eliminar esto.")
+        super().perform_destroy(instance)
 
 
 # --- Radicaciones de seguridad social ---
@@ -432,7 +484,7 @@ def _filtrar_radicaciones(qs, params):
 
 class RadicacionListaDashboard(generics.ListCreateAPIView):
     serializer_class = RadicacionSeguridadSocialSerializer
-    permission_classes = [EsPersonalInternoOSoloLectura]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = RadicacionSeguridadSocial.objects.select_related("trabajador__contratista").order_by("-radicada_en")
@@ -442,6 +494,18 @@ class RadicacionListaDashboard(generics.ListCreateAPIView):
         return _filtrar_radicaciones(qs, self.request.query_params)
 
     def perform_create(self, serializer):
+        contratista_id = _contratista_de(self.request)
+        if contratista_id is not None:
+            contratista = get_object_or_404(EmpresaContratista, pk=contratista_id)
+            _exigir_contratista_habilitado(
+                contratista,
+                "Todavía no puedes radicar seguridad social — se habilita cuando tengas una Declaración de "
+                "Método aprobada.",
+            )
+            trabajador = serializer.validated_data.get("trabajador")
+            if trabajador is None or trabajador.contratista_id != contratista_id:
+                raise PermissionDenied("Solo puedes radicar seguridad social de tus propios trabajadores.")
+            serializer.validated_data["estado"] = RadicacionSeguridadSocial.Estado.PENDIENTE
         radicacion = serializer.save()
         registrar_auditoria(self.request.user, radicacion, RegistroAuditoria.Accion.CREADO)
         if radicacion.estado == RadicacionSeguridadSocial.Estado.PENDIENTE:
