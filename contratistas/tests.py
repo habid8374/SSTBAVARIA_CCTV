@@ -136,7 +136,7 @@ class CatalogosTests(ApiTestsBase):
         response = self.client.get(reverse("contratistas:catalogos"), **self._auth(self.operador))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data["cursos_safety_academy"]), 7)
-        self.assertIn("Trabajos en Altura > 1.8 m", response.data["permisos_trabajo"])
+        self.assertIn("Permiso de trabajo en alturas / protección contra caídas", response.data["permisos_trabajo"])
         self.assertEqual(len(response.data["roles_firma"]), 5)
 
 
@@ -1190,7 +1190,7 @@ class AlertasAutomaticasTests(ApiTestsBase):
             declaracion=declaracion,
             orden=0,
             secuencia="Subir al techo",
-            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
             epp_requerido=["Casco de seguridad"],
         )
         alertas = generar_alertas(declaracion)
@@ -1204,7 +1204,7 @@ class AlertasAutomaticasTests(ApiTestsBase):
             declaracion=declaracion,
             orden=0,
             secuencia="Subir al techo",
-            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
             epp_requerido=["Otros: Equipo contra caídas (Arnés de seguridad, línea retráctil, doble gancho)"],
         )
         alertas = generar_alertas(declaracion)
@@ -1312,7 +1312,7 @@ class AlertasAutomaticasTests(ApiTestsBase):
             orden=0,
             secuencia="Trabajo en techo alto",
             altura_trabajo_metros=4.5,
-            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
         )
         alertas = generar_alertas(declaracion)
         self.assertIn("altura_sobre_4m_requiere_zbs", [a["codigo"] for a in alertas])
@@ -1405,7 +1405,7 @@ class AlertasAutomaticasTests(ApiTestsBase):
             declaracion=declaracion,
             orden=0,
             secuencia="Subir al techo",
-            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
         )
         url = reverse("contratistas:declaraciones_alertas", args=[declaracion.pk])
         response = self.client.get(url, **self._auth(self.operador))
@@ -1432,7 +1432,7 @@ class DeclaracionMetodoTests(ApiTestsBase):
                     "probabilidad_con": 3,
                     "frecuencia_con": 3,
                     "impacto_con": 1,
-                    "permisos_requeridos": ["Trabajos en Altura > 1.8 m"],
+                    "permisos_requeridos": ["Permiso de trabajo en alturas / protección contra caídas"],
                     "tarea_sif": True,
                 },
                 {
@@ -1619,7 +1619,7 @@ class DeclaracionMetodoTests(ApiTestsBase):
             probabilidad_sin=6,
             frecuencia_sin=3,
             impacto_sin=3,
-            permisos_requeridos=["Trabajos en Altura > 1.8 m"],
+            permisos_requeridos=["Permiso de trabajo en alturas / protección contra caídas"],
             epp_requerido=["Casco de seguridad"],
         )
         FirmaMetodo.objects.create(
@@ -1841,11 +1841,11 @@ def _construir_excel_declaracion_prueba():
     hoja["D14"], hoja["E14"], hoja["F14"] = 3, 3, 3
     hoja["H14"] = "Medidas de prueba"
     hoja["I14"], hoja["J14"], hoja["K14"] = 1, 1, 1
-    hoja["M14"] = "Trabajos en Altura > 1.8 m"
+    hoja["M14"] = "Permiso de trabajo en alturas / protección contra caídas"
     hoja["N14"] = "SI"
 
     hoja_fpe = libro.create_sheet("Firmas,Permisos, EPP")
-    hoja_fpe["I4"] = "Trabajos en Altura > 1.8 m"
+    hoja_fpe["I4"] = "Permiso de trabajo en alturas / protección contra caídas"
     hoja_fpe["K4"] = "X"
     hoja_fpe["L4"] = "Casco de seguridad"
     hoja_fpe["N4"] = "X"
@@ -1890,7 +1890,7 @@ class ImportarExcelDeclaracionTests(ApiTestsBase):
         actividad = response.data["actividades"][0]
         self.assertEqual(actividad["secuencia"], "1. Actividad de prueba")
         self.assertEqual(actividad["descripcion_riesgo"], "Riesgo de prueba")
-        self.assertEqual(actividad["permisos_requeridos"], ["Trabajos en Altura > 1.8 m"])
+        self.assertEqual(actividad["permisos_requeridos"], ["Permiso de trabajo en alturas / protección contra caídas"])
         self.assertEqual(actividad["epp_requerido"], ["Casco de seguridad"])
         self.assertTrue(actividad["tarea_sif"])
         self.assertEqual(response.data["avisos"], [])
