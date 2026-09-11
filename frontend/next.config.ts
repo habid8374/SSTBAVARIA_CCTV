@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Imagen de Docker liviana para Coolify — copia solo lo que server.js
-  // necesita para correr, en vez de todo node_modules.
-  output: "standalone",
-
   // Permite servir el dev server también por 127.0.0.1, no solo localhost.
   allowedDevOrigins: ["127.0.0.1", "localhost"],
 
