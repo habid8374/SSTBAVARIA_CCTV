@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+db.sqlite3
+/staticfiles/
+/media/
+.git/
+.github/
+.claude/
+frontend/
+equipo_local/
+*.md

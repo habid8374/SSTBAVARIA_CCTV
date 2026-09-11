@@ -590,6 +590,149 @@ apuntando a ese dominio, y por último vuelve a Railway a completar
 `CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` con el dominio de Vercel ya
 generado.
 
+## Migrar a Hostinger con Coolify
+
+El repo trae `Dockerfile` (backend, raíz del repo) y `frontend/Dockerfile`
+(frontend) listos para que [Coolify](https://coolify.io) los construya
+directo desde GitHub — es self-hosted (corre en tu propio VPS de
+Hostinger, no es un servicio de terceros como Railway/Vercel) y con una
+sola instancia maneja ambas apps + la base de datos.
+
+**Orden recomendado — no cortes DNS hasta el último paso.** Todo lo de
+abajo corre en paralelo a Railway/Vercel, que siguen sirviendo el tráfico
+real sin tocarse hasta el paso 8. Si algo sale mal en el camino, no hay
+downtime: simplemente no cambias el DNS todavía.
+
+### 1. Instalar Coolify en el VPS
+
+Por SSH al VPS de Hostinger (como root o con sudo):
+
+```bash
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+```
+
+Al terminar, imprime la URL del panel (`http://<IP-del-VPS>:8000`) — entra
+ahí, crea tu cuenta de administrador y, en el asistente inicial, deja que
+Coolify configure su propio proxy (Traefik) y certificados HTTPS
+automáticos (Let's Encrypt) — los necesitas para los dos pasos siguientes.
+
+### 2. Base de datos: crear el Postgres en Coolify
+
+**+ New → Database → PostgreSQL** en un proyecto nuevo (ej. "SST Bavaria
+CCTV"). Coolify genera las credenciales solas — cópialas, las necesitas en
+el paso 3 (`DATABASE_URL`) y en el paso 5 (migrar los datos).
+
+### 3. Backend: nueva app en Coolify
+
+**+ New → Application → Public Repository** (o conecta tu cuenta de
+GitHub si prefieres repos privados) apuntando a este repositorio, rama
+`main` (o la que tengas en producción).
+
+- **Build Pack**: `Dockerfile` (Coolify lo detecta solo al ver
+  `Dockerfile` en la raíz).
+- **Base Directory**: `/` (default).
+- **Port**: `8000`.
+- Variables de entorno (**Environment Variables** de la app) — la misma
+  tabla que usa Railway arriba, con estos cambios:
+
+  | Variable | Valor |
+  |---|---|
+  | `SECRET_KEY` | genera una **nueva** — no reuses la de Railway |
+  | `DEBUG` | `False` |
+  | `ALLOWED_HOSTS` | el dominio que le vayas a poner a esta app en Coolify, ej. `api.sst-cctv.com` (defínelo ahora aunque el DNS todavía no apunte ahí — lo conectas en el paso 8) |
+  | `CSRF_TRUSTED_ORIGINS` | `https://api.sst-cctv.com` (mismo dominio, con `https://`) |
+  | `CORS_ALLOWED_ORIGINS` | `https://sst-cctv.com,https://www.sst-cctv.com` (el dominio del frontend nuevo) |
+  | `DATABASE_URL` | `postgresql://<usuario>:<password>@<host-interno-que-da-coolify>:5432/<db>` — Coolify te muestra la cadena de conexión completa en la pantalla del recurso Postgres del paso 2 |
+  | `BREVO_API_KEY`, `BREVO_REMITENTE_EMAIL`, `BREVO_REMITENTE_NOMBRE` | copia los mismos valores de Railway |
+  | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL` | copia los mismos 4 de Railway — R2 es un servicio externo (Cloudflare), no depende de dónde corra el backend, así que los archivos ya subidos siguen funcionando igual sin migrar nada |
+  | `SENTRY_DSN` | copia el mismo de Railway |
+  | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CLAIMS_EMAIL` | copia los mismos de Railway — **no regeneres las llaves**, si cambian se invalidan todas las suscripciones push que ya tiene la gente instalada |
+
+- **Domains**: agrega `api.sst-cctv.com` (o el subdominio que prefieras) —
+  Coolify emite el certificado HTTPS solo en cuanto el DNS apunte ahí
+  (paso 8), mientras tanto puedes probar por la URL temporal que asigna
+  (`<algo>.sslip.io`).
+- Deploy. El `Dockerfile` corre `migrate` y `collectstatic` solo en cada
+  arranque (mismo comportamiento que tenía el `Procfile` de Railway).
+
+### 4. Frontend: nueva app en Coolify
+
+Otra app del mismo tipo, mismo repo:
+
+- **Build Pack**: `Dockerfile`.
+- **Base Directory**: `/frontend`.
+- **Port**: `3000`.
+- **Build Argument** (no variable de entorno normal — en Coolify es un
+  campo aparte, "Build Variable" o similar según la versión):
+  `NEXT_PUBLIC_API_URL` = `https://api.sst-cctv.com` (la URL pública del
+  backend del paso 3). Next.js la hornea dentro del JS en el momento de
+  `npm run build`, así que si la cambias después hay que reconstruir la
+  imagen, no basta con reiniciar el contenedor.
+- **Domains**: `sst-cctv.com` y `www.sst-cctv.com`.
+- Deploy.
+
+### 5. Migrar los datos de Railway al Postgres nuevo
+
+El repo ya tiene `python manage.py backup_db` (`core/management/commands/
+backup_db.py`), que vuelca toda la base con `dumpdata` — el mismo mecanismo
+sirve para migrar, sin necesitar `pg_dump`/`pg_restore` ni que las
+versiones de Postgres coincidan:
+
+1. Desde una consola con acceso al backend de **Railway** (la pestaña
+   Shell del servicio, o local con `DATABASE_URL` de Railway exportada):
+   ```bash
+   python manage.py dumpdata --natural-foreign --natural-primary \
+     -e contenttypes -e auth.permission -e sessions \
+     -o respaldo_migracion.json
+   ```
+2. Copia ese archivo a donde vayas a correr el siguiente comando contra el
+   backend **nuevo** (Coolify) — por ejemplo, desde tu máquina con
+   `DATABASE_URL` apuntando al Postgres de Coolify (necesitas exponerlo
+   temporalmente con un puerto público, o conectarte desde dentro del VPS).
+3. En el Postgres nuevo, ya con las tablas creadas (el backend de Coolify
+   ya corrió `migrate` en su primer deploy):
+   ```bash
+   python manage.py loaddata respaldo_migracion.json
+   ```
+4. Verifica en `https://<dominio-temporal-del-backend>/admin/` que los
+   contratistas, declaraciones y usuarios de verdad están ahí antes de
+   seguir.
+
+### 6. Notificaciones push y Web Push
+
+Las suscripciones push (`SuscripcionPush`) quedan migradas con el paso 5
+igual que el resto de los datos — como reutilizaste las mismas
+`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, siguen siendo válidas en el
+servidor nuevo sin que la gente tenga que reinstalar la PWA.
+
+### 7. Respaldo automático de la base de datos
+
+El `backup_db` que corría como Cron Job de Railway se recrea en Coolify
+con **Scheduled Tasks** (dentro de la app del backend, no como recurso
+aparte): comando `python manage.py backup_db`, misma expresión cron
+(`0 7 * * *`, 2:00 a.m. Bogotá) — usa las mismas variables de R2 que ya
+tiene la app, no hace falta configurarlas de nuevo.
+
+### 8. Cortar DNS — el paso que sí es definitivo
+
+Solo después de confirmar en los dominios temporales de Coolify que login,
+Declaración de Método, Contratistas y Alertas funcionan igual que en
+producción: entra a Porkbun (o donde tengas el DNS de `sst-cctv.com`) y
+cambia los registros que hoy apuntan a Vercel/Railway para que apunten al
+VPS de Hostinger — típicamente un registro **A** en la raíz y en `www`
+hacia la IP del VPS (Coolify te dice exactamente qué registro poner al
+agregar cada dominio en los pasos 3 y 4). La propagación puede tardar
+minutos a horas según el TTL anterior — durante ese rato convive tráfico
+viejo (Railway/Vercel) y nuevo (Coolify), así que no apagues los servicios
+viejos todavía.
+
+### 9. Apagar Railway y Vercel
+
+Solo cuando lleves unos días viendo tráfico real y estable en Coolify
+(revisa Sentry para confirmar que no hay errores nuevos): pausa o borra
+los proyectos de Railway y Vercel. Guarda un respaldo final
+(`backup_db`) desde Railway antes de borrar el Postgres viejo, por si acaso.
+
 ### Dominio propio (`sst-cctv.com`)
 
 El frontend en producción vive en **`https://www.sst-cctv.com`** (dominio
