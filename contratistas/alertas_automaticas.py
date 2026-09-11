@@ -16,6 +16,8 @@ altura_trabajo_metros y profundidad_excavacion_metros — que solo disparan
 alertas cuando el contratista los diligencia; si quedan vacíos, esas
 reglas simplemente no aplican (no se asume nada en su ausencia)."""
 
+import re
+
 from .models import nivel_riesgo
 
 PERMISO_ALTURA = "Certificado de apoyo en alturas / protección contra caídas"
@@ -23,7 +25,30 @@ PERMISO_EXCAVACION = "Excavaciones o Demolición"
 EPP_CONTRA_CAIDAS = "Otros: Equipo contra caídas (Arnés de seguridad, línea retráctil, doble gancho)"
 ROL_SEGURIDAD_PLANTA = "seguridad_planta"
 
-PALABRAS_CLAVE_ALTURA = ["altura", "techo", "cubierta", "andamio", "plataforma elevad", "escalera"]
+# Palabras que por sí solas ya implican trabajo en altura sin ambigüedad
+# razonable (a diferencia de "altura", "andamio" o "escalera" sueltas — ver
+# abajo, se quitaron de esta lista porque en Excel reales del cliente
+# aparecían en frases sin relación real con trabajo en altura: "acceso por
+# escaleras" de oficina, "andamio movil" usado a la altura de los hombros,
+# "nivelaran la altura y la luz" de un ajuste de instalación).
+PALABRAS_CLAVE_ALTURA = ["techo", "cubierta", "plataforma elevad"]
+
+# La palabra "altura" sola es demasiado ambigua (nivelar la altura de algo,
+# la altura de los hombros, etc.) — solo cuenta como señal real de trabajo
+# en altura cuando aparece en una de estas frases: "trabajo(s) en altura",
+# "altura de <número>" (ej. "altura de 120 mt") o "<número> m/mt/metros de
+# altura" (ej. "3 metros de altura").
+_PATRON_ALTURA_CON_CONTEXTO = re.compile(
+    r"trabajos?\s+en\s+altura"
+    r"|altura\s+de\s+\d"
+    r"|\d[\d.,]*\s*(?:m|mts?|metros)\s+de\s+altura"
+)
+
+
+def _texto_sugiere_trabajo_en_altura(texto):
+    if any(palabra in texto for palabra in PALABRAS_CLAVE_ALTURA):
+        return True
+    return bool(_PATRON_ALTURA_CON_CONTEXTO.search(texto))
 
 
 def _firmas_seguridad_planta_vigentes(declaracion):
@@ -142,7 +167,7 @@ def generar_alertas(declaracion):
         texto = " ".join(
             [actividad.secuencia or "", actividad.tecnicas_herramientas or "", actividad.descripcion_riesgo or ""]
         ).lower()
-        if PERMISO_ALTURA not in permisos and any(palabra in texto for palabra in PALABRAS_CLAVE_ALTURA):
+        if PERMISO_ALTURA not in permisos and _texto_sugiere_trabajo_en_altura(texto):
             alertas.append(
                 _alerta(
                     "texto_sugiere_altura_sin_permiso",

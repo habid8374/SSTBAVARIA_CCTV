@@ -1513,6 +1513,40 @@ class AlertasAutomaticasTests(ApiTestsBase):
         alertas = generar_alertas(declaracion)
         self.assertIn("texto_sugiere_altura_sin_permiso", [a["codigo"] for a in alertas])
 
+    def test_texto_sugiere_altura_sin_permiso_ignora_menciones_sin_relacion_real(self):
+        """Un contratista reportó una alerta de altura sobre una actividad
+        de 'caídas a mismo y diferente nivel' que en realidad no implicaba
+        trabajo en altura — venía de palabras sueltas ('escalera', 'altura',
+        'andamio') en frases sin relación con el SOP de trabajo en altura:
+        acceder por escaleras de oficina, un andamio usado a la altura de
+        los hombros, y nivelar la altura de una instalación. Estas 3 frases
+        salen literalmente de un Excel real del cliente."""
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            secuencia="2. TRASLADO DE HERRAMIENTAS",
+            descripcion_riesgo="Locativo - caidas al mismo nivel - acceso por escaleras",
+        )
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=1,
+            secuencia="3. DEMOLICION DE MURO CORTINA",
+            tecnicas_herramientas="sin que la pulidora sobre pase la alturas de los hombros",
+            descripcion_riesgo="Locativo: caidas a un mismo y diferente nivel: por uso de andamio movil",
+        )
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=2,
+            secuencia="8. INSTALACION DE DIVISIONES DE VIDRIO",
+            tecnicas_herramientas="nivelaran la altura y la luz entre el muro y la division",
+            descripcion_riesgo="BIOMECANICO Posturas mantenidas- movimientos repetitivos",
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("texto_sugiere_altura_sin_permiso", [a["codigo"] for a in alertas])
+
     def test_no_repite_la_misma_alerta_para_filas_de_riesgo_de_una_misma_tarea(self):
         """El Excel real del cliente trae varias filas de riesgo (matriz
         Kinney) bajo una misma 'Secuencia de Actividades' — el importador
