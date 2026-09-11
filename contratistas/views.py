@@ -676,6 +676,21 @@ class DeclaracionMetodoDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPI
         registrar_auditoria(self.request.user, declaracion, RegistroAuditoria.Accion.ACTUALIZADO, snapshot_anterior)
         if declaracion.estado == estado_anterior:
             return
+        if declaracion.estado == DeclaracionMetodo.Estado.APROBADA:
+            # En el proceso real del cliente, la firma de "Seguridad de
+            # Planta (Site)" no la diligencia el contratista al subir la
+            # declaración — se produce cuando SST/interventoría la aprueba,
+            # así que aprobar registra esa firma sola, a nombre de quien
+            # aprobó, en vez de exigir un paso manual aparte.
+            FirmaMetodo.objects.get_or_create(
+                declaracion=declaracion,
+                rol=FirmaMetodo.Rol.SEGURIDAD_PLANTA,
+                defaults={
+                    "nombre_firmante": self.request.user.get_full_name() or self.request.user.username,
+                    "firmante_usuario": self.request.user,
+                    "hash_documento": calcular_hash_declaracion(declaracion),
+                },
+            )
         if declaracion.estado in (DeclaracionMetodo.Estado.APROBADA, DeclaracionMetodo.Estado.RECHAZADA):
             notificar_decision_declaracion(declaracion)
         elif declaracion.estado == DeclaracionMetodo.Estado.ENVIADA:

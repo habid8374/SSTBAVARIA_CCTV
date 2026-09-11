@@ -1800,6 +1800,60 @@ class DeclaracionMetodoTests(ApiTestsBase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["estado"], "aprobada")
 
+    def test_aprobar_registra_automaticamente_la_firma_de_seguridad_de_planta(self):
+        """En el proceso real del cliente, la firma de "Seguridad de Planta"
+        no la diligencia el contratista al subir la declaración — se
+        produce cuando SST/interventoría la aprueba. Por eso aprobar debe
+        registrar esa firma sola, a nombre de quien aprobó."""
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
+        self.assertFalse(declaracion.firmas.filter(rol="seguridad_planta").exists())
+
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+        firma_seguridad = declaracion.firmas.get(rol="seguridad_planta")
+        self.assertEqual(firma_seguridad.firmante_usuario, self.admin)
+        self.assertFalse(firma_seguridad.documento_modificado_despues_de_firmar)
+
+    def test_aprobar_no_duplica_firma_de_seguridad_de_planta_ya_registrada(self):
+        declaracion = DeclaracionMetodo.objects.create(
+            contratista=self.contratista,
+            fecha_elaboracion=datetime.date(2026, 7, 11),
+            descripcion_trabajo="Instalación de pórtico",
+        )
+        FirmaMetodo.objects.create(
+            declaracion=declaracion, rol="supervisor_contratista", nombre_firmante="Ana", firmante_usuario=self.admin
+        )
+        FirmaMetodo.objects.create(
+            declaracion=declaracion,
+            rol="seguridad_planta",
+            nombre_firmante="Carlos ya firmó manualmente",
+            firmante_usuario=self.admin,
+        )
+
+        response = self.client.patch(
+            reverse("contratistas:declaraciones_detalle", args=[declaracion.pk]),
+            {"estado": "aprobada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(declaracion.firmas.filter(rol="seguridad_planta").count(), 1)
+        firma_seguridad = declaracion.firmas.get(rol="seguridad_planta")
+        self.assertEqual(firma_seguridad.nombre_firmante, "Carlos ya firmó manualmente")
+
     @override_settings(BREVO_API_KEY="clave-de-prueba")
     @patch("camaras_ia.notificaciones.urllib.request.urlopen")
     def test_aprobar_declaracion_notifica_al_contratista(self, mock_urlopen):

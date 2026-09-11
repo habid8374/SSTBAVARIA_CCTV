@@ -431,6 +431,15 @@ const TEMAS: Tema[] = [
           firma registrada, o si alguna firma quedó desactualizada por una edición posterior — evita aprobar
           un documento vacío o distinto al que se firmó.
         </P>
+        <P>
+          La firma de <strong>&quot;Seguridad de Planta (Site)&quot;</strong> es distinta a las demás: en el
+          proceso real, esa persona no firma al momento de subir la declaración — su firma se produce
+          justamente cuando SST/interventoría <strong>aprueba</strong>. Por eso, al aprobar, el sistema
+          registra esa firma automáticamente a nombre de quien aprobó, sin un paso manual aparte. Si una
+          actividad está marcada como tarea SIF, es normal ver la alerta &quot;Tarea SIF sin firma de
+          Seguridad de Planta&quot; mientras la declaración todavía no se ha aprobado — se resuelve sola al
+          aprobar.
+        </P>
         <Sub>Notificación y descarga en PDF o Excel</Sub>
         <P>
           Al aprobar o rechazar, se le avisa por correo al contacto de la empresa contratista (si tiene correo
