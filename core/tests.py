@@ -1,6 +1,7 @@
 import gzip
 import json
 import os
+import tempfile
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -545,6 +546,53 @@ class BackupDbCommandTests(TestCase):
 
         self.assertFalse(default_storage.exists(ruta_vieja))
         self.assertTrue(default_storage.exists(ruta_nueva))
+
+
+class RestaurarRespaldoConLoaddataTests(TestCase):
+    """Migrar de un servidor a otro (ej. Railway → Hostinger) se hace con
+    `backup_db` + `loaddata` contra una base nueva y vacía — reproduce ese
+    escenario exacto: la señal crear_perfil_usuario no debe chocar con el
+    PerfilUsuario que ya trae el propio respaldo al restaurarlo con
+    `loaddata` (ver core/models.py, raw=True)."""
+
+    def test_loaddata_no_revienta_por_perfilusuario_duplicado(self):
+        usuario = Usuario.objects.create_user("contratista_migrado", "x@x.com", "clave12345")
+        usuario.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        usuario.perfil.save(update_fields=["rol"])
+
+        buffer = json.dumps(
+            [
+                {
+                    "model": "auth.user",
+                    "pk": usuario.pk,
+                    "fields": {
+                        "username": usuario.username,
+                        "password": usuario.password,
+                        "is_superuser": False,
+                        "is_staff": False,
+                        "is_active": True,
+                    },
+                },
+                {
+                    "model": "core.perfilusuario",
+                    "pk": usuario.perfil.pk,
+                    "fields": {"usuario": usuario.pk, "rol": "contratista"},
+                },
+            ]
+        )
+
+        Usuario.objects.all().delete()
+        self.assertEqual(PerfilUsuario.objects.count(), 0)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as archivo:
+            archivo.write(buffer)
+            ruta_temporal = archivo.name
+        self.addCleanup(lambda: os.remove(ruta_temporal))
+
+        call_command("loaddata", ruta_temporal, format="json")
+
+        self.assertEqual(PerfilUsuario.objects.count(), 1)
+        self.assertEqual(PerfilUsuario.objects.get().rol, PerfilUsuario.Rol.CONTRATISTA)
 
 
 VAPID_DE_PRUEBA = {

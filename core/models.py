@@ -116,10 +116,15 @@ class RegistroInicioSesion(models.Model):
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def crear_perfil_usuario(sender, instance, created, **kwargs):
+def crear_perfil_usuario(sender, instance, created, raw=False, **kwargs):
     """Todo usuario nuevo recibe un perfil automáticamente: Administrador si
     se creó como superusuario (ej. createsuperuser), Operador en cualquier
-    otro caso — se puede cambiar después desde la gestión de usuarios."""
+    otro caso — se puede cambiar después desde la gestión de usuarios.
+    `raw=True` durante loaddata (restaurar un respaldo) — ahí el propio
+    fixture ya trae su PerfilUsuario, así que crear uno aparte chocaría
+    con la restricción de unicidad en usuario_id."""
+    if raw:
+        return
     if created:
         PerfilUsuario.objects.get_or_create(
             usuario=instance,
