@@ -23,7 +23,6 @@ from .models import nivel_riesgo
 PERMISO_ALTURA = "Certificado de apoyo en alturas / protección contra caídas"
 PERMISO_EXCAVACION = "Excavaciones o Demolición"
 EPP_CONTRA_CAIDAS = "Otros: Equipo contra caídas (Arnés de seguridad, línea retráctil, doble gancho)"
-ROL_SEGURIDAD_PLANTA = "seguridad_planta"
 
 # Palabras que por sí solas ya implican trabajo en altura sin ambigüedad
 # razonable (a diferencia de "altura", "andamio" o "escalera" sueltas — ver
@@ -49,14 +48,6 @@ def _texto_sugiere_trabajo_en_altura(texto):
     if any(palabra in texto for palabra in PALABRAS_CLAVE_ALTURA):
         return True
     return bool(_PATRON_ALTURA_CON_CONTEXTO.search(texto))
-
-
-def _firmas_seguridad_planta_vigentes(declaracion):
-    return [
-        f
-        for f in declaracion.firmas.all()
-        if f.rol == ROL_SEGURIDAD_PLANTA and not f.documento_modificado_despues_de_firmar
-    ]
 
 
 def _alerta(codigo, actividad, titulo, mensaje, motivo_sugerido, fuente):
@@ -94,7 +85,6 @@ def generar_alertas(declaracion):
     """Devuelve una lista de alertas (dict) para las actividades de la
     declaración dada. Es de solo lectura — no modifica nada."""
     alertas = []
-    firmas_seguridad_vigentes = _firmas_seguridad_planta_vigentes(declaracion)
 
     for actividad in declaracion.actividades.all():
         permisos = actividad.permisos_requeridos or []
@@ -146,21 +136,6 @@ def generar_alertas(declaracion):
                     "El riesgo con mitigación aplicada sigue en banda alta — revisar si "
                     "las medidas descritas son suficientes o si falta información.",
                     "Método Kinney (evaluación de riesgo)",
-                )
-            )
-
-        if actividad.tarea_sif and not firmas_seguridad_vigentes:
-            alertas.append(
-                _alerta(
-                    "sif_sin_firma_seguridad",
-                    actividad,
-                    "Tarea SIF sin firma de Seguridad de Planta",
-                    f"La actividad «{etiqueta}» está marcada como tarea SIF (potencial de "
-                    "lesión seria o fatal) pero la declaración no tiene una firma vigente "
-                    "de Seguridad de Planta (Site).",
-                    "Falta la firma de Seguridad de Planta (Site) exigida para una tarea "
-                    "con potencial de lesión seria o fatal.",
-                    "Buenas prácticas internas — tareas SIF",
                 )
             )
 

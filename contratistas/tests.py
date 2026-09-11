@@ -1484,22 +1484,16 @@ class AlertasAutomaticasTests(ApiTestsBase):
         alertas = generar_alertas(declaracion)
         self.assertNotIn("riesgo_alto_con_mitigacion", [a["codigo"] for a in alertas])
 
-    def test_sif_sin_firma_seguridad_genera_alerta(self):
+    def test_sif_sin_firma_seguridad_ya_no_genera_alerta(self):
+        """Esta alerta existió, pero la firma de Seguridad de Planta nunca
+        se diligencia antes de aprobar — se registra sola al aprobar (ver
+        DeclaracionMetodoDetalle.perform_update) — así que advertir sobre
+        su ausencia durante la revisión solo generaba ruido sin nada que
+        corregir. Se quitó del motor de alertas."""
         from .alertas_automaticas import generar_alertas
 
         declaracion = self._declaracion()
         ActividadMetodo.objects.create(declaracion=declaracion, orden=0, secuencia="Trabajo SIF", tarea_sif=True)
-        alertas = generar_alertas(declaracion)
-        self.assertIn("sif_sin_firma_seguridad", [a["codigo"] for a in alertas])
-
-    def test_sif_con_firma_seguridad_vigente_no_genera_esa_alerta(self):
-        from .alertas_automaticas import generar_alertas
-
-        declaracion = self._declaracion()
-        ActividadMetodo.objects.create(declaracion=declaracion, orden=0, secuencia="Trabajo SIF", tarea_sif=True)
-        FirmaMetodo.objects.create(
-            declaracion=declaracion, rol="seguridad_planta", nombre_firmante="Ana", firmante_usuario=self.admin
-        )
         alertas = generar_alertas(declaracion)
         self.assertNotIn("sif_sin_firma_seguridad", [a["codigo"] for a in alertas])
 

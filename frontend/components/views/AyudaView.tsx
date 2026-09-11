@@ -435,10 +435,7 @@ const TEMAS: Tema[] = [
           La firma de <strong>&quot;Seguridad de Planta (Site)&quot;</strong> es distinta a las demás: en el
           proceso real, esa persona no firma al momento de subir la declaración — su firma se produce
           justamente cuando SST/interventoría <strong>aprueba</strong>. Por eso, al aprobar, el sistema
-          registra esa firma automáticamente a nombre de quien aprobó, sin un paso manual aparte. Si una
-          actividad está marcada como tarea SIF, es normal ver la alerta &quot;Tarea SIF sin firma de
-          Seguridad de Planta&quot; mientras la declaración todavía no se ha aprobado — se resuelve sola al
-          aprobar.
+          registra esa firma automáticamente a nombre de quien aprobó, sin un paso manual aparte.
         </P>
         <Sub>Notificación y descarga en PDF o Excel</Sub>
         <P>
@@ -463,8 +460,8 @@ const TEMAS: Tema[] = [
           con alertas automáticas cuando alguna actividad no cumple con reglas tomadas de los procedimientos
           de seguridad del cliente (SOP &quot;Safety to Sustain&quot;) — por ejemplo, un certificado de
           apoyo en alturas marcado sin el EPP contra caídas correspondiente, una excavación sin medidas de
-          mitigación detalladas, un riesgo que sigue alto después de mitigar, o una tarea SIF sin firma de
-          Seguridad de Planta. Cada alerta cita de qué procedimiento sale y trae un botón <strong>&quot;Usar
+          mitigación detalladas, o un riesgo que sigue alto después de mitigar. Cada alerta cita de qué
+          procedimiento sale y trae un botón <strong>&quot;Usar
           como motivo de rechazo&quot;</strong> que solo copia un texto sugerido al campo Observaciones —{" "}
           <strong>el sistema nunca aprueba ni rechaza por sí solo</strong>: las alertas son un apoyo para
           decidir, no reemplazan el criterio de quien revisa, y no bloquean aprobar aunque haya alertas
