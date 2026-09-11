@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
 
 import { useDialog } from "@/components/DialogProvider";
 import {
@@ -83,6 +83,29 @@ function riesgoMasAlto(declaracion: DeclaracionMetodo): number {
   return declaracion.actividades.reduce((max, a) => Math.max(max, a.riesgo_sin, a.riesgo_con), 0);
 }
 
+type GrupoContratista = {
+  contratistaId: number;
+  nombre: string;
+  declaraciones: DeclaracionMetodo[];
+};
+
+// El backend ya entrega las declaraciones ordenadas por más reciente
+// primero — recorrerlas en ese orden y crear cada grupo la primera vez que
+// aparece su contratista hace que el contratista con la actividad más
+// reciente quede de primero, sin necesidad de ordenar aparte.
+function agruparPorContratista(declaraciones: DeclaracionMetodo[]): GrupoContratista[] {
+  const grupos = new Map<number, GrupoContratista>();
+  for (const d of declaraciones) {
+    let grupo = grupos.get(d.contratista);
+    if (!grupo) {
+      grupo = { contratistaId: d.contratista, nombre: d.contratista_nombre, declaraciones: [] };
+      grupos.set(d.contratista, grupo);
+    }
+    grupo.declaraciones.push(d);
+  }
+  return Array.from(grupos.values());
+}
+
 function EstadoBadge({ estado }: { estado: EstadoDeclaracion }) {
   const estilos: Record<EstadoDeclaracion, string> = {
     borrador: "bg-zinc-100 text-zinc-700",
@@ -107,7 +130,22 @@ export default function DeclaracionMetodoView({ token, rol }: { token: string; r
   const [catalogos, setCatalogos] = useState<Catalogos | null>(null);
   const [seleccionada, setSeleccionada] = useState<DeclaracionMetodo | "nueva" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [contratistasAbiertos, setContratistasAbiertos] = useState<Set<number>>(new Set());
   const { confirmar } = useDialog();
+
+  const grupos = useMemo(() => (declaraciones ? agruparPorContratista(declaraciones) : []), [declaraciones]);
+
+  function alternarGrupo(contratistaId: number) {
+    setContratistasAbiertos((previo) => {
+      const siguiente = new Set(previo);
+      if (siguiente.has(contratistaId)) {
+        siguiente.delete(contratistaId);
+      } else {
+        siguiente.add(contratistaId);
+      }
+      return siguiente;
+    });
+  }
 
   function cargarDeclaraciones() {
     listarDeclaraciones(token)
@@ -187,66 +225,91 @@ export default function DeclaracionMetodoView({ token, rol }: { token: string; r
         </p>
       )}
 
-      {declaraciones && declaraciones.length > 0 && (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-corp-border bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-corp-muted">
-              <tr>
-                <th className="px-4 py-2.5">Trabajo</th>
-                <th className="px-4 py-2.5">Contratista</th>
-                <th className="px-4 py-2.5">Planta / área</th>
-                <th className="px-4 py-2.5">Fecha</th>
-                <th className="px-4 py-2.5">Actividades</th>
-                <th className="px-4 py-2.5">Riesgo más alto</th>
-                <th className="px-4 py-2.5">Estado</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-corp-border">
-              {declaraciones.map((d) => {
-                const riesgo = riesgoMasAlto(d);
-                const nivel = nivelRiesgo(riesgo);
-                return (
-                  <tr
-                    key={d.id}
-                    onClick={() => setSeleccionada(d)}
-                    className="cursor-pointer hover:bg-corp-blue-light/40"
-                  >
-                    <td className="max-w-xs truncate px-4 py-2.5 font-medium text-corp-navy">
-                      {d.descripcion_trabajo}
-                    </td>
-                    <td className="px-4 py-2.5">{d.contratista_nombre}</td>
-                    <td className="px-4 py-2.5">{d.planta_area || "—"}</td>
-                    <td className="px-4 py-2.5">{d.fecha_elaboracion}</td>
-                    <td className="px-4 py-2.5">{d.actividades.length}</td>
-                    <td className="px-4 py-2.5">
-                      {d.actividades.length > 0 ? (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${nivel.color}`}>
-                          {nivel.etiqueta} ({riesgo})
-                        </span>
-                      ) : (
-                        <span className="text-xs text-corp-muted">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <EstadoBadge estado={d.estado} />
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      {rol === "administrador" && (
-                        <button
-                          type="button"
-                          onClick={(e) => eliminar(d, e)}
-                          className="text-xs font-medium text-red-600 hover:underline"
-                        >
-                          Eliminar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {grupos.length > 0 && (
+        <div className="mt-6 flex flex-col gap-3">
+          {grupos.map((grupo) => {
+            const abierto = grupos.length === 1 || contratistasAbiertos.has(grupo.contratistaId);
+            return (
+              <div key={grupo.contratistaId} className="overflow-hidden rounded-xl border border-corp-border bg-white">
+                <button
+                  type="button"
+                  onClick={() => grupos.length > 1 && alternarGrupo(grupo.contratistaId)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-zinc-50"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="font-semibold text-corp-navy">{grupo.nombre}</span>
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-corp-muted">
+                      {grupo.declaraciones.length}
+                    </span>
+                  </span>
+                  {grupos.length > 1 && (
+                    <span className="text-xs text-corp-muted">{abierto ? "▲ Ocultar" : "▼ Ver declaraciones"}</span>
+                  )}
+                </button>
+
+                {abierto && (
+                  <div className="overflow-x-auto border-t border-corp-border">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-corp-muted">
+                        <tr>
+                          <th className="px-4 py-2.5">Trabajo</th>
+                          <th className="px-4 py-2.5">Planta / área</th>
+                          <th className="px-4 py-2.5">Fecha</th>
+                          <th className="px-4 py-2.5">Actividades</th>
+                          <th className="px-4 py-2.5">Riesgo más alto</th>
+                          <th className="px-4 py-2.5">Estado</th>
+                          <th className="px-4 py-2.5" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-corp-border">
+                        {grupo.declaraciones.map((d) => {
+                          const riesgo = riesgoMasAlto(d);
+                          const nivel = nivelRiesgo(riesgo);
+                          return (
+                            <tr
+                              key={d.id}
+                              onClick={() => setSeleccionada(d)}
+                              className="cursor-pointer hover:bg-corp-blue-light/40"
+                            >
+                              <td className="max-w-xs truncate px-4 py-2.5 font-medium text-corp-navy">
+                                {d.descripcion_trabajo}
+                              </td>
+                              <td className="px-4 py-2.5">{d.planta_area || "—"}</td>
+                              <td className="px-4 py-2.5">{d.fecha_elaboracion}</td>
+                              <td className="px-4 py-2.5">{d.actividades.length}</td>
+                              <td className="px-4 py-2.5">
+                                {d.actividades.length > 0 ? (
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${nivel.color}`}>
+                                    {nivel.etiqueta} ({riesgo})
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-corp-muted">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <EstadoBadge estado={d.estado} />
+                              </td>
+                              <td className="px-4 py-2.5 text-right">
+                                {rol === "administrador" && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => eliminar(d, e)}
+                                    className="text-xs font-medium text-red-600 hover:underline"
+                                  >
+                                    Eliminar
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

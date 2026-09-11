@@ -357,6 +357,12 @@ const TEMAS: Tema[] = [
           Formulario de análisis de riesgo por trabajo (método Kinney: Probabilidad × Frecuencia × Impacto)
           que un contratista diligencia antes de una labor puntual.
         </P>
+        <P>
+          El listado se ve <strong>agrupado por contratista</strong>: cada empresa es una sección con su
+          nombre y cuántas declaraciones tiene, que se despliega al hacer clic para ver su tabla completa —
+          así, si un contratista acumula varias declaraciones con el tiempo, quedan juntas y organizadas en
+          vez de mezcladas con las de otras empresas.
+        </P>
         <Ul>
           <li>Datos generales: contratista, área/planta, número de pedido, fechas, descripción del trabajo.</li>
           <li>Una fila por actividad, con el riesgo <strong>sin</strong> medidas de mitigación y{" "}
