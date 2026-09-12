@@ -36,7 +36,7 @@ export default function SistemaView({ token, esSuperusuario }: { token: string; 
 
   return (
     <div>
-      <div className="mb-6 flex gap-1 border-b border-corp-border">
+      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-corp-border">
         <BotonPestana activa={pestana === "brevo"} onClick={() => setPestana("brevo")}>
           Brevo (correo)
         </BotonPestana>
@@ -78,7 +78,7 @@ function BotonPestana({
     <button
       type="button"
       onClick={onClick}
-      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
+      className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition ${
         activa ? "border-corp-blue text-corp-blue" : "border-transparent text-corp-muted hover:text-corp-navy"
       }`}
     >
