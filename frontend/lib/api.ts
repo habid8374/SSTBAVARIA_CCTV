@@ -214,6 +214,10 @@ export type EventoDashboard = {
   notificacion_enviada: boolean;
   notificacion_detalle: string;
   estado: EstadoEvento;
+  tipos_ia: { id: number; nombre: string; severidad: "baja" | "media" | "alta" }[];
+  descripcion_ia: string;
+  ia_analizado_en: string | null;
+  ia_error: string;
 };
 
 export type ReglaAlerta = {
@@ -543,6 +547,90 @@ export function actualizarConfiguracionNotificaciones(
     method: "PATCH",
     headers: authHeaders(token),
     body: JSON.stringify(cambios),
+  });
+}
+
+// --- Sistema: Inteligencia Artificial (clasificación de eventos con Claude/Gemini) ---
+
+export type ProveedorIA = "claude" | "gemini";
+
+export type ConfiguracionIA = {
+  proveedor: ProveedorIA;
+  api_key_configurada: boolean;
+  modelo: string;
+  actualizada_en: string;
+};
+
+export type CambiosConfiguracionIA = {
+  proveedor?: ProveedorIA;
+  api_key?: string;
+  modelo?: string;
+};
+
+export function obtenerConfiguracionIA(token: string): Promise<ConfiguracionIA> {
+  return request<ConfiguracionIA>("/api/camaras-ia/dashboard/configuracion-ia/", {
+    headers: authHeaders(token),
+  });
+}
+
+export function actualizarConfiguracionIA(
+  token: string,
+  cambios: CambiosConfiguracionIA
+): Promise<ConfiguracionIA> {
+  return request<ConfiguracionIA>("/api/camaras-ia/dashboard/configuracion-ia/", {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export type Severidad = "baja" | "media" | "alta";
+
+export type TipoEventoIA = {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  severidad: Severidad;
+  activo: boolean;
+  creado_en: string;
+};
+
+export type NuevoTipoEventoIA = {
+  nombre: string;
+  descripcion: string;
+  severidad?: Severidad;
+};
+
+export function listarTiposEventoIA(token: string): Promise<TipoEventoIA[]> {
+  return request<TipoEventoIA[]>("/api/camaras-ia/dashboard/tipos-evento-ia/", {
+    headers: authHeaders(token),
+  });
+}
+
+export function crearTipoEventoIA(token: string, datos: NuevoTipoEventoIA): Promise<TipoEventoIA> {
+  return request<TipoEventoIA>("/api/camaras-ia/dashboard/tipos-evento-ia/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarTipoEventoIA(
+  token: string,
+  id: number,
+  cambios: Partial<NuevoTipoEventoIA & { activo: boolean }>
+): Promise<TipoEventoIA> {
+  return request<TipoEventoIA>(`/api/camaras-ia/dashboard/tipos-evento-ia/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarTipoEventoIA(token: string, id: number): Promise<void> {
+  return request<void>(`/api/camaras-ia/dashboard/tipos-evento-ia/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
   });
 }
 

@@ -12,13 +12,16 @@ from django.utils import timezone
 
 from core.models import Empresa
 
+from .ia_deteccion import _parsear_json, clasificar_evento
 from .models import (
     Camara,
+    ConfiguracionIA,
     ConfiguracionNotificaciones,
     EquipoLocal,
     EventoDetectado,
     InstruccionSeguridad,
     ReglaAlerta,
+    TipoEventoIA,
     ZonaRestringida,
 )
 from .services import _regla_vigente, disparar_alerta, evaluar_zona_horario, punto_en_circulo, punto_en_poligono, punto_en_zona
@@ -1207,3 +1210,214 @@ class DashboardEndpointsTests(TestCase):
         info = contenido.getinfo("equipo_local/instalar.sh")
         modo = (info.external_attr >> 16) & 0o777
         self.assertTrue(modo & 0o111)
+
+
+class ParsearJsonTests(TestCase):
+    def test_json_puro(self):
+        self.assertEqual(_parsear_json('{"eventos": [1, 2], "descripcion": "ok"}'), {"eventos": [1, 2], "descripcion": "ok"})
+
+    def test_json_envuelto_en_fence_markdown(self):
+        texto = '```json\n{"eventos": [3], "descripcion": "con casco no puesto"}\n```'
+        self.assertEqual(_parsear_json(texto), {"eventos": [3], "descripcion": "con casco no puesto"})
+
+    def test_json_invalido_devuelve_vacio(self):
+        self.assertEqual(_parsear_json("esto no es json"), {"eventos": [], "descripcion": ""})
+
+    def test_json_que_no_es_un_objeto_devuelve_vacio(self):
+        self.assertEqual(_parsear_json("[1, 2, 3]"), {"eventos": [], "descripcion": ""})
+
+
+class ClasificarEventoTests(TestCase):
+    def setUp(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.evento = EventoDetectado.objects.create(
+            camara=self.camara,
+            zona=self.zona,
+            punto_x=1,
+            punto_y=1,
+            snapshot=SimpleUploadedFile("evento.jpg", b"contenido-jpeg-falso"),
+        )
+        self.tipo_casco = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Sin casco", descripcion="Persona sin casco puesto"
+        )
+        self.tipo_caida = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Caída", descripcion="Persona en el suelo"
+        )
+
+    def test_sin_snapshot_no_hace_nada(self):
+        evento_sin_foto = EventoDetectado.objects.create(camara=self.camara, zona=self.zona, punto_x=1, punto_y=1)
+        clasificar_evento(evento_sin_foto)
+        self.assertIsNone(evento_sin_foto.ia_analizado_en)
+
+    def test_sin_api_key_no_hace_nada(self):
+        clasificar_evento(self.evento)
+        self.evento.refresh_from_db()
+        self.assertIsNone(self.evento.ia_analizado_en)
+        self.assertEqual(self.evento.tipos_ia.count(), 0)
+
+    @override_settings(ANTHROPIC_API_KEY="desde-settings")
+    def test_sin_catalogo_no_hace_nada(self):
+        TipoEventoIA.objects.all().delete()
+        clasificar_evento(self.evento)
+        self.evento.refresh_from_db()
+        self.assertIsNone(self.evento.ia_analizado_en)
+
+    @override_settings(ANTHROPIC_API_KEY="desde-settings")
+    @patch("anthropic.Anthropic")
+    def test_clasifica_con_claude_y_guarda_resultado(self, mock_anthropic_cls):
+        bloque_texto = type("Bloque", (), {"type": "text", "text": '{"eventos": [%d], "descripcion": "sin casco"}' % self.tipo_casco.id})()
+        mock_respuesta = type("Respuesta", (), {"content": [bloque_texto]})()
+        mock_anthropic_cls.return_value.messages.create.return_value = mock_respuesta
+
+        clasificar_evento(self.evento)
+
+        self.evento.refresh_from_db()
+        self.assertIsNotNone(self.evento.ia_analizado_en)
+        self.assertEqual(self.evento.ia_error, "")
+        self.assertEqual(list(self.evento.tipos_ia.all()), [self.tipo_casco])
+        self.assertEqual(self.evento.descripcion_ia, "sin casco")
+        mock_anthropic_cls.assert_called_once_with(api_key="desde-settings")
+        _, kwargs = mock_anthropic_cls.return_value.messages.create.call_args
+        self.assertEqual(kwargs["model"], "claude-opus-5")
+
+    @override_settings(GEMINI_API_KEY="desde-settings")
+    @patch("google.genai.Client")
+    def test_clasifica_con_gemini_y_guarda_resultado(self, mock_genai_cls):
+        ConfiguracionIA.obtener()  # crea la fila singleton
+        config = ConfiguracionIA.objects.get(pk=1)
+        config.proveedor = ConfiguracionIA.Proveedor.GEMINI
+        config.save()
+
+        mock_respuesta = type(
+            "Respuesta", (), {"text": '{"eventos": [%d], "descripcion": "persona caída"}' % self.tipo_caida.id}
+        )()
+        mock_genai_cls.return_value.models.generate_content.return_value = mock_respuesta
+
+        clasificar_evento(self.evento)
+
+        self.evento.refresh_from_db()
+        self.assertEqual(list(self.evento.tipos_ia.all()), [self.tipo_caida])
+        self.assertEqual(self.evento.descripcion_ia, "persona caída")
+        mock_genai_cls.assert_called_once_with(api_key="desde-settings")
+
+    @override_settings(ANTHROPIC_API_KEY="")
+    @patch("anthropic.Anthropic")
+    def test_api_key_de_la_bd_tiene_prioridad_sobre_settings(self, mock_anthropic_cls):
+        config = ConfiguracionIA.obtener()
+        config.api_key = "desde-la-bd"
+        config.save()
+        bloque_texto = type("Bloque", (), {"type": "text", "text": '{"eventos": [], "descripcion": ""}'})()
+        mock_anthropic_cls.return_value.messages.create.return_value = type("R", (), {"content": [bloque_texto]})()
+
+        clasificar_evento(self.evento)
+
+        mock_anthropic_cls.assert_called_once_with(api_key="desde-la-bd")
+
+    @override_settings(ANTHROPIC_API_KEY="desde-settings")
+    @patch("anthropic.Anthropic")
+    def test_error_de_api_no_rompe_y_queda_registrado(self, mock_anthropic_cls):
+        mock_anthropic_cls.return_value.messages.create.side_effect = RuntimeError("timeout de red")
+
+        clasificar_evento(self.evento)  # no debe lanzar
+
+        self.evento.refresh_from_db()
+        self.assertIn("timeout de red", self.evento.ia_error)
+        self.assertIsNotNone(self.evento.ia_analizado_en)
+        self.assertEqual(self.evento.tipos_ia.count(), 0)
+
+    @override_settings(ANTHROPIC_API_KEY="desde-settings")
+    @patch("anthropic.Anthropic")
+    def test_ids_no_validos_se_ignoran(self, mock_anthropic_cls):
+        id_inexistente = self.tipo_casco.id + self.tipo_caida.id + 999
+        bloque_texto = type(
+            "Bloque", (), {"type": "text", "text": '{"eventos": [%d, %d], "descripcion": "x"}' % (self.tipo_casco.id, id_inexistente)}
+        )()
+        mock_anthropic_cls.return_value.messages.create.return_value = type("R", (), {"content": [bloque_texto]})()
+
+        clasificar_evento(self.evento)
+
+        self.evento.refresh_from_db()
+        self.assertEqual(list(self.evento.tipos_ia.all()), [self.tipo_casco])
+
+
+class ConfiguracionIAYTipoEventoIAEndpointsTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+
+    def _auth(self, user):
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        )
+        return {"HTTP_AUTHORIZATION": f"Token {response.data['token']}"}
+
+    def test_operador_puede_ver_configuracion_ia_pero_no_editarla(self):
+        response = self.client.get(reverse("camaras_ia:configuracion_ia"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("api_key", response.data)  # write-only, nunca se devuelve
+
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_ia"),
+            {"proveedor": "gemini"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_configura_proveedor_y_api_key(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_ia"),
+            {"proveedor": "gemini", "api_key": "una-clave-secreta"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["api_key_configurada"])
+        config = ConfiguracionIA.obtener()
+        self.assertEqual(config.proveedor, "gemini")
+        self.assertEqual(config.api_key, "una-clave-secreta")
+
+    def test_admin_crea_tipo_evento_ia(self):
+        response = self.client.post(
+            reverse("camaras_ia:tipos_evento_ia_lista"),
+            {"nombre": "Sin casco", "descripcion": "Persona sin casco puesto", "severidad": "alta"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(TipoEventoIA.objects.count(), 1)
+        self.assertEqual(TipoEventoIA.objects.first().empresa, self.empresa)
+
+    def test_operador_puede_crear_tipo_evento_ia_pero_no_eliminarlo(self):
+        # Mismo criterio que InstruccionSeguridad: cualquier personal interno
+        # puede crear/editar contenido operativo, pero borrar (irreversible)
+        # requiere Administrador — ver EsAdministradorParaEliminar.
+        response = self.client.post(
+            reverse("camaras_ia:tipos_evento_ia_lista"),
+            {"nombre": "Sin casco", "descripcion": "x"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+        response = self.client.delete(
+            reverse("camaras_ia:tipos_evento_ia_detalle", args=[response.data["id"]]),
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_elimina_tipo_evento_ia(self):
+        tipo = TipoEventoIA.objects.create(empresa=self.empresa, nombre="Sin casco", descripcion="x")
+        response = self.client.delete(
+            reverse("camaras_ia:tipos_evento_ia_detalle", args=[tipo.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(TipoEventoIA.objects.count(), 0)

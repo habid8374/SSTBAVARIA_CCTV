@@ -75,6 +75,7 @@ export default function AlertasView({ token }: { token: string }) {
               <th className="px-4 py-3">Zona</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Alerta</th>
+              <th className="px-4 py-3">IA</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -111,6 +112,30 @@ export default function AlertasView({ token }: { token: string }) {
                   >
                     {evento.disparo_alerta ? "Alerta" : "Normal"}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {evento.tipos_ia.length > 0 ? (
+                    <div className="flex flex-wrap gap-1" title={evento.descripcion_ia}>
+                      {evento.tipos_ia.map((tipo) => (
+                        <span
+                          key={tipo.id}
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            tipo.severidad === "alta"
+                              ? "bg-red-100 text-red-700"
+                              : tipo.severidad === "media"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-zinc-100 text-zinc-600"
+                          }`}
+                        >
+                          {tipo.nombre}
+                        </span>
+                      ))}
+                    </div>
+                  ) : evento.ia_analizado_en ? (
+                    <span className="text-xs text-corp-muted">Nada detectado</span>
+                  ) : (
+                    <span className="text-xs text-corp-muted">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span

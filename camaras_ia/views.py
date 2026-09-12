@@ -18,13 +18,16 @@ from rest_framework.response import Response
 from core.models import Empresa
 from core.permissions import EsAdministrador, EsAdministradorOSoloLectura, EsAdministradorParaEliminar
 
+from .ia_deteccion import clasificar_evento
 from .models import (
     Camara,
+    ConfiguracionIA,
     ConfiguracionNotificaciones,
     EquipoLocal,
     EventoDetectado,
     InstruccionSeguridad,
     ReglaAlerta,
+    TipoEventoIA,
     ZonaRestringida,
 )
 from .serializers import (
@@ -32,6 +35,7 @@ from .serializers import (
     CamaraCalibracionSerializer,
     CamaraCrearSerializer,
     CamaraDashboardSerializer,
+    ConfiguracionIASerializer,
     ConfiguracionNotificacionesSerializer,
     EquipoLocalSerializer,
     EventoDashboardSerializer,
@@ -39,6 +43,7 @@ from .serializers import (
     InstruccionSeguridadSerializer,
     ReglaAlertaSerializer,
     SnapshotReferenciaSerializer,
+    TipoEventoIASerializer,
     ZonaDashboardSerializer,
 )
 from .services import disparar_alerta, evaluar_zona_horario
@@ -91,6 +96,8 @@ def recibir_evento_camara(request):
 
     if regla is not None:
         disparar_alerta(evento, regla)
+
+    clasificar_evento(evento)
 
     equipo.ultima_conexion = timezone.now()
     equipo.save(update_fields=["ultima_conexion"])
@@ -302,7 +309,11 @@ class EventoListaDashboard(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = EventoDetectado.objects.select_related("camara", "zona").order_by("-timestamp")
+        qs = (
+            EventoDetectado.objects.select_related("camara", "zona")
+            .prefetch_related("tipos_ia")
+            .order_by("-timestamp")
+        )
         estado = self.request.query_params.get("estado")
         if estado:
             qs = qs.filter(estado=estado)
@@ -321,7 +332,7 @@ class EventoListaDashboard(generics.ListAPIView):
 class EventoDetalleDashboard(generics.RetrieveUpdateAPIView):
     """Marcar un evento como revisado (o de vuelta a nuevo)."""
 
-    queryset = EventoDetectado.objects.select_related("camara", "zona")
+    queryset = EventoDetectado.objects.select_related("camara", "zona").prefetch_related("tipos_ia")
     serializer_class = EventoDashboardSerializer
     permission_classes = [IsAuthenticated]
 
@@ -482,6 +493,43 @@ class ConfiguracionNotificacionesDetalle(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return ConfiguracionNotificaciones.obtener()
+
+
+class ConfiguracionIADetalle(generics.RetrieveUpdateAPIView):
+    """Fila única — el administrador elige el proveedor (Claude o Gemini) y
+    digita su API key desde acá en vez de por variable de entorno."""
+
+    serializer_class = ConfiguracionIASerializer
+    permission_classes = [EsAdministradorOSoloLectura]
+
+    def get_object(self):
+        return ConfiguracionIA.obtener()
+
+
+class TipoEventoIAListaCrear(generics.ListCreateAPIView):
+    """Catálogo de eventos que la IA debe buscar en cada snapshot — el
+    administrador lo redacta en lenguaje natural (ej. "Persona sin casco
+    puesto"), sin tocar código (ver camaras_ia/ia_deteccion.py)."""
+
+    serializer_class = TipoEventoIASerializer
+    permission_classes = [EsAdministradorParaEliminar]
+
+    def get_queryset(self):
+        return TipoEventoIA.objects.filter(empresa=Empresa.objects.first())
+
+    def perform_create(self, serializer):
+        empresa = Empresa.objects.first()
+        if empresa is None:
+            empresa = Empresa.objects.create(nombre="Empresa")
+        serializer.save(empresa=empresa)
+
+
+class TipoEventoIADetalle(generics.RetrieveUpdateDestroyAPIView):
+    """Editar o eliminar un tipo de evento del catálogo (solo Administrador)."""
+
+    queryset = TipoEventoIA.objects.all()
+    serializer_class = TipoEventoIASerializer
+    permission_classes = [EsAdministradorParaEliminar]
 
 
 class EquipoLocalListaCrear(generics.ListCreateAPIView):

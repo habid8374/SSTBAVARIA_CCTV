@@ -2,11 +2,13 @@ from django.contrib import admin
 
 from .models import (
     Camara,
+    ConfiguracionIA,
     ConfiguracionNotificaciones,
     EquipoLocal,
     EventoDetectado,
     InstruccionSeguridad,
     ReglaAlerta,
+    TipoEventoIA,
     ZonaRestringida,
 )
 
@@ -68,10 +70,23 @@ class ReglaAlertaAdmin(admin.ModelAdmin):
 
 @admin.register(EventoDetectado)
 class EventoDetectadoAdmin(admin.ModelAdmin):
-    list_display = ("camara", "zona", "timestamp", "disparo_alerta", "estado")
+    list_display = ("camara", "zona", "timestamp", "disparo_alerta", "estado", "ia_analizado_en")
     list_filter = ("estado", "disparo_alerta", "camara")
     date_hierarchy = "timestamp"
-    readonly_fields = ("timestamp",)
+    readonly_fields = ("timestamp", "ia_analizado_en")
+    filter_horizontal = ("tipos_ia",)
+
+
+@admin.register(ConfiguracionIA)
+class ConfiguracionIAAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "modelo", "actualizada_en")
+
+
+@admin.register(TipoEventoIA)
+class TipoEventoIAAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "empresa", "severidad", "activo", "creado_en")
+    list_filter = ("empresa", "severidad", "activo")
+    search_fields = ("nombre", "descripcion")
 
 
 @admin.register(InstruccionSeguridad)

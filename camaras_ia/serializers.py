@@ -9,11 +9,13 @@ from core.validators import validar_tamano_archivo
 
 from .models import (
     Camara,
+    ConfiguracionIA,
     ConfiguracionNotificaciones,
     EquipoLocal,
     EventoDetectado,
     InstruccionSeguridad,
     ReglaAlerta,
+    TipoEventoIA,
     ZonaRestringida,
 )
 
@@ -186,6 +188,7 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
 
     camara_nombre = serializers.CharField(source="camara.nombre", read_only=True)
     zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
+    tipos_ia = serializers.SerializerMethodField()
 
     class Meta:
         model = EventoDetectado
@@ -204,6 +207,10 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
             "notificacion_enviada",
             "notificacion_detalle",
             "estado",
+            "tipos_ia",
+            "descripcion_ia",
+            "ia_analizado_en",
+            "ia_error",
         ]
         read_only_fields = [
             "id",
@@ -219,6 +226,16 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
             "canal_notificacion",
             "notificacion_enviada",
             "notificacion_detalle",
+            "tipos_ia",
+            "descripcion_ia",
+            "ia_analizado_en",
+            "ia_error",
+        ]
+
+    def get_tipos_ia(self, evento):
+        return [
+            {"id": t.id, "nombre": t.nombre, "severidad": t.severidad}
+            for t in evento.tipos_ia.all()
         ]
 
 
@@ -312,6 +329,34 @@ class ConfiguracionNotificacionesSerializer(serializers.ModelSerializer):
 
     def get_brevo_api_key_configurada(self, obj):
         return bool(obj.brevo_api_key or settings.BREVO_API_KEY)
+
+
+class ConfiguracionIASerializer(serializers.ModelSerializer):
+    """La API key nunca se devuelve en la respuesta (write-only) — solo se
+    informa si hay una configurada (en la BD o por variable de entorno),
+    igual que ConfiguracionNotificacionesSerializer con Brevo."""
+
+    api_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    api_key_configurada = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConfiguracionIA
+        fields = ["proveedor", "api_key", "api_key_configurada", "modelo", "actualizada_en"]
+        read_only_fields = ["actualizada_en"]
+
+    def get_api_key_configurada(self, obj):
+        from .ia_deteccion import _api_key_por_defecto
+
+        return bool(obj.api_key or _api_key_por_defecto(obj.proveedor))
+
+
+class TipoEventoIASerializer(serializers.ModelSerializer):
+    """CRUD del catálogo de eventos que la IA busca en cada snapshot."""
+
+    class Meta:
+        model = TipoEventoIA
+        fields = ["id", "nombre", "descripcion", "severidad", "activo", "creado_en"]
+        read_only_fields = ["id", "creado_en"]
 
 
 class EquipoLocalSerializer(serializers.ModelSerializer):

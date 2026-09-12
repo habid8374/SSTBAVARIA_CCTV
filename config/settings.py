@@ -196,6 +196,16 @@ BREVO_REMITENTE_EMAIL = os.environ.get("BREVO_REMITENTE_EMAIL", "alertas@sst-cct
 BREVO_REMITENTE_NOMBRE = os.environ.get("BREVO_REMITENTE_NOMBRE", "SST Bavaria — Cámaras IA")
 
 
+# Clasificación de eventos de cámaras con un modelo de visión (Claude o
+# Gemini, según ConfiguracionIA) — ver camaras_ia/ia_deteccion.py. El
+# administrador puede digitar la API key desde el dashboard (Sistema →
+# Inteligencia Artificial) en vez de por variable de entorno; estas son solo
+# el fallback. Sin ninguna de las dos, la clasificación por IA no corre —
+# opcional, nunca rompe recibir_evento_camara.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+
 # Notificaciones push al navegador/celular (Web Push + VAPID) — ver
 # core/push.py. Sin las 3 variables configuradas, el envío simplemente no
 # hace nada (igual que Brevo sin API key): nunca rompe el flujo que la

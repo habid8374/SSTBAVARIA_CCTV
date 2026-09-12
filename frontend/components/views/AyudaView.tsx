@@ -47,7 +47,8 @@ const TEMAS: Tema[] = [
             rol de la Declaración de Método.</li>
           <li><strong>Indicadores</strong> (personal interno): panel comparativo entre todas las empresas
             contratistas.</li>
-          <li><strong>Sistema</strong> (solo Administrador): credenciales de Brevo y equipos locales.</li>
+          <li><strong>Sistema</strong> (solo Administrador): credenciales de Brevo, Inteligencia Artificial y
+            equipos locales.</li>
           <li><strong>Usuarios</strong> (solo Administrador): quién tiene acceso y con qué rol.</li>
           <li><strong>Ayuda</strong>: esta sección.</li>
         </Ul>
@@ -690,12 +691,36 @@ const TEMAS: Tema[] = [
     soloAdmin: true,
     contenido: (
       <>
-        <P>Solo Administrador. Cuatro pestañas:</P>
+        <P>Solo Administrador. Cinco pestañas:</P>
         <Sub>Brevo (correo)</Sub>
         <P>
           Acá se digita la API key de Brevo (el proveedor que envía los correos de alerta) y el remitente —
           sin necesidad de tocar nada en Railway. La API key nunca se vuelve a mostrar una vez guardada (por
           seguridad); el badge indica si hay una configurada o no.
+        </P>
+        <Sub>Inteligencia Artificial</Sub>
+        <P>
+          Cada vez que el equipo local reporta una persona en una zona restringida (ver &quot;Alertas
+          automáticas&quot; más abajo), el snapshot de ese momento se le manda a un modelo de visión — Claude
+          (Anthropic) o Gemini (Google), a elegir — para que revise si aparece alguno de los eventos del{" "}
+          <strong>catálogo</strong> de más abajo en esa misma pestaña. Es completamente opcional: sin una API
+          key configurada (acá o por variable de entorno del servidor), el sistema sigue funcionando exacto
+          igual que siempre, solo sin esa capa extra de análisis.
+        </P>
+        <P>
+          El <strong>catálogo de eventos</strong> es lo que hace útil la clasificación — cada fila es una
+          instrucción en lenguaje natural que se le pasa a la IA junto con la foto (ej. &quot;Persona sin
+          casco de seguridad puesto en la cabeza&quot;, &quot;Persona en el suelo, postura de caída&quot;,
+          &quot;Humo o llamas visibles en la imagen&quot;). Entre más detallada la descripción, mejor
+          detecta. Cada evento tiene una <strong>severidad</strong> (baja/media/alta) que se ve como color del
+          badge en la bandeja de Alertas. Se puede desactivar un evento sin borrarlo (para dejar de buscarlo
+          temporalmente) con el botón &quot;Desactivar&quot;.
+        </P>
+        <P>
+          Lo que la IA encuentra queda guardado en el evento y se ve como badges de colores en la columna{" "}
+          <strong>&quot;IA&quot;</strong> de la bandeja de Alertas — pasar el mouse por encima muestra la
+          descripción completa que devolvió el modelo. Si la clasificación falla (API caída, sin créditos,
+          etc.) el evento sigue su curso normal igual — nunca bloquea ni retrasa una alerta real.
         </P>
         <Sub>Equipo local</Sub>
         <P>

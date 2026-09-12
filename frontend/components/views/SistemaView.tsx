@@ -5,20 +5,31 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
+  actualizarConfiguracionIA,
   actualizarConfiguracionNotificaciones,
   actualizarEquipoLocal,
+  actualizarTipoEventoIA,
   crearEquipoLocal,
+  crearTipoEventoIA,
   descargarEquipoLocalZip,
   eliminarEquipoLocal,
+  eliminarTipoEventoIA,
   listarEquiposLocales,
+  listarTiposEventoIA,
+  obtenerConfiguracionIA,
   obtenerConfiguracionNotificaciones,
+  type ConfiguracionIA,
   type ConfiguracionNotificaciones,
   type EquipoLocal,
+  type NuevoTipoEventoIA,
+  type ProveedorIA,
+  type Severidad,
+  type TipoEventoIA,
 } from "@/lib/api";
 import AuditoriaView from "./AuditoriaView";
 import ReglasContratistasView from "./ReglasContratistasView";
 
-type Pestana = "brevo" | "equipo-local" | "reglas" | "auditoria";
+type Pestana = "brevo" | "ia" | "equipo-local" | "reglas" | "auditoria";
 
 export default function SistemaView({ token, esSuperusuario }: { token: string; esSuperusuario: boolean }) {
   const [pestana, setPestana] = useState<Pestana>("brevo");
@@ -28,6 +39,9 @@ export default function SistemaView({ token, esSuperusuario }: { token: string; 
       <div className="mb-6 flex gap-1 border-b border-corp-border">
         <BotonPestana activa={pestana === "brevo"} onClick={() => setPestana("brevo")}>
           Brevo (correo)
+        </BotonPestana>
+        <BotonPestana activa={pestana === "ia"} onClick={() => setPestana("ia")}>
+          Inteligencia Artificial
         </BotonPestana>
         <BotonPestana activa={pestana === "equipo-local"} onClick={() => setPestana("equipo-local")}>
           Equipo local
@@ -43,6 +57,7 @@ export default function SistemaView({ token, esSuperusuario }: { token: string; 
       </div>
 
       {pestana === "brevo" && <ConfiguracionBrevo token={token} />}
+      {pestana === "ia" && <ConfiguracionInteligenciaArtificial token={token} />}
       {pestana === "equipo-local" && <EquiposLocales token={token} />}
       {pestana === "reglas" && <ReglasContratistasView token={token} />}
       {pestana === "auditoria" && esSuperusuario && <AuditoriaView token={token} />}
@@ -185,6 +200,362 @@ function ConfiguracionBrevo({ token }: { token: string }) {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
+  const [config, setConfig] = useState<ConfiguracionIA | null>(null);
+  const [proveedor, setProveedor] = useState<ProveedorIA>("claude");
+  const [apiKey, setApiKey] = useState("");
+  const [modelo, setModelo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [exito, setExito] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  function cargar() {
+    obtenerConfiguracionIA(token)
+      .then((data) => {
+        setConfig(data);
+        setProveedor(data.proveedor);
+        setModelo(data.modelo);
+      })
+      .catch(() => setError("No se pudo cargar la configuración de IA."));
+  }
+
+  useEffect(cargar, [token]);
+
+  async function guardar(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setExito(null);
+    setGuardando(true);
+    try {
+      const cambios: Parameters<typeof actualizarConfiguracionIA>[1] = { proveedor, modelo };
+      if (apiKey.trim()) {
+        cambios.api_key = apiKey.trim();
+      }
+      const actualizado = await actualizarConfiguracionIA(token, cambios);
+      setConfig(actualizado);
+      setApiKey("");
+      setExito("Configuración guardada.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar la configuración.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-corp-muted">
+          Cuando el equipo local reporta una persona en una zona restringida, el snapshot se le manda a un
+          modelo de visión (Claude o Gemini) para que revise si aparece alguno de los eventos del catálogo de
+          abajo (EPP faltante, caídas, comportamiento riesgoso, etc.) — es opcional: sin API key configurada,
+          el sistema sigue funcionando igual, solo sin esa clasificación extra.
+        </p>
+        {config && (
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+              config.api_key_configurada ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+            }`}
+          >
+            {config.api_key_configurada ? "API key configurada" : "Sin API key configurada"}
+          </span>
+        )}
+      </div>
+
+      <form onSubmit={guardar} className="mt-6 max-w-md space-y-4 rounded-xl border border-corp-border bg-white p-5">
+        <Campo label="Proveedor">
+          <select
+            value={proveedor}
+            onChange={(event) => setProveedor(event.target.value as ProveedorIA)}
+            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          >
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="gemini">Gemini (Google)</option>
+          </select>
+        </Campo>
+        <Campo label="API key">
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder={config?.api_key_configurada ? "•••••••• (sin cambios)" : "sk-ant-… o AIza…"}
+            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          />
+          <p className="text-xs text-corp-muted">Déjalo en blanco para no cambiarla.</p>
+        </Campo>
+        <Campo label="Modelo (opcional)">
+          <input
+            value={modelo}
+            onChange={(event) => setModelo(event.target.value)}
+            placeholder={proveedor === "claude" ? "claude-opus-5" : "gemini-flash-latest"}
+            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          />
+          <p className="text-xs text-corp-muted">Déjalo vacío para usar el valor por defecto.</p>
+        </Campo>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+        )}
+        {exito && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+            {exito}
+          </div>
+        )}
+
+        <div className="flex justify-end pt-1">
+          <button
+            type="submit"
+            disabled={guardando}
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+          >
+            {guardando ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+      </form>
+
+      <div className="mt-8">
+        <h3 className="text-sm font-semibold text-corp-navy">Catálogo de eventos a detectar</h3>
+        <p className="mt-1 text-sm text-corp-muted">
+          Cada fila es una instrucción en lenguaje natural — entre más detallada, mejor detecta la IA. Ej.
+          &quot;Persona sin casco de seguridad puesto en la cabeza&quot;.
+        </p>
+        <CatalogoEventosIA token={token} />
+      </div>
+    </div>
+  );
+}
+
+function CatalogoEventosIA({ token }: { token: string }) {
+  const [tipos, setTipos] = useState<TipoEventoIA[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const { confirmar } = useDialog();
+
+  function cargar() {
+    listarTiposEventoIA(token)
+      .then(setTipos)
+      .catch(() => setError("No se pudo cargar el catálogo de eventos."));
+  }
+
+  useEffect(cargar, [token]);
+
+  async function alternarActivo(tipo: TipoEventoIA) {
+    try {
+      await actualizarTipoEventoIA(token, tipo.id, { activo: !tipo.activo });
+      cargar();
+    } catch {
+      setError("No se pudo actualizar el evento.");
+    }
+  }
+
+  async function eliminar(tipo: TipoEventoIA) {
+    const ok = await confirmar({
+      titulo: "Eliminar tipo de evento",
+      mensaje: `¿Eliminar "${tipo.nombre}"? La IA dejará de buscarlo en los snapshots.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminarTipoEventoIA(token, tipo.id);
+      cargar();
+    } catch {
+      setError("No se pudo eliminar el evento.");
+    }
+  }
+
+  const colorSeveridad: Record<Severidad, string> = {
+    alta: "bg-red-100 text-red-700",
+    media: "bg-amber-100 text-amber-700",
+    baja: "bg-zinc-100 text-zinc-600",
+  };
+
+  return (
+    <div>
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setMostrarFormulario(true)}
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+        >
+          + Nuevo evento
+        </button>
+      </div>
+
+      {error && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-4 overflow-x-auto rounded-xl border border-corp-border bg-white">
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <thead className="border-b border-corp-border bg-corp-blue-light text-xs uppercase text-corp-muted">
+            <tr>
+              <th className="px-4 py-3">Nombre</th>
+              <th className="px-4 py-3">Descripción</th>
+              <th className="px-4 py-3">Severidad</th>
+              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tipos?.map((tipo) => (
+              <tr key={tipo.id} className="border-b border-corp-border last:border-0">
+                <td className="px-4 py-3 font-medium text-corp-navy">{tipo.nombre}</td>
+                <td className="max-w-xs px-4 py-3 text-corp-muted">{tipo.descripcion}</td>
+                <td className="px-4 py-3">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colorSeveridad[tipo.severidad]}`}>
+                    {tipo.severidad}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      tipo.activo ? "bg-green-100 text-green-700" : "bg-zinc-100 text-zinc-500"
+                    }`}
+                  >
+                    {tipo.activo ? "Activo" : "Inactivo"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => alternarActivo(tipo)}
+                      className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy hover:border-corp-blue"
+                    >
+                      {tipo.activo ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => eliminar(tipo)}
+                      className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {tipos?.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-corp-muted">
+            Todavía no hay eventos configurados en el catálogo.
+          </p>
+        )}
+      </div>
+
+      {mostrarFormulario && (
+        <FormularioNuevoTipoEvento
+          token={token}
+          onCerrar={() => setMostrarFormulario(false)}
+          onCreado={() => {
+            setMostrarFormulario(false);
+            cargar();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FormularioNuevoTipoEvento({
+  token,
+  onCerrar,
+  onCreado,
+}: {
+  token: string;
+  onCerrar: () => void;
+  onCreado: () => void;
+}) {
+  const [datos, setDatos] = useState<NuevoTipoEventoIA>({ nombre: "", descripcion: "", severidad: "media" });
+  const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setEnviando(true);
+    try {
+      await crearTipoEventoIA(token, datos);
+      onCreado();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo crear el evento.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 className="text-lg font-semibold text-corp-navy">Nuevo evento a detectar</h2>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <Campo label="Nombre">
+            <input
+              required
+              autoFocus
+              value={datos.nombre}
+              onChange={(event) => setDatos({ ...datos, nombre: event.target.value })}
+              placeholder="Sin casco"
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+          <Campo label="Descripción (qué debe buscar la IA)">
+            <textarea
+              required
+              rows={3}
+              value={datos.descripcion}
+              onChange={(event) => setDatos({ ...datos, descripcion: event.target.value })}
+              placeholder="Persona sin casco de seguridad puesto en la cabeza"
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+          <Campo label="Severidad">
+            <select
+              value={datos.severidad}
+              onChange={(event) => setDatos({ ...datos, severidad: event.target.value as Severidad })}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            >
+              <option value="baja">Baja</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+            </select>
+          </Campo>
+
+          {error && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-corp-muted hover:bg-zinc-100"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={enviando}
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+            >
+              {enviando ? "Creando…" : "Crear evento"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

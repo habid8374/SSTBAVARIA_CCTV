@@ -126,6 +126,74 @@ class ConfiguracionNotificaciones(models.Model):
         return objeto
 
 
+class ConfiguracionIA(models.Model):
+    """Fila única (singleton) con el proveedor y la API key del modelo de
+    visión que clasifica eventos de cámaras (EPP faltante, caídas,
+    comportamiento riesgoso, etc. — ver TipoEventoIA) — editable desde el
+    dashboard (Sistema → Inteligencia Artificial), igual que
+    ConfiguracionNotificaciones con Brevo. Si queda sin api_key (ni en esta
+    fila ni por variable de entorno), la clasificación por IA simplemente no
+    corre — es opcional, nunca rompe recibir_evento_camara (ver
+    camaras_ia/ia_deteccion.py)."""
+
+    class Proveedor(models.TextChoices):
+        CLAUDE = "claude", "Claude (Anthropic)"
+        GEMINI = "gemini", "Gemini (Google)"
+
+    proveedor = models.CharField(max_length=20, choices=Proveedor.choices, default=Proveedor.CLAUDE)
+    api_key = models.CharField("API key", max_length=255, blank=True)
+    modelo = models.CharField(
+        "modelo",
+        max_length=100,
+        blank=True,
+        help_text="ID del modelo a usar, ej. claude-opus-5 o gemini-flash-latest. "
+        "Vacío = valor por defecto según el proveedor (ver ia_deteccion.MODELOS_POR_DEFECTO).",
+    )
+    actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
+
+    class Meta:
+        verbose_name = "configuración de IA"
+        verbose_name_plural = "configuración de IA"
+
+    def __str__(self):
+        return f"Configuración de IA ({self.get_proveedor_display()})"
+
+    @classmethod
+    def obtener(cls):
+        objeto, _ = cls.objects.get_or_create(pk=1)
+        return objeto
+
+
+class TipoEventoIA(models.Model):
+    """Catálogo de eventos que la IA debe buscar en cada snapshot — lo
+    administra el cliente desde el dashboard (Sistema → Eventos IA), sin
+    tocar código: cada fila es una instrucción en lenguaje natural (ej.
+    "Persona sin casco puesto", "Humo o llamas visibles") que se le pasa al
+    modelo de visión junto con la foto del evento."""
+
+    class Severidad(models.TextChoices):
+        BAJA = "baja", "Baja"
+        MEDIA = "media", "Media"
+        ALTA = "alta", "Alta"
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="tipos_evento_ia")
+    nombre = models.CharField(max_length=150)
+    descripcion = models.TextField(
+        help_text="Qué debe buscar la IA en la imagen — en lenguaje natural, con el mayor detalle posible."
+    )
+    severidad = models.CharField(max_length=10, choices=Severidad.choices, default=Severidad.MEDIA)
+    activo = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "tipo de evento IA"
+        verbose_name_plural = "tipos de evento IA"
+        ordering = ["empresa", "nombre"]
+
+    def __str__(self):
+        return f"{self.nombre} — {self.empresa.nombre}"
+
+
 class EquipoLocal(models.Model):
     """Mini-PC/equipo en sitio que reporta eventos. Se autentica con API key propia."""
 
@@ -324,6 +392,19 @@ class EventoDetectado(models.Model):
     )
     notificacion_detalle = models.CharField(
         "detalle de la notificación", max_length=255, blank=True
+    )
+    tipos_ia = models.ManyToManyField(
+        TipoEventoIA,
+        blank=True,
+        related_name="eventos",
+        verbose_name="eventos detectados por IA",
+        help_text="Cuáles del catálogo de TipoEventoIA identificó la IA en este snapshot.",
+    )
+    descripcion_ia = models.TextField("descripción de la IA", blank=True)
+    ia_analizado_en = models.DateTimeField("analizado por IA en", null=True, blank=True)
+    ia_error = models.CharField(
+        "error de análisis IA", max_length=255, blank=True,
+        help_text="Si la clasificación falló (API caída, sin créditos, etc.) — el evento sigue su curso normal igual.",
     )
 
     class Meta:

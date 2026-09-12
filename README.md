@@ -545,6 +545,7 @@ creado ahí.
    | `BREVO_REMITENTE_NOMBRE` | nombre que aparece como remitente, ej. `SST Bavaria — Cámaras IA` — también configurable desde el dashboard |
    | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL` | Cloudflare R2 para que los archivos subidos (`media/`) sobrevivan a los despliegues — ver la sección "Almacenamiento de archivos (`media/`) en Cloudflare R2" más abajo. Sin estas 4 variables, cae a disco local (se pierde en cada deploy) |
    | `SENTRY_DSN` | opcional — monitoreo de errores con [Sentry](https://sentry.io). DSN del proyecto (Settings → Projects → tu proyecto → Client Keys (DSN)). Sin esta variable, Sentry simplemente no se activa |
+   | `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` | opcional — clasificación de eventos de cámaras con IA (ver "Clasificación de eventos con IA" más abajo). También configurable desde el dashboard (Sistema → Inteligencia Artificial), que tiene prioridad sobre estas variables |
 
 4. Railway detecta `railway.json` (build con Nixpacks) y corre
    automáticamente `migrate`, `collectstatic` y levanta `gunicorn` según el
@@ -838,6 +839,42 @@ queda como servidor web escuchando):
 5. Deploy. Railway va a correr el comando todos los días a esa hora — se
    puede probar de inmediato con el botón "Trigger" del servicio en vez
    de esperar al horario programado.
+
+### Clasificación de eventos de cámaras con IA
+
+Además de la regla de zona+horario (¿hay alguien parado en un sitio
+restringido en un horario prohibido?), el sistema puede analizar el snapshot
+del evento con un modelo de visión (Claude o Gemini) para identificar *qué*
+está pasando — EPP faltante, una caída, humo/incendio, o cualquier otro
+evento que el cliente defina. Es opcional y aditivo: nunca reemplaza la
+regla de zona/horario, solo la enriquece.
+
+- **Dónde corre**: en el backend (`camaras_ia/ia_deteccion.py`), justo
+  después de crear el `EventoDetectado` en `recibir_evento_camara`. La API
+  key nunca sale del servidor — el equipo local no necesita saber nada de
+  esto.
+- **Configuración** (dashboard, Sistema → Inteligencia Artificial):
+  proveedor (`Claude` o `Gemini`), API key, y opcionalmente el modelo
+  exacto (por defecto `claude-opus-5` o `gemini-flash-latest`). Sin API key
+  configurada (ni acá ni en `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`), la
+  clasificación simplemente no corre — el resto del sistema sigue igual.
+- **Catálogo de eventos** (`TipoEventoIA`, misma pestaña): cada fila es una
+  descripción en lenguaje natural de qué debe buscar la IA en la imagen —
+  el cliente lo edita libremente desde el dashboard, sin tocar código. Sin
+  ningún evento en el catálogo, tampoco corre la clasificación (no hay qué
+  buscar).
+- **Resultado**: se guarda en el propio evento (`tipos_ia`, `descripcion_ia`)
+  y se ve como badges de color (por severidad) en la columna "IA" de la
+  bandeja de Alertas.
+- **Alcance actual**: solo analiza el snapshot de eventos que ya dispara el
+  flujo existente (persona detectada en una zona restringida configurada).
+  No hace muestreo continuo de video para eventos independientes de una
+  zona (ej. un incendio en un punto sin zona dibujada) — eso requeriría un
+  disparador nuevo en `equipo_local` y tiene implicaciones de costo por el
+  volumen de llamadas, así que quedó fuera de este alcance a propósito.
+- Si falla (red, créditos agotados, respuesta inesperada), queda registrado
+  en `evento.ia_error` y el evento sigue su curso normal — nunca bloquea ni
+  retrasa una alerta real de zona/horario.
 
 ### Notificaciones push (Web Push) al celular
 
