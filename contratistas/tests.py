@@ -1541,6 +1541,105 @@ class AlertasAutomaticasTests(ApiTestsBase):
         alertas = generar_alertas(declaracion)
         self.assertNotIn("texto_sugiere_altura_sin_permiso", [a["codigo"] for a in alertas])
 
+    def test_texto_sugiere_electrico_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, secuencia="Desenergizar tablero", descripcion_riesgo="Electrocucion"
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_electrico_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_electrico_no_genera_alerta_con_permiso_marcado(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            descripcion_riesgo="Electrocucion",
+            permisos_requeridos=["Certificado de apoyo en trabajo eléctrico"],
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("texto_sugiere_electrico_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_espacio_confinado_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, descripcion_riesgo="Ingreso a espacio confinado del tanque"
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_espacio_confinado_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_sustancias_peligrosas_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, descripcion_riesgo="Riesgo de derrame de sustancia peligrosa"
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_sustancias_peligrosas_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_loto_bloqueo_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, tecnicas_herramientas="Se realiza bloqueo y etiquetado de la máquina"
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_loto_bloqueo_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_loto_bloqueo_no_genera_alerta_con_permiso_marcado(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            tecnicas_herramientas="Se realiza bloqueo y etiquetado de la máquina",
+            permisos_requeridos=["Certificado de apoyo LOTO / bloqueo y etiquetado de energías"],
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("texto_sugiere_loto_bloqueo_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_trabajo_caliente_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(declaracion=declaracion, orden=0, tecnicas_herramientas="Soldadura del marco")
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_trabajo_caliente_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_izaje_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            tecnicas_herramientas="Se usa el izador de motores y el montacargas para el retiro",
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_izaje_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_izaje_no_genera_alerta_con_permiso_marcado(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            tecnicas_herramientas="Se usa el izador de motores y el montacargas para el retiro",
+            permisos_requeridos=["Izaje (grúa, tecle, polipasto, montacargas, poleas)"],
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("texto_sugiere_izaje_sin_permiso", [a["codigo"] for a in alertas])
+
     def test_no_repite_la_misma_alerta_para_filas_de_riesgo_de_una_misma_tarea(self):
         """El Excel real del cliente trae varias filas de riesgo (matriz
         Kinney) bajo una misma 'Secuencia de Actividades' — el importador

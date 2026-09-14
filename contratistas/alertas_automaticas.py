@@ -7,7 +7,10 @@ estado de la declaración, no bloquea aprobar/rechazar, y el texto sugerido
 es solo un punto de partida que el revisor edita o descarta libremente.
 
 Las reglas están basadas en los SOP "Safety to Sustain" (trabajos en
-altura, excavaciones, sistemas anticaída) que compartió el cliente.
+altura, excavaciones, sistemas anticaída) que compartió el cliente, más las
+categorías de peligro del Anexo A de la GTC 45 (guía técnica colombiana de
+identificación de peligros y valoración de riesgos) — ver
+CATEGORIAS_PELIGRO_TEXTO más abajo para el detalle de cada una.
 
 Fase A usa solo datos que el formulario ya capturaba (permisos, EPP,
 riesgo, firmas, tarea SIF). Fase B suma los umbrales numéricos exactos de
@@ -17,6 +20,7 @@ alertas cuando el contratista los diligencia; si quedan vacíos, esas
 reglas simplemente no aplican (no se asume nada en su ausencia)."""
 
 import re
+import unicodedata
 
 from .models import nivel_riesgo
 
@@ -44,10 +48,108 @@ _PATRON_ALTURA_CON_CONTEXTO = re.compile(
 )
 
 
-def _texto_sugiere_trabajo_en_altura(texto):
-    if any(palabra in texto for palabra in PALABRAS_CLAVE_ALTURA):
+def _sin_acentos(texto):
+    """minúsculas sin acentos — para que las palabras clave de abajo no
+    necesiten repetirse con y sin tilde (ej. "electrocucion" atrapa tanto
+    "electrocución" como "electrocucion")."""
+    texto = unicodedata.normalize("NFKD", texto)
+    return "".join(c for c in texto if not unicodedata.combining(c))
+
+
+# Catálogo de categorías de peligro que se detectan por texto libre contra
+# el catálogo de permisos ZBS — basado en las categorías de peligro del
+# Anexo A de la GTC 45 (guía técnica colombiana de identificación de
+# peligros y valoración de riesgos) que el cliente pidió cruzar contra las
+# declaraciones. Cada entrada funciona igual que la heurística de "trabajo
+# en altura" ya existente: si el texto de la actividad menciona palabras de
+# esa categoría pero el permiso correspondiente no está marcado, se sugiere
+# revisar — nunca decide por sí sola (ver docstring del módulo).
+CATEGORIAS_PELIGRO_TEXTO = [
+    {
+        "codigo": "altura",
+        "descripcion_corta": "trabajo en altura",
+        "permiso": PERMISO_ALTURA,
+        "palabras_clave": PALABRAS_CLAVE_ALTURA,
+        "patron_contexto": _PATRON_ALTURA_CON_CONTEXTO,
+        "fuente": "SOP.MAZ.SAFE.1.9 Trabajos en Alturas — heurística de texto, confirmar manualmente",
+    },
+    {
+        "codigo": "electrico",
+        "descripcion_corta": "riesgo eléctrico",
+        "permiso": "Certificado de apoyo en trabajo eléctrico",
+        "palabras_clave": [
+            "electrocucion", "choque electrico", "contacto electrico", "riesgo electrico",
+            "sistema electrico vivo", "subestacion electrica", "alta tension", "energia electrica",
+        ],
+        "fuente": "GTC 45 — Anexo A, peligro físico: Eléctrico (alta y baja tensión, estática)",
+    },
+    {
+        "codigo": "espacio_confinado",
+        "descripcion_corta": "trabajo en espacio confinado",
+        "permiso": "Certificado de apoyo en espacios confinados",
+        "palabras_clave": ["espacio confinado", "espacios confinados"],
+        "fuente": "GTC 45 — Anexo A, condiciones de seguridad: Espacios confinados",
+    },
+    {
+        "codigo": "sustancias_peligrosas",
+        "descripcion_corta": "manejo de sustancias peligrosas",
+        "permiso": "Certificado de apoyo en manejo de sustancias peligrosas",
+        "palabras_clave": [
+            "sustancia peligrosa", "sustancias peligrosas", "material peligroso", "materiales peligrosos",
+            "derrame de sustancia", "derrame de quimico", "producto quimico peligroso",
+        ],
+        "fuente": "GTC 45 — Anexo A, peligro químico",
+    },
+    {
+        "codigo": "loto_bloqueo",
+        "descripcion_corta": "bloqueo y etiquetado de energías",
+        "permiso": "Certificado de apoyo LOTO / bloqueo y etiquetado de energías",
+        "palabras_clave": [
+            "bloqueo y etiquetado", "bloqueo de energia", "bloqueo de energias",
+            "candado y tarjeta", "desenergizar", "energia residual",
+        ],
+        "fuente": "GTC 45 — Anexo A, condiciones de seguridad: bloqueo de energías (LOTO)",
+    },
+    {
+        "codigo": "trabajo_caliente",
+        "descripcion_corta": "trabajo en caliente",
+        "permiso": "Trabajos en Caliente",
+        "palabras_clave": [
+            "soldadura", "esmerilado", "oxicorte", "corte con llama", "trabajo en caliente", "trabajos en caliente",
+        ],
+        "fuente": "GTC 45 — Anexo A, peligro físico/tecnológico: trabajos en caliente",
+    },
+    {
+        "codigo": "izaje",
+        "descripcion_corta": "izaje de cargas",
+        "permiso": "Izaje (grúa, tecle, polipasto, montacargas, poleas)",
+        "palabras_clave": [
+            "izaje", "grua", "tecle", "polipasto", "montacargas", "elevador de motores", "izador de motores",
+        ],
+        "fuente": "GTC 45 — Anexo A, condiciones de seguridad: mecánico (izaje de cargas)",
+    },
+]
+
+
+def _texto_sugiere_categoria(texto, categoria):
+    if any(palabra in texto for palabra in categoria["palabras_clave"]):
         return True
-    return bool(_PATRON_ALTURA_CON_CONTEXTO.search(texto))
+    patron = categoria.get("patron_contexto")
+    return bool(patron and patron.search(texto))
+
+
+def _alerta_categoria_texto(actividad, etiqueta, categoria):
+    descripcion = categoria["descripcion_corta"]
+    return _alerta(
+        f"texto_sugiere_{categoria['codigo']}_sin_permiso",
+        actividad,
+        f"El texto sugiere {descripcion} sin el permiso marcado",
+        f"La actividad «{etiqueta}» menciona palabras relacionadas con {descripcion}, pero no "
+        f'tiene marcado el permiso "{categoria["permiso"]}".',
+        f"Verificar si la actividad realmente implica {descripcion} y, de ser así, marcar el "
+        "permiso correspondiente.",
+        categoria["fuente"],
+    )
 
 
 def _alerta(codigo, actividad, titulo, mensaje, motivo_sugerido, fuente):
@@ -139,22 +241,17 @@ def generar_alertas(declaracion):
                 )
             )
 
-        texto = " ".join(
-            [actividad.secuencia or "", actividad.tecnicas_herramientas or "", actividad.descripcion_riesgo or ""]
-        ).lower()
-        if PERMISO_ALTURA not in permisos and _texto_sugiere_trabajo_en_altura(texto):
-            alertas.append(
-                _alerta(
-                    "texto_sugiere_altura_sin_permiso",
-                    actividad,
-                    "El texto sugiere trabajo en altura sin el permiso marcado",
-                    f"La actividad «{etiqueta}» menciona palabras relacionadas con trabajo "
-                    f'en altura, pero no tiene marcado el permiso "{PERMISO_ALTURA}".',
-                    "Verificar si la actividad realmente implica trabajo en altura y, de "
-                    "ser así, marcar el permiso correspondiente.",
-                    "Heurística de texto — confirmar manualmente antes de usar como motivo de rechazo",
-                )
-            )
+        texto = _sin_acentos(
+            " ".join(
+                [actividad.secuencia or "", actividad.tecnicas_herramientas or "", actividad.descripcion_riesgo or ""]
+            ).lower()
+        )
+        for categoria in CATEGORIAS_PELIGRO_TEXTO:
+            if categoria["permiso"] in permisos:
+                continue
+            if not _texto_sugiere_categoria(texto, categoria):
+                continue
+            alertas.append(_alerta_categoria_texto(actividad, etiqueta, categoria))
 
         if altura is not None and altura > 1.8 and PERMISO_ALTURA not in permisos:
             alertas.append(

@@ -115,14 +115,20 @@ frontend en Vercel — pero viven en el mismo repositorio.
     excavaciones, sistemas anticaída) genera advertencias.
     **Fase A**, sobre datos que el formulario ya captura — permiso de
     altura sin EPP contra caídas, excavación sin medidas de mitigación
-    detalladas, riesgo que sigue alto tras mitigar, tarea SIF sin firma de
-    Seguridad de Planta, texto que sugiere trabajo en altura sin el permiso
-    marcado. **Fase B**, sobre dos campos numéricos opcionales por
-    actividad (`altura_trabajo_metros`, `profundidad_excavacion_metros`
-    — solo disparan alerta si el contratista los diligencia): más de 1.8 m
-    sin permiso de altura, más de 4 m (exige aprobación previa de Zone
-    Safety), excavación mayor a 1.2 m (exige salida de emergencia), mayor
-    a 1.3 m (exige retén exterior) y mayor a 5 m (exige andamiaje). Cada
+    detalladas, riesgo que sigue alto tras mitigar, texto que sugiere
+    trabajo en altura sin el permiso marcado. **Fase B**, sobre dos campos
+    numéricos opcionales por actividad (`altura_trabajo_metros`,
+    `profundidad_excavacion_metros` — solo disparan alerta si el
+    contratista los diligencia): más de 1.8 m sin permiso de altura, más de
+    4 m (exige aprobación previa de Zone Safety), excavación mayor a 1.2 m
+    (exige salida de emergencia), mayor a 1.3 m (exige retén exterior) y
+    mayor a 5 m (exige andamiaje). **Categorías GTC 45** (`CATEGORIAS_PELIGRO_TEXTO`
+    en el mismo archivo — pedido del cliente, cruzar la GTC 45 contra las
+    declaraciones): la misma heurística de texto que altura, generalizada a
+    riesgo eléctrico, espacios confinados, sustancias peligrosas, bloqueo y
+    etiquetado de energías (LOTO), trabajos en caliente e izaje de cargas —
+    cada una avisa si el texto de la actividad menciona esa categoría pero
+    el certificado de apoyo correspondiente no está marcado. Cada
     alerta cita su fuente y trae un motivo de rechazo sugerido, con un
     botón en el formulario que solo copia ese texto al campo Observaciones.
     **Regla dura: el motor nunca decide por sí solo** — no cambia el estado

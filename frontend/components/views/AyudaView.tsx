@@ -478,6 +478,18 @@ const TEMAS: Tema[] = [
           aplican — no se asume nada en su ausencia.
         </P>
         <P>
+          Además de trabajo en altura, el sistema revisa el texto de cada actividad (secuencia, técnicas y
+          descripción del riesgo) contra las categorías de peligro de la <strong>GTC 45</strong> (la guía
+          técnica colombiana de identificación de peligros) y avisa si menciona palabras de alguna de estas
+          categorías pero el certificado de apoyo correspondiente no está marcado: <strong>riesgo
+          eléctrico</strong> (ej. &quot;electrocución&quot;), <strong>espacios confinados</strong>,{" "}
+          <strong>sustancias peligrosas</strong> (ej. &quot;derrame&quot;), <strong>bloqueo y etiquetado de
+          energías / LOTO</strong>, <strong>trabajos en caliente</strong> (ej. &quot;soldadura&quot;) e{" "}
+          <strong>izaje de cargas</strong> (ej. &quot;montacargas&quot;, &quot;grúa&quot;). Igual que con
+          altura, es solo una heurística de texto — el revisor confirma si de verdad aplica antes de usarla
+          como motivo de rechazo.
+        </P>
+        <P>
           Cada alerta trae, debajo del botón de motivo de rechazo, un pequeño cuadro para{" "}
           <strong>dejar una nota</strong> sobre esa alerta en particular — por ejemplo, por qué se descartó o
           qué se validó en sitio con el contratista antes de decidir. Las notas quedan con el nombre de quien
