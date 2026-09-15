@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 
 import { useDialog } from "@/components/DialogProvider";
 import {
@@ -12,8 +12,10 @@ import {
   crearContratista,
   crearRadicacion,
   crearTrabajador,
+  descargarPlantillaTrabajadoresExcel,
   eliminarTrabajador,
   exportarRadicacionesExcel,
+  importarTrabajadoresExcel,
   listarContratistas,
   listarRadicaciones,
   listarTrabajadores,
@@ -27,6 +29,7 @@ import {
   type NuevaEmpresaContratista,
   type NuevoTrabajador,
   type RadicacionSeguridadSocial,
+  type ResultadoImportacionTrabajadores,
   type Rol,
   type TipoVinculacion,
   type Trabajador,
@@ -49,6 +52,9 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
   const [formulario, setFormulario] = useState<"nueva" | EmpresaContratista | null>(null);
   const [indicadores, setIndicadores] = useState<IndicadoresContratistas | null>(null);
   const [exportando, setExportando] = useState(false);
+  const [descargandoPlantilla, setDescargandoPlantilla] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [resultadoImportacion, setResultadoImportacion] = useState<ResultadoImportacionTrabajadores | null>(null);
 
   function cargar() {
     listarContratistas(token)
@@ -77,6 +83,34 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
     }
   }
 
+  async function descargarPlantilla() {
+    setDescargandoPlantilla(true);
+    try {
+      await descargarPlantillaTrabajadoresExcel(token);
+    } catch {
+      setError("No se pudo descargar la plantilla de trabajadores.");
+    } finally {
+      setDescargandoPlantilla(false);
+    }
+  }
+
+  async function importarTrabajadores(evento: ChangeEvent<HTMLInputElement>) {
+    const archivo = evento.target.files?.[0];
+    evento.target.value = "";
+    if (!archivo) return;
+    setImportando(true);
+    setResultadoImportacion(null);
+    try {
+      const resultado = await importarTrabajadoresExcel(token, archivo);
+      setResultadoImportacion(resultado);
+      if (resultado.creados > 0) cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo importar el archivo de trabajadores.");
+    } finally {
+      setImportando(false);
+    }
+  }
+
   const contratista = contratistas?.find((c) => c.id === seleccionada) ?? null;
 
   return (
@@ -85,7 +119,7 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
         <p className="text-sm text-corp-muted">
           Empresas contratistas, su personal y la radicación de seguridad social.
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={exportar}
@@ -95,16 +129,71 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
             {exportando ? "Exportando…" : "Exportar radicaciones (Excel)"}
           </button>
           {esInterno && (
-            <button
-              type="button"
-              onClick={() => setFormulario("nueva")}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
-            >
-              + Nueva empresa contratista
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={descargarPlantilla}
+                disabled={descargandoPlantilla}
+                className="rounded-lg border border-corp-border px-4 py-2 text-sm font-semibold text-corp-navy transition hover:border-corp-blue disabled:opacity-60"
+              >
+                {descargandoPlantilla ? "Generando…" : "Descargar plantilla trabajadores"}
+              </button>
+              <label className="cursor-pointer rounded-lg border border-corp-border px-4 py-2 text-sm font-semibold text-corp-navy transition hover:border-corp-blue">
+                {importando ? "Importando…" : "Importar trabajadores (Excel)"}
+                <input
+                  type="file"
+                  accept=".xlsx"
+                  onChange={importarTrabajadores}
+                  disabled={importando}
+                  className="hidden"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setFormulario("nueva")}
+                className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+              >
+                + Nueva empresa contratista
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {resultadoImportacion && (
+        <div className="mt-4 rounded-lg border border-corp-border bg-white px-4 py-3 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <p>
+              <strong className="text-emerald-700">{resultadoImportacion.creados}</strong> trabajador
+              {resultadoImportacion.creados === 1 ? "" : "es"} importado{resultadoImportacion.creados === 1 ? "" : "s"}
+              {resultadoImportacion.errores.length > 0 && (
+                <>
+                  {" "}
+                  · <strong className="text-red-700">{resultadoImportacion.errores.length}</strong> fila
+                  {resultadoImportacion.errores.length === 1 ? "" : "s"} con error
+                </>
+              )}
+              . A cada uno le queda pendiente la radicación de seguridad social.
+            </p>
+            <button
+              type="button"
+              onClick={() => setResultadoImportacion(null)}
+              className="text-xs font-semibold text-corp-muted hover:text-corp-navy"
+            >
+              Cerrar
+            </button>
+          </div>
+          {resultadoImportacion.errores.length > 0 && (
+            <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-md bg-red-50 p-2 text-xs text-red-800">
+              {resultadoImportacion.errores.map((err) => (
+                <li key={err.fila}>
+                  Fila {err.fila}: {err.mensaje}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {indicadores &&
         (indicadores.radicaciones_vencidas > 0 ||

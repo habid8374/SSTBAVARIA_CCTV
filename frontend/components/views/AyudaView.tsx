@@ -337,6 +337,26 @@ const TEMAS: Tema[] = [
           las radicaciones con contratista, trabajador, planilla, vencimiento y estado — útil para reportes o
           auditoría fuera de la app.
         </P>
+        <Sub>Cargar trabajadores en bloque desde Excel</Sub>
+        <P>
+          Solo para personal interno (SST/interventoría), arriba de la vista hay dos botones:{" "}
+          <strong>&quot;Descargar plantilla trabajadores&quot;</strong> genera un .xlsx en blanco con una
+          columna <strong>Contratista</strong> desplegable (lista las empresas activas) para poder cargar
+          personal de varias empresas contratistas en un mismo archivo — cada fila indica a cuál pertenece.
+          Al terminar de llenarla, <strong>&quot;Importar trabajadores (Excel)&quot;</strong> la sube: cada
+          fila válida se crea con las mismas reglas que si se registrara a mano desde el formulario (documento
+          único por contratista, autorización de datos obligatoria — columna &quot;Autorización datos
+          (SI/NO)&quot;, también desplegable). Las filas marcadas <strong>NO</strong>, con un contratista que
+          no calza con el desplegable, o con un documento repetido, no se crean — quedan reportadas con su
+          número de fila para corregir y volver a intentar, sin tumbar el resto del archivo. La plantilla
+          también trae una columna de fecha para el <strong>examen médico</strong>, la{" "}
+          <strong>certificación de trabajo en alturas</strong> y cada uno de los{" "}
+          <strong>cursos de Safety Academy</strong> — diligenciar una fecha ahí equivale a marcar ese curso
+          como completado en esa fecha (igual que hacerlo uno por uno en el formulario), y dejarla vacía lo
+          deja pendiente; así se puede verificar de una vez la vigencia de cada trabajador importado. Ningún
+          trabajador importado queda con radicación de seguridad social — esa parte sigue pendiente, igual
+          que si se hubiera cargado a mano.
+        </P>
         <Sub>Vencimiento de examen médico y certificación de alturas</Sub>
         <P>
           En el formulario de cada trabajador hay dos campos opcionales — <strong>vencimiento del examen

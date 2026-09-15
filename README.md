@@ -329,6 +329,24 @@ frontend en Vercel — pero viven en el mismo repositorio.
   (enlazado desde el formulario de trabajador y desde el login) — es un
   borrador técnico: le faltan los datos propios de la empresa (NIT, razón
   social, contacto) y revisión legal antes de considerarse definitivo.
+- **Carga masiva de trabajadores desde Excel** (`contratistas/importar_trabajadores_excel.py`,
+  solo `EsPersonalInterno`): pensado para el Excel masivo que ya maneja el
+  cliente — la plantilla descargable (`GET .../trabajadores/plantilla-excel/`)
+  trae una columna "Contratista" desplegable (`openpyxl.DataValidation`,
+  lista las empresas activas) para poder mezclar personal de varias
+  contratistas en un mismo archivo. Al importarla (`POST
+  .../trabajadores/importar-excel/`), cada fila pasa por
+  `TrabajadorSerializer` igual que el formulario manual — documento único
+  por contratista, autorización de datos obligatoria (columna "SI/NO",
+  también desplegable) — así que una fila que no pasaría el formulario
+  tampoco se crea acá: queda reportada `{fila, mensaje}` sin tumbar el
+  resto del archivo. La plantilla también trae una columna de fecha por
+  cada curso Safety Academy (`ENCABEZADOS_CURSOS`, generadas desde
+  `Trabajador.CURSOS`) más examen médico y certificación de alturas, para
+  poder verificar la vigencia de cada trabajador al importar en vez de
+  marcarlo curso por curso después. Nunca crea `RadicacionSeguridadSocial`
+  — cada trabajador importado queda igual que si se hubiera registrado a
+  mano, pendiente de esa radicación.
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 
@@ -474,6 +492,8 @@ eliminar) requiere rol Administrador.
 | `GET /api/contratistas/catalogos/` | Listas fijas para los formularios: cursos Safety Academy, permisos de trabajo, roles de firma |
 | `GET/POST /api/contratistas/empresas/`, `GET/PATCH/DELETE /api/contratistas/empresas/<id>/` | CRUD de `EmpresaContratista` |
 | `GET/POST /api/contratistas/trabajadores/`, `GET/PATCH/DELETE /api/contratistas/trabajadores/<id>/` | CRUD de `Trabajador`; filtro `?contratista=` |
+| `GET /api/contratistas/trabajadores/plantilla-excel/` | Descarga la plantilla .xlsx de carga masiva (solo `EsPersonalInterno`) |
+| `POST /api/contratistas/trabajadores/importar-excel/` | Carga masiva de `Trabajador` desde esa plantilla — crea las filas válidas, devuelve `{creados, errores:[{fila, mensaje}]}` (solo `EsPersonalInterno`) |
 | `GET/POST /api/contratistas/radicaciones/`, `GET/PATCH/DELETE /api/contratistas/radicaciones/<id>/` | CRUD de `RadicacionSeguridadSocial` (multipart para el soporte de pago); filtros `?trabajador=&contratista=&estado=` |
 | `POST /api/contratistas/radicaciones/<id>/aprobar/`, `POST .../rechazar/` | Decisión del interventor sobre una radicación (`observaciones` opcional) |
 | `GET/POST /api/contratistas/declaraciones/`, `GET/PATCH/DELETE /api/contratistas/declaraciones/<id>/` | `DeclaracionMetodo` con sus `actividades` anidadas (se reemplazan todas en cada guardado) |
