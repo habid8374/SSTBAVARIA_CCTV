@@ -662,6 +662,17 @@ GitHub si prefieres repos privados) apuntando a este repositorio, rama
   | `BREVO_API_KEY`, `BREVO_REMITENTE_EMAIL`, `BREVO_REMITENTE_NOMBRE` | copia los mismos valores de Railway |
   | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL` | copia los mismos 4 de Railway — R2 es un servicio externo (Cloudflare), no depende de dónde corra el backend, así que los archivos ya subidos siguen funcionando igual sin migrar nada |
   | `SENTRY_DSN` | copia el mismo de Railway |
+
+**Auto-deploy en cada push**: como la app se conecta como "Public
+Repository" (no vía GitHub App), Coolify no registra el webhook solo —
+hay que agregarlo a mano una vez. En la app → **Settings → Advanced →
+Git**, sección "Manual Git webhooks" → GitHub, copia la **Webhook URL**
+(`http://<tu-servidor>:8000/webhooks/source/github/events/manual`) y el
+**Webhook secret**. En GitHub → **Settings → Webhooks → Add webhook**,
+pega esa URL como Payload URL, `application/json` como Content type, el
+secreto copiado, y marca "Just the push event". Sin este paso, "Auto
+deploy: Deploy on push (webhooks)" queda activado en Coolify pero nunca
+se dispara — todos los despliegues salen como "Manual" en el historial.
   | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CLAIMS_EMAIL` | copia los mismos de Railway — **no regeneres las llaves**, si cambian se invalidan todas las suscripciones push que ya tiene la gente instalada |
 
 - **Domains**: agrega primero la URL temporal que asigna Coolify
