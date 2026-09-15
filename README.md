@@ -369,54 +369,87 @@ frontend en Vercel — pero viven en el mismo repositorio.
   social, contacto) y revisión legal antes de considerarse definitivo.
 - **Carga masiva de trabajadores desde Excel** (`contratistas/importar_trabajadores_excel.py`,
   solo `EsPersonalInterno`): pensado para el Excel masivo que ya maneja el
-  cliente — el orden y encabezados de columna replican, en lo posible, la
-  hoja real del cliente ("TABLA INGRESOS"): `ENCABEZADOS_BASE` empieza con
-  "Fecha de revisión y validación", "Validación" (desplegable
-  Ingreso/Renovación) y "Contratista (empresa)" (desplegable, lista las
-  empresas activas, para poder mezclar personal de varias contratistas en
-  un mismo archivo), seguido de los datos básicos y "Número de pedido o
-  CM" (texto libre, sin validación — el cliente no precisó su significado
-  todavía). Al importarla (`POST .../trabajadores/importar-excel/`), cada
-  fila pasa por `TrabajadorSerializer` igual que el formulario manual —
-  documento único por contratista, autorización de datos obligatoria
-  (columna "SI/NO", también desplegable) — así que una fila que no pasaría
-  el formulario tampoco se crea acá: queda reportada `{fila, mensaje}` sin
-  tumbar el resto del archivo. La plantilla también trae una columna de
-  fecha de **vencimiento** por cada curso Safety Academy y cada
-  certificación especial (encabezado "... — vencimiento (AAAA-MM-DD o
-  N/A)") — leídas de los catálogos editables
+  cliente — el orden y encabezados de columna replican, columna por
+  columna en lo posible, la hoja real del cliente ("TABLA INGRESOS").
+  `ENCABEZADOS_BASE` (30 columnas fijas, antes de los cursos/certificaciones
+  dinámicos) empieza con "Fecha de revisión y validación", "Validación"
+  (desplegable Ingreso/Renovación) y "Contratista (empresa)" (desplegable,
+  lista las empresas activas, para poder mezclar personal de varias
+  contratistas en un mismo archivo), sigue con los datos básicos y una
+  tanda de campos de control puramente informativos que también replican
+  la hoja del cliente: "Número de pedido o CM", "¿Casco rojo?", "Clase de
+  riesgo" (I–V), "Área de trabajo" (Proyecto/Envase/Elaboración/Ingeniería
+  y Serv/Calidad/People), "Formato de inclusión firmado", "Registros de
+  EPP entregados", "Pago de seguridad social cumple", "Inducción del
+  empleador registrada", "Responsable de SST en planta" (nombre y
+  teléfono), "Radicación OK", "Radicado por", "Validador" y "Requisitos OK
+  verificados" — ninguno de estos afecta cursos, certificaciones ni ningún
+  cálculo de vigencia. "Tipo de contratista" y "contrato marco" (que en el
+  Excel del cliente se repiten por fila) se editan una sola vez en
+  `EmpresaContratista`, no por trabajador; la planilla de seguridad social
+  (número, fecha de reporte, vencimiento, ARL vigente) sigue viviendo en
+  `RadicacionSeguridadSocial`, su propio modelo/flujo — la carga masiva de
+  trabajadores nunca crea radicaciones. Al importarla (`POST
+  .../trabajadores/importar-excel/`), cada fila pasa por
+  `TrabajadorSerializer` igual que el formulario manual — documento único
+  por contratista, autorización de datos obligatoria (columna "SI/NO",
+  también desplegable) — así que una fila que no pasaría el formulario
+  tampoco se crea acá: queda reportada `{fila, mensaje}` sin tumbar el
+  resto del archivo.
+- **Columna de estado antes de cada vencimiento — de ahí sale el N/A
+  real**: examen médico, certificación de alturas y cada certificación
+  especial (espacios confinados, conducción, manlift, grúa, soldador,
+  rescatista, licencia SST) llevan, inmediatamente antes de su columna de
+  fecha, una columna de estado con desplegable
+  `"OutSafety,Drive,NA,No validado"` (`ESTADO_VALIDACION_OPCIONES`) — igual
+  que la validación `"OUTSAFETY, DRIVE,NA,NO VALIDADO)"` que usa el Excel
+  real del cliente en esas mismas columnas. `_fecha_segun_estado(estado,
+  fecha)` replica la fórmula del cliente `IF(estado="NA","NA",fecha)`: si
+  el estado dice "NA", la fecha de esa fila se ignora aunque haya algo
+  escrito. El estado en sí (OutSafety/Drive/No validado) es solo
+  informativo dentro del Excel — no se guarda en la base, porque nada en
+  el sistema depende de *dónde* se validó un certificado, solo de si
+  aplica y cuándo vence. Los cursos Safety Academy son la excepción: como
+  el cliente los agrupa en un solo paquete de inducciones sin ese detalle
+  de estado, cada uno lleva solo su columna de fecha (encabezado "... —
+  vencimiento (AAAA-MM-DD o N/A)") — ahí sí, dejarla vacía o escribir
+  "N/A" (`_valor_fecha` reconoce "N/A"/"NA"/"N.A."/"no aplica", sin
+  distinguir mayúsculas o acentos) significan lo mismo: no diligenciado,
+  ninguna de las dos formas tumba la fila. Las columnas de curso/
+  certificación se leen de los catálogos editables
   `CursoSafetyAcademy`/`CertificacionEspecial` en el momento de
   generar/leer el archivo (`_encabezados_y_catalogos()`), no de una lista
   fija en código, así que reflejan lo que un Administrador haya agregado o
-  desactivado desde Reglas de contratistas — más examen médico y
-  certificación de alturas, para poder verificar la vigencia de cada
-  trabajador al importar en vez de marcarlo uno por uno después. Dejar
-  vacía una celda de vencimiento o escribir "N/A" (`_valor_fecha`
-  reconoce "N/A"/"NA"/"N.A."/"no aplica", sin distinguir mayúsculas o
-  acentos) significan lo mismo — ese curso/certificación no queda
-  diligenciado, ninguna de las dos formas tumba la fila. Nunca crea
-  `RadicacionSeguridadSocial` — cada trabajador importado queda igual que
-  si se hubiera registrado a mano, pendiente de esa radicación.
+  desactivado desde Reglas de contratistas.
 - **Selector de calendario + colores de vigencia en la plantilla**: todas
   las columnas de fecha (revisión, inicio de contrato, examen médico,
   alturas, cada curso, cada certificación) llevan
   `DataValidation(type="date", errorStyle="warning")` — Excel muestra el
   ícono de calendario junto a la celda para elegir la fecha sin escribir
-  nada, y solo avisa (sin bloquear, para no impedir escribir "N/A") si el
-  valor no es una fecha válida. Las columnas de vencimiento además llevan
-  3 reglas de formato condicional (`openpyxl.formatting.rule.FormulaRule`,
-  comparando la fecha contra `TODAY()`) con los mismos colores y umbral de
-  15 días que usa el resto de la app: rojo vencida, ámbar por vencer, verde
+  nada, y solo avisa (sin bloquear) si el valor no es una fecha válida —
+  no bloquea porque la columna de estado ya puede decir "NA" y dejar la
+  fecha vacía. Las columnas de vencimiento además llevan 3 reglas de
+  formato condicional (`openpyxl.formatting.rule.FormulaRule`, comparando
+  la fecha contra `TODAY()`) con los mismos colores y umbral de 15 días
+  que usa el resto de la app: rojo vencida, ámbar por vencer, verde
   vigente — igual convención de colores que usa el Excel real del cliente
   (verde `#00B050`/rojo `#FF0000` en su hoja "TABLA INGRESOS").
   "Fecha de revisión y validación" viene prellenada con la fecha del día
   en que se descarga la plantilla (`datetime.date.today()`), editable si
   la revisión real fue otro día.
-- **Tres campos nuevos en `Trabajador`** (`fecha_revision_validacion`,
-  `tipo_validacion` con choices `TipoValidacion.INGRESO`/`RENOVACION`, y
-  `numero_pedido_cm`), todos opcionales y puramente informativos — no
-  afectan cursos, certificaciones ni ningún cálculo de vigencia. Se
-  editan tanto desde el formulario manual como desde la carga masiva.
+- **Campos nuevos en `Trabajador`**: `fecha_revision_validacion`,
+  `tipo_validacion` (choices `TipoValidacion.INGRESO`/`RENOVACION`),
+  `numero_pedido_cm`, `casco_rojo`, `clase_riesgo` (choices
+  `ClaseRiesgo.I`…`V`), `area_trabajo` (choices `AreaTrabajo.*`),
+  `formato_inclusion_firmado`, `registros_epp_entregados`,
+  `pago_seguridad_cumple`, `induccion_empleador_registrada`,
+  `responsable_sst_planta_nombre`/`_telefono`, `radicacion_ok`,
+  `radicado_por`, `validador`, `requisitos_ok_verificados` — todos
+  opcionales y puramente informativos, no afectan cursos, certificaciones
+  ni ningún cálculo de vigencia. Se editan tanto desde el formulario
+  manual (sección plegable "Campos de control") como desde la carga
+  masiva. `EmpresaContratista` gana `tipo_contratista`/`contrato_marco`
+  (también opcionales, editados una sola vez por empresa).
 - La plantilla generada queda **protegida** (`hoja.protection`/
   `libro.security`, contraseña `CONTRASENA_PLANTILLA` en
   `importar_trabajadores_excel.py`): las celdas de datos quedan libres

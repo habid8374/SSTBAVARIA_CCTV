@@ -3861,30 +3861,31 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
     def test_importar_excel_incluye_fechas_de_cursos_safety_academy(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        fila = [
-            None,
-            None,
-            self.contratista.nombre,
-            "Con Cursos",
-            "Prueba",
-            "1000123456",
-            "SI",
-            "",
-            "",
-            "",
-            "Fijo",
-            None,
-            None,
-            None,
-            None,
-            "2026-01-15",  # induccion_sst
-            None,  # riesgo_quimico
-            None,  # sam_jog_lototo
-            None,  # pasos_seguros
-            None,  # comportamientos_condiciones
-            None,  # identificacion_peligros
-            "2026-02-01",  # epp
-        ]
+        fila = (
+            [
+                None,  # fecha_revision_validacion
+                None,  # validacion
+                self.contratista.nombre,
+                "Con Cursos",
+                "Prueba",
+                "1000123456",
+                "SI",
+                "",
+                "",
+                "",
+                "Fijo",
+            ]
+            + [None] * 19  # resto de la base (número pedido, casco rojo, ..., estado/fecha alturas)
+            + [
+                "2026-01-15",  # induccion_sst
+                None,  # riesgo_quimico
+                None,  # sam_jog_lototo
+                None,  # pasos_seguros
+                None,  # comportamientos_condiciones
+                None,  # identificacion_peligros
+                "2026-02-01",  # epp
+            ]
+        )
         contenido = _construir_excel_trabajadores([tuple(fila)])
         archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
         response = self.client.post(
@@ -3903,24 +3904,28 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
     def test_importar_excel_incluye_fechas_de_certificaciones_especiales(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        fila = [
-            None,
-            None,
-            self.contratista.nombre,
-            "Con Certificaciones",
-            "Prueba",
-            "1000654321",
-            "SI",
-            "", "", "", "Fijo", None, None, None, None,
-            None, None, None, None, None, None, None,  # 7 columnas de cursos, vacías
-            None,  # espacios_confinados
-            None,  # conduccion_vehiculos
-            "2026-05-01",  # manlift
-            None,  # grua
-            None,  # soldador
-            None,  # rescatista
-            "2027-01-01",  # licencia_sst
-        ]
+        fila = (
+            [
+                None, None,
+                self.contratista.nombre,
+                "Con Certificaciones",
+                "Prueba",
+                "1000654321",
+                "SI",
+                "", "", "", "Fijo",
+            ]
+            + [None] * 19  # resto de la base
+            + [None, None, None, None, None, None, None]  # 7 columnas de cursos, vacías
+            + [
+                None, None,  # espacios_confinados: estado, fecha
+                None, None,  # conduccion_vehiculos
+                "Drive", "2026-05-01",  # manlift: estado validado, fecha
+                None, None,  # grua
+                None, None,  # soldador
+                None, None,  # rescatista
+                "OutSafety", "2027-01-01",  # licencia_sst
+            ]
+        )
         contenido = _construir_excel_trabajadores([tuple(fila)])
         archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
         response = self.client.post(
@@ -3939,18 +3944,22 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
     def test_importar_excel_na_en_fecha_de_curso_no_tumba_la_fila_y_queda_sin_diligenciar(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        fila = [
-            None,
-            None,
-            self.contratista.nombre,
-            "Con NA",
-            "Prueba",
-            "1000222111",
-            "SI",
-            "", "", "", "Fijo", None, None, None, None,
-            "N/A",  # induccion_sst — no aplica
-            None, None, None, None, None,
-        ]
+        fila = (
+            [
+                None, None,
+                self.contratista.nombre,
+                "Con NA",
+                "Prueba",
+                "1000222111",
+                "SI",
+                "", "", "", "Fijo",
+            ]
+            + [None] * 19
+            + [
+                "N/A",  # induccion_sst — no aplica
+                None, None, None, None, None,  # resto de cursos
+            ]
+        )
         contenido = _construir_excel_trabajadores([tuple(fila)])
         archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
         response = self.client.post(
@@ -3962,6 +3971,156 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         self.assertEqual(response.data["creados"], 1)
         trabajador = Trabajador.objects.get(documento="1000222111")
         self.assertEqual(trabajador.cursos_safety_academy, {})
+
+    def test_importar_excel_estado_na_en_alturas_ignora_la_fecha_aunque_este_escrita(self):
+        """Réplica de la fórmula del cliente IF(estado="NA","NA",fecha): si la
+        columna de estado dice NA, la fecha de esa fila se ignora aunque
+        alguien la haya dejado escrita — el estado manda."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        fila = (
+            [
+                None, None,
+                self.contratista.nombre,
+                "Con Estado NA",
+                "Prueba",
+                "1000444555",
+                "SI",
+                "", "", "", "Fijo",
+            ]
+            + [None] * 15  # numero_pedido_cm..requisitos_ok (15 columnas)
+            + [
+                None, None,  # examen médico: sin estado ni fecha
+                "NA", "2026-06-01",  # alturas: estado NA con fecha igual escrita
+            ]
+        )
+        contenido = _construir_excel_trabajadores([tuple(fila)])
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        trabajador = Trabajador.objects.get(documento="1000444555")
+        self.assertIsNone(trabajador.fecha_vencimiento_certificacion_alturas)
+
+    def test_importar_excel_estado_outsafety_en_alturas_si_toma_la_fecha(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        fila = (
+            [
+                None, None,
+                self.contratista.nombre,
+                "Con Estado OutSafety",
+                "Prueba",
+                "1000555444",
+                "SI",
+                "", "", "", "Fijo",
+            ]
+            + [None] * 15
+            + [
+                "Drive", "2026-08-01",  # examen médico validado por Drive
+                "OutSafety", "2026-09-01",  # alturas validado por OutSafety
+            ]
+        )
+        contenido = _construir_excel_trabajadores([tuple(fila)])
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        trabajador = Trabajador.objects.get(documento="1000555444")
+        self.assertEqual(trabajador.fecha_vencimiento_examen_medico, datetime.date(2026, 8, 1))
+        self.assertEqual(trabajador.fecha_vencimiento_certificacion_alturas, datetime.date(2026, 9, 1))
+
+    def test_importar_excel_estado_na_en_certificacion_especial_ignora_la_fecha(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        fila = (
+            [
+                None, None,
+                self.contratista.nombre,
+                "Con Cert NA",
+                "Prueba",
+                "1000666777",
+                "SI",
+                "", "", "", "Fijo",
+            ]
+            + [None] * 15
+            + [None, None, None, None]  # examen médico y alturas, sin diligenciar
+            + [None, None, None, None, None, None, None]  # 7 cursos, vacíos
+            + [
+                "NA", "2026-05-01",  # espacios_confinados: estado NA con fecha igual escrita
+            ]
+        )
+        contenido = _construir_excel_trabajadores([tuple(fila)])
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        trabajador = Trabajador.objects.get(documento="1000666777")
+        self.assertNotIn("espacios_confinados", trabajador.certificaciones_especiales)
+
+    def test_importar_excel_incluye_los_campos_de_control_replicados_del_cliente(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        fila = (
+            [
+                None, None,
+                self.contratista.nombre,
+                "Con Control",
+                "Prueba",
+                "1000777666",
+                "SI",
+                "", "", "", "Fijo", None,
+                "CM-1",  # numero_pedido_cm
+                "SI",  # casco_rojo
+                "III",  # clase_riesgo
+                "Envase",  # area_trabajo
+                "SI",  # formato_inclusion_firmado
+                "SI",  # registros_epp_entregados
+                "SI",  # pago_seguridad_cumple
+                "SI",  # induccion_empleador_registrada
+                "Juan Pérez",  # responsable_sst_planta_nombre
+                "3001234567",  # responsable_sst_planta_telefono
+                "SI",  # radicacion_ok
+                "María Gómez",  # radicado_por
+                "Carlos Ruiz",  # validador
+                "SI",  # requisitos_ok_verificados
+            ]
+        )
+        contenido = _construir_excel_trabajadores([tuple(fila)])
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        trabajador = Trabajador.objects.get(documento="1000777666")
+        self.assertTrue(trabajador.casco_rojo)
+        self.assertEqual(trabajador.clase_riesgo, "III")
+        self.assertEqual(trabajador.area_trabajo, "envase")
+        self.assertTrue(trabajador.formato_inclusion_firmado)
+        self.assertTrue(trabajador.registros_epp_entregados)
+        self.assertTrue(trabajador.pago_seguridad_cumple)
+        self.assertTrue(trabajador.induccion_empleador_registrada)
+        self.assertEqual(trabajador.responsable_sst_planta_nombre, "Juan Pérez")
+        self.assertEqual(trabajador.responsable_sst_planta_telefono, "3001234567")
+        self.assertTrue(trabajador.radicacion_ok)
+        self.assertEqual(trabajador.radicado_por, "María Gómez")
+        self.assertEqual(trabajador.validador, "Carlos Ruiz")
+        self.assertTrue(trabajador.requisitos_ok_verificados)
 
     def test_importar_excel_incluye_fecha_revision_validacion_y_numero_pedido(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

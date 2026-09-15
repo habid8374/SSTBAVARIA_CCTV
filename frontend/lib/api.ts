@@ -1035,6 +1035,8 @@ export type EmpresaContratista = {
   id: number;
   nombre: string;
   nit: string;
+  tipo_contratista: string;
+  contrato_marco: string;
   contacto_nombre: string;
   contacto_telefono: string;
   contacto_correo: string;
@@ -1081,6 +1083,15 @@ export function actualizarContratista(
 
 export type TipoVinculacion = "fijo" | "temporal";
 export type TipoValidacion = "" | "ingreso" | "renovacion";
+export type ClaseRiesgo = "" | "I" | "II" | "III" | "IV" | "V";
+export type AreaTrabajo =
+  | ""
+  | "proyecto"
+  | "envase"
+  | "elaboracion"
+  | "ingenieria_serv"
+  | "calidad"
+  | "people";
 
 export type RadicacionResumen = {
   id: number;
@@ -1107,6 +1118,19 @@ export type Trabajador = {
   fecha_revision_validacion: string | null;
   tipo_validacion: TipoValidacion;
   numero_pedido_cm: string;
+  casco_rojo: boolean;
+  clase_riesgo: ClaseRiesgo;
+  area_trabajo: AreaTrabajo;
+  formato_inclusion_firmado: boolean;
+  registros_epp_entregados: boolean;
+  pago_seguridad_cumple: boolean;
+  induccion_empleador_registrada: boolean;
+  responsable_sst_planta_nombre: string;
+  responsable_sst_planta_telefono: string;
+  radicacion_ok: boolean;
+  radicado_por: string;
+  validador: string;
+  requisitos_ok_verificados: boolean;
   cursos_safety_academy: Record<string, string | null>;
   cursos_pendientes: Opcion[];
   cursos_vencidos: (Opcion & { fecha_vencimiento: string })[];
@@ -1139,6 +1163,19 @@ export type NuevoTrabajador = {
   fecha_revision_validacion?: string | null;
   tipo_validacion?: TipoValidacion;
   numero_pedido_cm?: string;
+  casco_rojo?: boolean;
+  clase_riesgo?: ClaseRiesgo;
+  area_trabajo?: AreaTrabajo;
+  formato_inclusion_firmado?: boolean;
+  registros_epp_entregados?: boolean;
+  pago_seguridad_cumple?: boolean;
+  induccion_empleador_registrada?: boolean;
+  responsable_sst_planta_nombre?: string;
+  responsable_sst_planta_telefono?: string;
+  radicacion_ok?: boolean;
+  radicado_por?: string;
+  validador?: string;
+  requisitos_ok_verificados?: boolean;
   cursos_safety_academy?: Record<string, string | null>;
   certificaciones_especiales?: Record<string, string | null>;
   fecha_vencimiento_examen_medico?: string | null;

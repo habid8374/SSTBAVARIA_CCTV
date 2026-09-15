@@ -29,6 +29,8 @@ import {
   type NuevaEmpresaContratista,
   type NuevoTrabajador,
   type RadicacionSeguridadSocial,
+  type AreaTrabajo,
+  type ClaseRiesgo,
   type ResultadoImportacionTrabajadores,
   type Rol,
   type TipoValidacion,
@@ -817,6 +819,8 @@ function FormularioContratista({
 }) {
   const [nombre, setNombre] = useState(contratista?.nombre ?? "");
   const [nit, setNit] = useState(contratista?.nit ?? "");
+  const [tipoContratista, setTipoContratista] = useState(contratista?.tipo_contratista ?? "");
+  const [contratoMarco, setContratoMarco] = useState(contratista?.contrato_marco ?? "");
   const [contactoNombre, setContactoNombre] = useState(contratista?.contacto_nombre ?? "");
   const [contactoTelefono, setContactoTelefono] = useState(contratista?.contacto_telefono ?? "");
   const [contactoCorreo, setContactoCorreo] = useState(contratista?.contacto_correo ?? "");
@@ -836,6 +840,8 @@ function FormularioContratista({
     const datos: Partial<NuevaEmpresaContratista> = {
       nombre,
       nit,
+      tipo_contratista: tipoContratista,
+      contrato_marco: contratoMarco,
       contacto_nombre: contactoNombre,
       contacto_telefono: contactoTelefono,
       contacto_correo: contactoCorreo,
@@ -871,6 +877,14 @@ function FormularioContratista({
           <Campo label="NIT">
             <input value={nit} onChange={(e) => setNit(e.target.value)} className={INPUT} />
           </Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Tipo de contratista — opcional">
+              <input value={tipoContratista} onChange={(e) => setTipoContratista(e.target.value)} className={INPUT} />
+            </Campo>
+            <Campo label="Contrato marco — opcional">
+              <input value={contratoMarco} onChange={(e) => setContratoMarco(e.target.value)} className={INPUT} />
+            </Campo>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Contacto — nombre">
               <input value={contactoNombre} onChange={(e) => setContactoNombre(e.target.value)} className={INPUT} />
@@ -995,6 +1009,31 @@ function FormularioTrabajador({
   );
   const [tipoValidacion, setTipoValidacion] = useState<TipoValidacion>(trabajador?.tipo_validacion ?? "");
   const [numeroPedidoCm, setNumeroPedidoCm] = useState(trabajador?.numero_pedido_cm ?? "");
+  const [cascoRojo, setCascoRojo] = useState(trabajador?.casco_rojo ?? false);
+  const [claseRiesgo, setClaseRiesgo] = useState<ClaseRiesgo>(trabajador?.clase_riesgo ?? "");
+  const [areaTrabajo, setAreaTrabajo] = useState<AreaTrabajo>(trabajador?.area_trabajo ?? "");
+  const [formatoInclusionFirmado, setFormatoInclusionFirmado] = useState(
+    trabajador?.formato_inclusion_firmado ?? false
+  );
+  const [registrosEppEntregados, setRegistrosEppEntregados] = useState(
+    trabajador?.registros_epp_entregados ?? false
+  );
+  const [pagoSeguridadCumple, setPagoSeguridadCumple] = useState(trabajador?.pago_seguridad_cumple ?? false);
+  const [induccionEmpleadorRegistrada, setInduccionEmpleadorRegistrada] = useState(
+    trabajador?.induccion_empleador_registrada ?? false
+  );
+  const [responsableSstPlantaNombre, setResponsableSstPlantaNombre] = useState(
+    trabajador?.responsable_sst_planta_nombre ?? ""
+  );
+  const [responsableSstPlantaTelefono, setResponsableSstPlantaTelefono] = useState(
+    trabajador?.responsable_sst_planta_telefono ?? ""
+  );
+  const [radicacionOk, setRadicacionOk] = useState(trabajador?.radicacion_ok ?? false);
+  const [radicadoPor, setRadicadoPor] = useState(trabajador?.radicado_por ?? "");
+  const [validador, setValidador] = useState(trabajador?.validador ?? "");
+  const [requisitosOkVerificados, setRequisitosOkVerificados] = useState(
+    trabajador?.requisitos_ok_verificados ?? false
+  );
   const [fechaVencExamenMedico, setFechaVencExamenMedico] = useState(
     trabajador?.fecha_vencimiento_examen_medico ?? ""
   );
@@ -1063,6 +1102,19 @@ function FormularioTrabajador({
       fecha_revision_validacion: fechaRevisionValidacion || null,
       tipo_validacion: tipoValidacion,
       numero_pedido_cm: numeroPedidoCm,
+      casco_rojo: cascoRojo,
+      clase_riesgo: claseRiesgo,
+      area_trabajo: areaTrabajo,
+      formato_inclusion_firmado: formatoInclusionFirmado,
+      registros_epp_entregados: registrosEppEntregados,
+      pago_seguridad_cumple: pagoSeguridadCumple,
+      induccion_empleador_registrada: induccionEmpleadorRegistrada,
+      responsable_sst_planta_nombre: responsableSstPlantaNombre,
+      responsable_sst_planta_telefono: responsableSstPlantaTelefono,
+      radicacion_ok: radicacionOk,
+      radicado_por: radicadoPor,
+      validador,
+      requisitos_ok_verificados: requisitosOkVerificados,
       fecha_vencimiento_examen_medico: fechaVencExamenMedico || null,
       fecha_vencimiento_certificacion_alturas: fechaVencCertAlturas || null,
       cursos_safety_academy: cursos,
@@ -1162,6 +1214,80 @@ function FormularioTrabajador({
               </select>
             </Campo>
           </div>
+
+          <details className="rounded-lg border border-corp-border p-3">
+            <summary className="cursor-pointer text-sm font-medium text-corp-navy">
+              Campos de control (replican el Excel del cliente) — opcionales
+            </summary>
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <Campo label="Clase de riesgo">
+                  <select value={claseRiesgo} onChange={(e) => setClaseRiesgo(e.target.value as ClaseRiesgo)} className={INPUT}>
+                    <option value="">—</option>
+                    <option value="I">I</option>
+                    <option value="II">II</option>
+                    <option value="III">III</option>
+                    <option value="IV">IV</option>
+                    <option value="V">V</option>
+                  </select>
+                </Campo>
+                <Campo label="Área de trabajo">
+                  <select value={areaTrabajo} onChange={(e) => setAreaTrabajo(e.target.value as AreaTrabajo)} className={INPUT}>
+                    <option value="">—</option>
+                    <option value="proyecto">Proyecto</option>
+                    <option value="envase">Envase</option>
+                    <option value="elaboracion">Elaboración</option>
+                    <option value="ingenieria_serv">Ingeniería y Serv</option>
+                    <option value="calidad">Calidad</option>
+                    <option value="people">People</option>
+                  </select>
+                </Campo>
+                <Campo label="Radicado por">
+                  <input value={radicadoPor} onChange={(e) => setRadicadoPor(e.target.value)} className={INPUT} />
+                </Campo>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Campo label="Responsable de SST en planta — nombre">
+                  <input
+                    value={responsableSstPlantaNombre}
+                    onChange={(e) => setResponsableSstPlantaNombre(e.target.value)}
+                    className={INPUT}
+                  />
+                </Campo>
+                <Campo label="Responsable de SST en planta — teléfono">
+                  <input
+                    value={responsableSstPlantaTelefono}
+                    onChange={(e) => setResponsableSstPlantaTelefono(e.target.value)}
+                    className={INPUT}
+                  />
+                </Campo>
+              </div>
+              <Campo label="Validador">
+                <input value={validador} onChange={(e) => setValidador(e.target.value)} className={INPUT} />
+              </Campo>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                {[
+                  { etiqueta: "¿Casco rojo?", valor: cascoRojo, set: setCascoRojo },
+                  { etiqueta: "Formato de inclusión firmado", valor: formatoInclusionFirmado, set: setFormatoInclusionFirmado },
+                  { etiqueta: "Registros de EPP entregados", valor: registrosEppEntregados, set: setRegistrosEppEntregados },
+                  { etiqueta: "Pago de seguridad cumple", valor: pagoSeguridadCumple, set: setPagoSeguridadCumple },
+                  { etiqueta: "Inducción del empleador registrada", valor: induccionEmpleadorRegistrada, set: setInduccionEmpleadorRegistrada },
+                  { etiqueta: "Radicación OK", valor: radicacionOk, set: setRadicacionOk },
+                  { etiqueta: "Requisitos OK verificados", valor: requisitosOkVerificados, set: setRequisitosOkVerificados },
+                ].map((campo) => (
+                  <label key={campo.etiqueta} className="flex items-center gap-2 text-sm text-corp-navy">
+                    <input
+                      type="checkbox"
+                      checked={campo.valor}
+                      onChange={(e) => campo.set(e.target.checked)}
+                      className="h-4 w-4 rounded border-corp-border accent-corp-blue"
+                    />
+                    {campo.etiqueta}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </details>
 
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Vencimiento examen médico — opcional">
