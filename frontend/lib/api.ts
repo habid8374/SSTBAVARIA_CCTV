@@ -688,8 +688,8 @@ export function descargarEquipoLocalZip(token: string, equipoId: number): Promis
 export type Opcion = { clave: string; etiqueta: string };
 
 export type Catalogos = {
-  cursos_safety_academy: (Opcion & { obligatorio: boolean })[];
-  certificaciones_especiales: Opcion[];
+  cursos_safety_academy: (Opcion & { obligatorio: boolean; meses_vigencia: number | null })[];
+  certificaciones_especiales: (Opcion & { meses_vigencia: number | null })[];
   permisos_trabajo: string[];
   equipos_epp: string[];
   roles_firma: Opcion[];
@@ -706,6 +706,7 @@ export type CursoSafetyAcademy = {
   activo: boolean;
   obligatorio: boolean;
   orden: number;
+  meses_vigencia: number | null;
 };
 
 export type NuevoCursoSafetyAcademy = {
@@ -714,6 +715,7 @@ export type NuevoCursoSafetyAcademy = {
   activo?: boolean;
   obligatorio?: boolean;
   orden?: number;
+  meses_vigencia?: number | null;
 };
 
 export function listarCursos(token: string): Promise<CursoSafetyAcademy[]> {
@@ -750,6 +752,7 @@ export type CertificacionEspecial = {
   etiqueta: string;
   activo: boolean;
   orden: number;
+  meses_vigencia: number | null;
 };
 
 export type NuevaCertificacionEspecial = {
@@ -757,6 +760,7 @@ export type NuevaCertificacionEspecial = {
   etiqueta: string;
   activo?: boolean;
   orden?: number;
+  meses_vigencia?: number | null;
 };
 
 export function listarCertificacionesEspeciales(token: string): Promise<CertificacionEspecial[]> {
@@ -1101,6 +1105,7 @@ export type Trabajador = {
   fecha_inicio_contrato: string | null;
   cursos_safety_academy: Record<string, string | null>;
   cursos_pendientes: Opcion[];
+  cursos_vencidos: (Opcion & { fecha_vencimiento: string })[];
   certificaciones_especiales: Record<string, string | null>;
   certificaciones_especiales_vencidas: (Opcion & { fecha_vencimiento: string })[];
   fecha_vencimiento_examen_medico: string | null;
@@ -1286,6 +1291,7 @@ export type IndicadoresContratistas = {
   certificaciones_alturas_vencidas: number;
   certificaciones_alturas_por_vencer: number;
   certificaciones_especiales_vencidas: number;
+  cursos_vencidos: number;
 };
 
 export function obtenerIndicadoresContratistas(token: string): Promise<IndicadoresContratistas> {

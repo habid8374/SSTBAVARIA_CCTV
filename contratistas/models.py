@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import hashlib
 import json
@@ -70,6 +71,31 @@ def _dias_para_vencer(fecha):
     return (fecha - timezone.localdate()).days
 
 
+def _sumar_meses(fecha, meses):
+    """`fecha` + `meses` meses calendario (ajusta el día si el mes destino
+    es más corto, ej. 31 de enero + 1 mes = 28/29 de febrero)."""
+    mes_total = fecha.month - 1 + meses
+    anio = fecha.year + mes_total // 12
+    mes = mes_total % 12 + 1
+    ultimo_dia_mes = calendar.monthrange(anio, mes)[1]
+    return fecha.replace(year=anio, month=mes, day=min(fecha.day, ultimo_dia_mes))
+
+
+def _vencidas_de_mapa(mapa, etiquetas):
+    """Entradas de un mapa {clave: fecha ISO o null} (cursos_safety_academy
+    o certificaciones_especiales) cuya fecha de vencimiento ya pasó —
+    ignora las que nunca se diligenciaron. `etiquetas` es {clave: etiqueta}
+    del catálogo correspondiente."""
+    resultado = []
+    for clave, fecha_iso in (mapa or {}).items():
+        if not fecha_iso:
+            continue
+        fecha = datetime.date.fromisoformat(fecha_iso)
+        if _vencido(fecha):
+            resultado.append({"clave": clave, "etiqueta": etiquetas.get(clave, clave), "fecha_vencimiento": fecha_iso})
+    return resultado
+
+
 class Trabajador(models.Model):
     """Trabajador de una empresa contratista, con sus datos de afiliación."""
 
@@ -102,7 +128,12 @@ class Trabajador(models.Model):
         "cursos Safety Academy",
         default=dict,
         blank=True,
-        help_text="Mapa {tipo_curso: fecha ISO o null} — ver Trabajador.CURSOS para las claves válidas",
+        help_text=(
+            "Mapa {tipo_curso: fecha de vencimiento ISO o null} — ver CursoSafetyAcademy para las claves "
+            "válidas. CursoSafetyAcademy.meses_vigencia (si está configurado) solo se usa para sugerir "
+            "esta fecha al marcar el curso completado; el valor guardado siempre es la fecha de "
+            "vencimiento real, editable libremente."
+        ),
     )
     certificaciones_especiales = models.JSONField(
         "certificaciones especiales",
@@ -165,16 +196,29 @@ class Trabajador(models.Model):
     @property
     def cursos_pendientes(self):
         """Cursos Safety Academy marcados como obligatorios que este
-        trabajador todavía no tiene completados (sin fecha registrada).
-        Se calcula al vuelo contra el catálogo actual — nada queda
-        guardado, así que un curso recién marcado obligatorio aplica a
-        todos los trabajadores activos sin necesidad de tocarlos uno por uno."""
-        completados = self.cursos_safety_academy or {}
+        trabajador no tiene vigentes — porque nunca se diligenció su fecha
+        de vencimiento, o porque esa fecha ya pasó (vencido cuenta igual
+        de pendiente que nunca hecho: en ambos casos no está al día). Se
+        calcula al vuelo contra el catálogo actual — nada queda guardado,
+        así que un curso recién marcado obligatorio aplica a todos los
+        trabajadores activos sin necesidad de tocarlos uno por uno."""
+        vencimientos = self.cursos_safety_academy or {}
+        hoy = timezone.localdate()
+        pendiente = lambda clave: not vencimientos.get(clave) or datetime.date.fromisoformat(vencimientos[clave]) < hoy
         return [
             {"clave": c.clave, "etiqueta": c.etiqueta}
             for c in CursoSafetyAcademy.objects.filter(activo=True, obligatorio=True)
-            if not completados.get(c.clave)
+            if pendiente(c.clave)
         ]
+
+    @property
+    def cursos_vencidos(self):
+        """Cursos Safety Academy que este trabajador SÍ tiene registrados
+        (con fecha de vencimiento) pero ya vencieron — incluye tanto
+        obligatorios como no obligatorios (a diferencia de
+        cursos_pendientes, que solo mira obligatorios)."""
+        etiquetas = dict(CursoSafetyAcademy.objects.filter(activo=True).values_list("clave", "etiqueta"))
+        return _vencidas_de_mapa(self.cursos_safety_academy, etiquetas)
 
     @property
     def examen_medico_vencido(self):
@@ -199,16 +243,8 @@ class Trabajador(models.Model):
         cursos_pendientes, no avisa por las que nunca se diligenciaron
         (esas certificaciones no aplican a todo trabajador, ver el
         docstring de CertificacionEspecial)."""
-        registradas = self.certificaciones_especiales or {}
         etiquetas = dict(CertificacionEspecial.objects.filter(activo=True).values_list("clave", "etiqueta"))
-        resultado = []
-        for clave, fecha_iso in registradas.items():
-            if not fecha_iso:
-                continue
-            fecha = datetime.date.fromisoformat(fecha_iso)
-            if _vencido(fecha):
-                resultado.append({"clave": clave, "etiqueta": etiquetas.get(clave, clave), "fecha_vencimiento": fecha_iso})
-        return resultado
+        return _vencidas_de_mapa(self.certificaciones_especiales, etiquetas)
 
 
 def soporte_pago_upload_to(instance, filename):
@@ -557,7 +593,17 @@ class CursoSafetyAcademy(models.Model):
     obligatorio = models.BooleanField(
         "obligatorio para todo trabajador",
         default=False,
-        help_text="Si está marcado, se avisa cuando un trabajador activo no lo tiene completado.",
+        help_text="Si está marcado, se avisa cuando un trabajador activo no lo tiene vigente.",
+    )
+    meses_vigencia = models.PositiveIntegerField(
+        "meses de vigencia",
+        null=True,
+        blank=True,
+        help_text=(
+            "Cada cuántos meses vence este curso (ej. 18). Déjalo vacío si no vence o no se conoce el "
+            "período — al marcar el curso completado, el formulario sugiere hoy + estos meses como "
+            "fecha de vencimiento, pero siempre queda editable a mano."
+        ),
     )
     orden = models.PositiveIntegerField(default=0)
 
@@ -584,6 +630,16 @@ class CertificacionEspecial(models.Model):
     clave = models.SlugField(max_length=50, unique=True)
     etiqueta = models.CharField(max_length=150)
     activo = models.BooleanField(default=True)
+    meses_vigencia = models.PositiveIntegerField(
+        "meses de vigencia",
+        null=True,
+        blank=True,
+        help_text=(
+            "Cada cuántos meses vence esta certificación (ej. 36 para espacios confinados). Déjalo "
+            "vacío si no se conoce el período — al marcarla completada, el formulario sugiere hoy + "
+            "estos meses como fecha de vencimiento, pero siempre queda editable a mano."
+        ),
+    )
     orden = models.PositiveIntegerField(default=0)
 
     class Meta:

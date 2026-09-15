@@ -296,10 +296,18 @@ const TEMAS: Tema[] = [
           <li><strong>Trabajadores</strong> de esa empresa: documento, EPS/ARL/AFP, tipo de vinculación,
             cursos de Safety Academy — los cursos marcados con <span className="text-amber-700">*</span>{" "}
             son obligatorios (se configuran en Sistema → Reglas de contratistas); si a un trabajador activo
-            le falta alguno, aparece un aviso ⚠ junto a su nombre en la lista. También tiene{" "}
-            <strong>certificaciones especiales</strong> (espacios confinados, conducción, manlift, grúa,
-            soldador, rescatista, licencia SST) — a diferencia de los cursos, se marcan solo para quien de
-            verdad realiza esa actividad, y solo avisan cuando una que el trabajador sí tiene ya venció.</li>
+            le falta alguno o lo tiene <strong>vencido</strong>, aparece un aviso ⚠ junto a su nombre en la
+            lista. La fecha que se guarda por curso es su <strong>vencimiento</strong> (no cuándo se hizo) —
+            al marcarlo completado, el formulario sugiere hoy + el período de vigencia configurado para ese
+            curso (si se configuró uno), con un badge de color junto a la fecha:{" "}
+            <strong className="text-emerald-700">Vigente</strong> (verde),{" "}
+            <strong className="text-amber-700">Vence en N días</strong> (ámbar, a 15 días o menos) o{" "}
+            <strong className="text-red-700">Vencido</strong> (rojo) — la fecha siempre queda editable a
+            mano. También tiene <strong>certificaciones especiales</strong> (espacios confinados,
+            conducción, manlift, grúa, soldador, rescatista, licencia SST) — a diferencia de los cursos, se
+            marcan solo para quien de verdad realiza esa actividad, con el mismo esquema de fecha de
+            vencimiento y badge de color, y solo avisan &quot;vencida&quot; cuando una que el trabajador sí
+            tiene ya venció (no cuenta como pendiente si nunca la tuvo).</li>
           <li><strong>Radicación de seguridad social</strong>: por cada trabajador y mes, se sube el
             comprobante de pago (PDF o foto) con número de planilla y fecha de vencimiento.</li>
         </Ol>
@@ -352,17 +360,25 @@ const TEMAS: Tema[] = [
           (SI/NO)&quot;, también desplegable). Las filas marcadas <strong>NO</strong>, con un contratista que
           no calza con el desplegable, o con un documento repetido, no se crean — quedan reportadas con su
           número de fila para corregir y volver a intentar, sin tumbar el resto del archivo. La plantilla
-          también trae una columna de fecha para el <strong>examen médico</strong>, la{" "}
-          <strong>certificación de trabajo en alturas</strong>, cada uno de los{" "}
-          <strong>cursos de Safety Academy</strong> y cada <strong>certificación especial</strong>{" "}
-          (espacios confinados, conducción, manlift, grúa, soldador, rescatista, licencia SST) —
-          diligenciar una fecha ahí equivale a marcarla como completada/vigente desde esa fecha (igual que
-          hacerlo uno por uno en el formulario), y dejarla vacía la deja sin diligenciar; así se puede
-          verificar de una vez la vigencia de cada trabajador importado. Estas columnas se arman con lo que
-          esté activo en Sistema → Reglas de contratistas en ese momento, así que si se agrega o desactiva
-          un curso o certificación, la próxima plantilla descargada ya lo refleja. Ningún trabajador
-          importado queda con radicación de seguridad social — esa parte sigue pendiente, igual que si se
-          hubiera cargado a mano.
+          también trae una columna de fecha de <strong>vencimiento</strong> para el{" "}
+          <strong>examen médico</strong>, la <strong>certificación de trabajo en alturas</strong>, cada uno
+          de los <strong>cursos de Safety Academy</strong> y cada <strong>certificación especial</strong>{" "}
+          (espacios confinados, conducción, manlift, grúa, soldador, rescatista, licencia SST) — el
+          encabezado de cada columna lo aclara (&quot;... — vencimiento (AAAA-MM-DD)&quot;); diligenciar una
+          fecha ahí equivale a marcarla completada con ese vencimiento (igual que hacerlo uno por uno en el
+          formulario), y dejarla vacía la deja sin diligenciar; así se puede verificar de una vez la vigencia
+          de cada trabajador importado. Estas columnas se arman con lo que esté activo en Sistema → Reglas de
+          contratistas en ese momento, así que si se agrega o desactiva un curso o certificación, la próxima
+          plantilla descargada ya lo refleja. Ningún trabajador importado queda con radicación de seguridad
+          social — esa parte sigue pendiente, igual que si se hubiera cargado a mano.
+        </P>
+        <P>
+          La plantilla descargada viene <strong>protegida</strong>: las fórmulas de los desplegables y la
+          hoja oculta &quot;Listas (no borrar)&quot; (de donde salen los nombres de las empresas
+          contratistas) no se pueden editar ni desocultar sin la contraseña interna del sistema — solo las
+          celdas de datos quedan libres para escribir. No es una medida de seguridad fuerte (se puede quitar
+          con herramientas de terceros), es para evitar que alguien rompa sin querer un desplegable o borre
+          la hoja de listas al llenar el archivo.
         </P>
         <Sub>Vencimiento de examen médico y certificación de alturas</Sub>
         <P>
@@ -806,6 +822,15 @@ const TEMAS: Tema[] = [
           de revisión pendiente</strong>. Cada ítem se puede editar (renombrar), desactivar sin borrar el
           historial de
           trabajadores/actividades que ya los tenían marcados.
+        </P>
+        <P>
+          Los cursos y certificaciones tienen además un botón <strong>&quot;Vigencia&quot;</strong> para
+          fijar sus <strong>meses de vigencia</strong> (ej. 18 para trabajo en alturas, 36 para espacios
+          confinados) — dejarlo vacío si no vence o no se conoce el período todavía. Ese número solo se usa
+          para <strong>sugerir</strong> la fecha de vencimiento (hoy + esos meses) cuando alguien marca el
+          curso/certificación como completado en la ficha del trabajador; la fecha final siempre queda
+          editable a mano, y el badge de color (vigente/por vencer/vencido) funciona igual tenga o no
+          configurado este número.
         </P>
         <Sub>Aviso al radicar/enviar (no solo al aprobar/rechazar)</Sub>
         <P>

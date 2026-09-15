@@ -121,6 +121,7 @@ class TrabajadorSerializer(serializers.ModelSerializer):
     contratista_nombre = serializers.CharField(source="contratista.nombre", read_only=True)
     ultima_radicacion = serializers.SerializerMethodField()
     cursos_pendientes = serializers.ReadOnlyField()
+    cursos_vencidos = serializers.ReadOnlyField()
     examen_medico_vencido = serializers.BooleanField(read_only=True)
     dias_para_vencer_examen_medico = serializers.IntegerField(read_only=True, allow_null=True)
     certificacion_alturas_vencida = serializers.BooleanField(read_only=True)
@@ -143,6 +144,7 @@ class TrabajadorSerializer(serializers.ModelSerializer):
             "fecha_inicio_contrato",
             "cursos_safety_academy",
             "cursos_pendientes",
+            "cursos_vencidos",
             "certificaciones_especiales",
             "certificaciones_especiales_vencidas",
             "fecha_vencimiento_examen_medico",
@@ -419,13 +421,19 @@ class CatalogosSerializer(serializers.Serializer):
 
     def get_cursos_safety_academy(self, obj):
         return [
-            {"clave": c.clave, "etiqueta": c.etiqueta, "obligatorio": c.obligatorio}
+            {
+                "clave": c.clave,
+                "etiqueta": c.etiqueta,
+                "obligatorio": c.obligatorio,
+                "meses_vigencia": c.meses_vigencia,
+            }
             for c in CursoSafetyAcademy.objects.filter(activo=True)
         ]
 
     def get_certificaciones_especiales(self, obj):
         return [
-            {"clave": c.clave, "etiqueta": c.etiqueta} for c in CertificacionEspecial.objects.filter(activo=True)
+            {"clave": c.clave, "etiqueta": c.etiqueta, "meses_vigencia": c.meses_vigencia}
+            for c in CertificacionEspecial.objects.filter(activo=True)
         ]
 
     def get_permisos_trabajo(self, obj):
@@ -456,14 +464,14 @@ class FuncionarioSerializer(serializers.ModelSerializer):
 class CursoSafetyAcademySerializer(serializers.ModelSerializer):
     class Meta:
         model = CursoSafetyAcademy
-        fields = ["id", "clave", "etiqueta", "activo", "obligatorio", "orden"]
+        fields = ["id", "clave", "etiqueta", "activo", "obligatorio", "orden", "meses_vigencia"]
         read_only_fields = ["id"]
 
 
 class CertificacionEspecialSerializer(serializers.ModelSerializer):
     class Meta:
         model = CertificacionEspecial
-        fields = ["id", "clave", "etiqueta", "activo", "orden"]
+        fields = ["id", "clave", "etiqueta", "activo", "orden", "meses_vigencia"]
         read_only_fields = ["id"]
 
 

@@ -204,6 +204,28 @@ function Cursos({ token }: { token: string }) {
     }
   }
 
+  async function editarVigencia(curso: CursoSafetyAcademy) {
+    const texto = await pedirTexto({
+      titulo: "Meses de vigencia",
+      mensaje: "¿Cada cuántos meses vence este curso? Déjalo vacío si no vence o no se conoce el período.",
+      valorInicial: curso.meses_vigencia != null ? String(curso.meses_vigencia) : "",
+      textoConfirmar: "Guardar",
+      opcional: true,
+    });
+    if (texto === null) return;
+    const meses = texto.trim() === "" ? null : Number(texto.trim());
+    if (meses !== null && (!Number.isInteger(meses) || meses <= 0)) {
+      setError("Los meses de vigencia deben ser un número entero mayor que cero.");
+      return;
+    }
+    try {
+      await actualizarCurso(token, curso.id, { meses_vigencia: meses });
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la vigencia del curso.");
+    }
+  }
+
   async function eliminar(curso: CursoSafetyAcademy) {
     const ok = await confirmar({
       titulo: "Eliminar curso",
@@ -242,10 +264,16 @@ function Cursos({ token }: { token: string }) {
                   Obligatorio
                 </span>
               )}
+              <span className="ml-2 text-xs text-corp-muted">
+                {c.meses_vigencia != null ? `Vence cada ${c.meses_vigencia} meses` : "Sin período de vigencia definido"}
+              </span>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               <button type="button" onClick={() => alternarObligatorio(c)} className="text-corp-blue hover:underline">
                 {c.obligatorio ? "Quitar obligatoriedad" : "Marcar obligatorio"}
+              </button>
+              <button type="button" onClick={() => editarVigencia(c)} className="text-corp-blue hover:underline">
+                Vigencia
               </button>
               <button type="button" onClick={() => editar(c)} className="text-corp-blue hover:underline">
                 Editar
@@ -339,6 +367,28 @@ function CertificacionesEspeciales({ token }: { token: string }) {
     }
   }
 
+  async function editarVigencia(certificacion: CertificacionEspecial) {
+    const texto = await pedirTexto({
+      titulo: "Meses de vigencia",
+      mensaje: "¿Cada cuántos meses vence esta certificación (ej. 36 para espacios confinados)? Déjalo vacío si no se conoce el período.",
+      valorInicial: certificacion.meses_vigencia != null ? String(certificacion.meses_vigencia) : "",
+      textoConfirmar: "Guardar",
+      opcional: true,
+    });
+    if (texto === null) return;
+    const meses = texto.trim() === "" ? null : Number(texto.trim());
+    if (meses !== null && (!Number.isInteger(meses) || meses <= 0)) {
+      setError("Los meses de vigencia deben ser un número entero mayor que cero.");
+      return;
+    }
+    try {
+      await actualizarCertificacionEspecial(token, certificacion.id, { meses_vigencia: meses });
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la vigencia de la certificación.");
+    }
+  }
+
   async function eliminar(certificacion: CertificacionEspecial) {
     const ok = await confirmar({
       titulo: "Eliminar certificación especial",
@@ -374,8 +424,14 @@ function CertificacionesEspeciales({ token }: { token: string }) {
             <div>
               <span className={c.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{c.etiqueta}</span>
               <span className="ml-2 text-xs text-corp-muted">({c.clave})</span>
+              <span className="ml-2 text-xs text-corp-muted">
+                {c.meses_vigencia != null ? `Vence cada ${c.meses_vigencia} meses` : "Sin período de vigencia definido"}
+              </span>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <button type="button" onClick={() => editarVigencia(c)} className="text-corp-blue hover:underline">
+                Vigencia
+              </button>
               <button type="button" onClick={() => editar(c)} className="text-corp-blue hover:underline">
                 Editar
               </button>

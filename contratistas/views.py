@@ -39,6 +39,7 @@ from .models import (
     RegistroAuditoria,
     RegistroCapacitacion,
     Trabajador,
+    _sumar_meses,
     calcular_hash_declaracion,
     nivel_riesgo,
 )
@@ -140,6 +141,12 @@ def indicadores(request):
         for fecha in (valores or {}).values()
         if fecha and fecha < hoy_iso
     )
+    cursos_vencidos = sum(
+        1
+        for valores in trabajadores.values_list("cursos_safety_academy", flat=True)
+        for fecha in (valores or {}).values()
+        if fecha and fecha < hoy_iso
+    )
     return Response(
         {
             "radicaciones_vencidas": radicaciones.filter(fecha_vencimiento__lt=hoy).count(),
@@ -158,6 +165,7 @@ def indicadores(request):
                 fecha_vencimiento_certificacion_alturas__lte=limite_por_vencer,
             ).count(),
             "certificaciones_especiales_vencidas": certificaciones_especiales_vencidas,
+            "cursos_vencidos": cursos_vencidos,
         }
     )
 
@@ -250,10 +258,15 @@ def indicadores_dashboard(request):
         CursoSafetyAcademy.objects.filter(activo=True, obligatorio=True).values_list("clave", flat=True)
     )
     trabajadores_activos = list(Trabajador.objects.filter(activo=True).only("cursos_safety_academy"))
+    hoy_iso = hoy.isoformat()
     trabajadores_con_cursos_pendientes = sum(
         1
         for t in trabajadores_activos
-        if any(not (t.cursos_safety_academy or {}).get(clave) for clave in claves_obligatorias)
+        if any(
+            not (t.cursos_safety_academy or {}).get(clave)
+            or (t.cursos_safety_academy or {})[clave] < hoy_iso
+            for clave in claves_obligatorias
+        )
     )
 
     return Response(
@@ -1335,8 +1348,11 @@ def calificar_capacitacion(request, pk):
 
     if aprobado and registro.trabajador:
         trabajador = registro.trabajador
+        hoy = timezone.localdate()
+        induccion = CursoSafetyAcademy.objects.filter(clave="induccion_sst").first()
+        vencimiento = _sumar_meses(hoy, induccion.meses_vigencia) if induccion and induccion.meses_vigencia else hoy
         cursos = dict(trabajador.cursos_safety_academy or {})
-        cursos["induccion_sst"] = timezone.localdate().isoformat()
+        cursos["induccion_sst"] = vencimiento.isoformat()
         trabajador.cursos_safety_academy = cursos
         trabajador.save(update_fields=["cursos_safety_academy"])
 

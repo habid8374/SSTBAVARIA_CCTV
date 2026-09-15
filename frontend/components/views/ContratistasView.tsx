@@ -202,7 +202,8 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
           indicadores.examenes_medicos_por_vencer > 0 ||
           indicadores.certificaciones_alturas_vencidas > 0 ||
           indicadores.certificaciones_alturas_por_vencer > 0 ||
-          indicadores.certificaciones_especiales_vencidas > 0) && (
+          indicadores.certificaciones_especiales_vencidas > 0 ||
+          indicadores.cursos_vencidos > 0) && (
           <div className="mt-4 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {indicadores.radicaciones_vencidas > 0 && (
               <p>
@@ -252,6 +253,12 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
                 {indicadores.certificaciones_especiales_vencidas === 1 ? "" : "es"} especial (espacios confinados,
                 conducción, manlift, grúa, soldador, rescatista, licencia SST){" "}
                 <strong>vencida{indicadores.certificaciones_especiales_vencidas === 1 ? "" : "s"}</strong>.
+              </p>
+            )}
+            {indicadores.cursos_vencidos > 0 && (
+              <p>
+                ⚠ <strong>{indicadores.cursos_vencidos}</strong> curso{indicadores.cursos_vencidos === 1 ? "" : "s"}{" "}
+                Safety Academy <strong>vencido{indicadores.cursos_vencidos === 1 ? "" : "s"}</strong>.
               </p>
             )}
           </div>
@@ -347,6 +354,45 @@ function EstadoBadge({ estado }: { estado?: EstadoRadicacion }) {
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estilos[estado]}`}>{etiquetas[estado]}</span>
   );
+}
+
+/** `fecha` (AAAA-MM-DD) + `meses` meses calendario, ajustando el día si el
+ * mes destino es más corto (ej. 31 de enero + 1 mes = 28/29 de febrero) —
+ * espejo de _sumar_meses en contratistas/models.py, usada solo para sugerir
+ * una fecha de vencimiento por defecto al marcar un curso/certificación. */
+function sumarMeses(fechaIso: string, meses: number): string {
+  const [anio, mes, dia] = fechaIso.split("-").map(Number);
+  const mesTotal = mes - 1 + meses;
+  const anioDestino = anio + Math.floor(mesTotal / 12);
+  const mesDestino = ((mesTotal % 12) + 12) % 12;
+  const ultimoDia = new Date(anioDestino, mesDestino + 1, 0).getDate();
+  const diaFinal = Math.min(dia, ultimoDia);
+  return `${anioDestino}-${String(mesDestino + 1).padStart(2, "0")}-${String(diaFinal).padStart(2, "0")}`;
+}
+
+function diasParaVencer(fechaIso: string): number {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const fecha = new Date(`${fechaIso}T00:00:00`);
+  return Math.round((fecha.getTime() - hoy.getTime()) / 86400000);
+}
+
+/** Vigente/por vencer/vencido para una fecha de vencimiento cualquiera (curso
+ * o certificación especial) — mismo umbral de 15 días que VencimientoBadge. */
+function BadgeVigenciaFecha({ fecha }: { fecha: string | null }) {
+  if (!fecha) return null;
+  const dias = diasParaVencer(fecha);
+  if (dias < 0) {
+    return <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">Vencido</span>;
+  }
+  if (dias <= 15) {
+    return (
+      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+        Vence en {dias} día{dias === 1 ? "" : "s"}
+      </span>
+    );
+  }
+  return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Vigente</span>;
 }
 
 function VencimientoBadge({ radicacion }: { radicacion: RadicacionSeguridadSocial }) {
@@ -549,6 +595,15 @@ function PanelContratista({
                           ⚠ Certificación{t.certificaciones_especiales_vencidas.length === 1 ? "" : "es"} vencida
                           {t.certificaciones_especiales_vencidas.length === 1 ? "" : "s"}:{" "}
                           {t.certificaciones_especiales_vencidas.map((c) => c.etiqueta).join(", ")}
+                        </p>
+                      )}
+                      {t.cursos_vencidos.length > 0 && (
+                        <p
+                          className="mt-0.5 text-xs font-normal text-red-700"
+                          title={t.cursos_vencidos.map((c) => c.etiqueta).join(", ")}
+                        >
+                          ⚠ Curso{t.cursos_vencidos.length === 1 ? "" : "s"} vencido
+                          {t.cursos_vencidos.length === 1 ? "" : "s"}: {t.cursos_vencidos.map((c) => c.etiqueta).join(", ")}
                         </p>
                       )}
                     </td>
@@ -950,7 +1005,13 @@ function FormularioTrabajador({
   const [enviando, setEnviando] = useState(false);
 
   function alternarCurso(clave: string, marcado: boolean) {
-    setCursos((actual) => ({ ...actual, [clave]: marcado ? actual[clave] || new Date().toISOString().slice(0, 10) : null }));
+    setCursos((actual) => {
+      if (!marcado) return { ...actual, [clave]: null };
+      if (actual[clave]) return actual;
+      const curso = catalogos.cursos_safety_academy.find((c) => c.clave === clave);
+      const hoy = new Date().toISOString().slice(0, 10);
+      return { ...actual, [clave]: curso?.meses_vigencia ? sumarMeses(hoy, curso.meses_vigencia) : hoy };
+    });
   }
 
   function fecharCurso(clave: string, fecha: string) {
@@ -958,10 +1019,16 @@ function FormularioTrabajador({
   }
 
   function alternarCertificacion(clave: string, marcado: boolean) {
-    setCertificaciones((actual) => ({
-      ...actual,
-      [clave]: marcado ? actual[clave] || new Date().toISOString().slice(0, 10) : null,
-    }));
+    setCertificaciones((actual) => {
+      if (!marcado) return { ...actual, [clave]: null };
+      if (actual[clave]) return actual;
+      const certificacion = catalogos.certificaciones_especiales.find((c) => c.clave === clave);
+      const hoy = new Date().toISOString().slice(0, 10);
+      return {
+        ...actual,
+        [clave]: certificacion?.meses_vigencia ? sumarMeses(hoy, certificacion.meses_vigencia) : hoy,
+      };
+    });
   }
 
   function fecharCertificacion(clave: string, fecha: string) {
@@ -1085,6 +1152,11 @@ function FormularioTrabajador({
             {catalogos.cursos_safety_academy.some((c) => c.obligatorio) && (
               <span className="ml-2 text-xs text-amber-700">* obligatorio</span>
             )}
+            <p className="mt-0.5 text-xs text-corp-muted">
+              La fecha es el <strong>vencimiento</strong> del curso, no la de realización — al marcarlo se
+              sugiere hoy + el período de vigencia configurado en Sistema → Reglas de contratistas, editable
+              a mano.
+            </p>
             <div className="mt-2 space-y-2 rounded-lg border border-corp-border p-3">
               {catalogos.cursos_safety_academy.map((curso) => {
                 const completado = cursos[curso.clave] != null;
@@ -1101,12 +1173,15 @@ function FormularioTrabajador({
                       {curso.obligatorio && <span className="text-amber-700">*</span>}
                     </label>
                     {completado && (
-                      <input
-                        type="date"
-                        value={cursos[curso.clave] ?? ""}
-                        onChange={(e) => fecharCurso(curso.clave, e.target.value)}
-                        className="rounded-lg border border-corp-border px-2 py-1 text-xs outline-none focus:border-corp-blue"
-                      />
+                      <>
+                        <input
+                          type="date"
+                          value={cursos[curso.clave] ?? ""}
+                          onChange={(e) => fecharCurso(curso.clave, e.target.value)}
+                          className="rounded-lg border border-corp-border px-2 py-1 text-xs outline-none focus:border-corp-blue"
+                        />
+                        <BadgeVigenciaFecha fecha={cursos[curso.clave]} />
+                      </>
                     )}
                   </div>
                 );
@@ -1118,7 +1193,8 @@ function FormularioTrabajador({
             <span className="text-sm font-medium text-corp-navy">Certificaciones especiales</span>
             <p className="mt-0.5 text-xs text-corp-muted">
               Solo marca las que el trabajador realmente tiene — a diferencia de los cursos, ninguna es
-              obligatoria para todos.
+              obligatoria para todos. La fecha también es el <strong>vencimiento</strong>, no la de
+              realización.
             </p>
             <div className="mt-2 space-y-2 rounded-lg border border-corp-border p-3">
               {catalogos.certificaciones_especiales.map((certificacion) => {
@@ -1135,12 +1211,15 @@ function FormularioTrabajador({
                       {certificacion.etiqueta}
                     </label>
                     {completado && (
-                      <input
-                        type="date"
-                        value={certificaciones[certificacion.clave] ?? ""}
-                        onChange={(e) => fecharCertificacion(certificacion.clave, e.target.value)}
-                        className="rounded-lg border border-corp-border px-2 py-1 text-xs outline-none focus:border-corp-blue"
-                      />
+                      <>
+                        <input
+                          type="date"
+                          value={certificaciones[certificacion.clave] ?? ""}
+                          onChange={(e) => fecharCertificacion(certificacion.clave, e.target.value)}
+                          className="rounded-lg border border-corp-border px-2 py-1 text-xs outline-none focus:border-corp-blue"
+                        />
+                        <BadgeVigenciaFecha fecha={certificaciones[certificacion.clave]} />
+                      </>
                     )}
                   </div>
                 );
