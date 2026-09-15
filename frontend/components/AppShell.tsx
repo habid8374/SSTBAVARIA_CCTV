@@ -4,11 +4,13 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import type { Rol } from "@/lib/api";
 import { IconMenu } from "./icons";
+import NotificacionesInternasBell from "./NotificacionesInternasBell";
 import Sidebar, { type SeccionId } from "./Sidebar";
 
 const COLAPSADO_KEY = "sstbavaria_sidebar_colapsado";
 
 type Props = {
+  token: string;
   nombre: string;
   rol: Rol | null;
   seccionActiva: SeccionId;
@@ -19,6 +21,7 @@ type Props = {
 };
 
 export default function AppShell({
+  token,
   nombre,
   rol,
   seccionActiva,
@@ -64,25 +67,31 @@ export default function AppShell({
         nombre={nombre}
       />
 
-      {drawerAbierto && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <button
-            aria-label="Cerrar menú"
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setDrawerAbierto(false)}
-          />
-          <Sidebar
-            className="absolute inset-y-0 left-0 z-50 shadow-2xl"
-            seccionActiva={seccionActiva}
-            onSeleccionar={seleccionar}
-            rol={rol}
-            colapsado={false}
-            onToggleColapsado={toggleColapsado}
-            onCerrarSesion={onCerrarSesion}
-            nombre={nombre}
-          />
-        </div>
-      )}
+      <div
+        className={`fixed inset-0 z-40 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] md:hidden ${
+          drawerAbierto ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        aria-hidden={!drawerAbierto}
+        inert={!drawerAbierto}
+      >
+        <button
+          aria-label="Cerrar menú"
+          className="absolute inset-0 bg-black/50"
+          onClick={() => setDrawerAbierto(false)}
+        />
+        <Sidebar
+          className={`absolute inset-y-0 left-0 z-50 shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            drawerAbierto ? "translate-x-0" : "-translate-x-full"
+          }`}
+          seccionActiva={seccionActiva}
+          onSeleccionar={seleccionar}
+          rol={rol}
+          colapsado={false}
+          onToggleColapsado={toggleColapsado}
+          onCerrarSesion={onCerrarSesion}
+          nombre={nombre}
+        />
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-corp-border bg-white px-4 py-3 md:px-8">
@@ -94,10 +103,18 @@ export default function AppShell({
           >
             <IconMenu className="h-5 w-5" />
           </button>
-          <h1 className="text-lg font-semibold text-corp-navy">{tituloSeccion}</h1>
+          <h1 className="flex-1 text-lg font-semibold text-corp-navy">{tituloSeccion}</h1>
+          {rol !== "contratista" && <NotificacionesInternasBell token={token} onIrA={onSeleccionar} />}
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">{children}</main>
+
+        <footer className="flex items-center justify-center gap-2 border-t border-corp-border bg-white px-4 py-2.5 text-xs text-corp-muted">
+          <span>Powered by</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-axentia.png" alt="Axentia Technologies" className="h-4 w-auto" />
+          <span className="font-medium text-corp-navy">Axentia Technologies</span>
+        </footer>
       </div>
     </div>
   );

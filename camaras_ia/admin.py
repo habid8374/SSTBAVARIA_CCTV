@@ -1,6 +1,16 @@
 from django.contrib import admin
 
-from .models import Camara, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
+from .models import (
+    Camara,
+    ConfiguracionIA,
+    ConfiguracionNotificaciones,
+    EquipoLocal,
+    EventoDetectado,
+    InstruccionSeguridad,
+    ReglaAlerta,
+    TipoEventoIA,
+    ZonaRestringida,
+)
 
 
 class ReglaAlertaInline(admin.TabularInline):
@@ -22,6 +32,11 @@ class CamaraAdmin(admin.ModelAdmin):
     inlines = [ZonaRestringidaInline]
 
 
+@admin.register(ConfiguracionNotificaciones)
+class ConfiguracionNotificacionesAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "brevo_remitente_email", "actualizada_en")
+
+
 @admin.register(EquipoLocal)
 class EquipoLocalAdmin(admin.ModelAdmin):
     list_display = ("nombre", "empresa", "api_key", "activo", "ultima_conexion")
@@ -32,8 +47,8 @@ class EquipoLocalAdmin(admin.ModelAdmin):
 
 @admin.register(ZonaRestringida)
 class ZonaRestringidaAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "camara", "activa")
-    list_filter = ("camara__empresa", "activa")
+    list_display = ("nombre", "camara", "tipo", "activa")
+    list_filter = ("camara__empresa", "tipo", "activa")
     search_fields = ("nombre",)
     inlines = [ReglaAlertaInline]
 
@@ -55,7 +70,27 @@ class ReglaAlertaAdmin(admin.ModelAdmin):
 
 @admin.register(EventoDetectado)
 class EventoDetectadoAdmin(admin.ModelAdmin):
-    list_display = ("camara", "zona", "timestamp", "disparo_alerta", "estado")
+    list_display = ("camara", "zona", "timestamp", "disparo_alerta", "estado", "ia_analizado_en")
     list_filter = ("estado", "disparo_alerta", "camara")
     date_hierarchy = "timestamp"
-    readonly_fields = ("timestamp",)
+    readonly_fields = ("timestamp", "ia_analizado_en")
+    filter_horizontal = ("tipos_ia",)
+
+
+@admin.register(ConfiguracionIA)
+class ConfiguracionIAAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "modelo", "actualizada_en")
+
+
+@admin.register(TipoEventoIA)
+class TipoEventoIAAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "empresa", "severidad", "activo", "creado_en")
+    list_filter = ("empresa", "severidad", "activo")
+    search_fields = ("nombre", "descripcion")
+
+
+@admin.register(InstruccionSeguridad)
+class InstruccionSeguridadAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "camara", "estado", "zona", "creada_en")
+    list_filter = ("empresa", "estado")
+    search_fields = ("texto", "notas")

@@ -9,6 +9,8 @@ import logging
 
 from django.utils import timezone
 
+from .notificaciones import ErrorEnvioCorreo, enviar_correo_brevo
+
 logger = logging.getLogger("camaras_ia.alertas")
 
 
@@ -29,6 +31,28 @@ def punto_en_poligono(punto, poligono):
                 dentro = not dentro
         x1, y1 = x2, y2
     return dentro
+
+
+def punto_en_circulo(punto, centro, radio_px):
+    """True si `punto` (x, y) cae dentro del círculo de centro `centro`
+    (x, y) y radio `radio_px`, ya en píxeles. `radio_px` None o <= 0 nunca
+    contiene nada (ej. cámara sin calibrar, ver Camara.px_por_metro)."""
+    if radio_px is None or radio_px <= 0:
+        return False
+    x, y = punto
+    cx, cy = centro
+    return (x - cx) ** 2 + (y - cy) ** 2 <= radio_px**2
+
+
+def punto_en_zona(punto, zona, px_por_metro=None):
+    """Dispatch según zona.tipo: polígono (por defecto) o punto+radio real
+    (necesita que la cámara esté calibrada — px_por_metro no None)."""
+    if zona.tipo == zona.Tipo.PUNTO_RADIO:
+        if zona.centro_x is None or zona.centro_y is None or zona.radio_metros is None or not px_por_metro:
+            return False
+        radio_px = zona.radio_metros * px_por_metro
+        return punto_en_circulo(punto, (zona.centro_x, zona.centro_y), radio_px)
+    return punto_en_poligono(punto, zona.poligono)
 
 
 def _regla_vigente(regla, momento):
@@ -63,8 +87,9 @@ def evaluar_zona_horario(camara, punto, momento=None):
     """
     momento = momento or timezone.localtime()
 
+    px_por_metro = camara.px_por_metro
     for zona in camara.zonas.filter(activa=True).prefetch_related("reglas"):
-        if not punto_en_poligono(punto, zona.poligono):
+        if not punto_en_zona(punto, zona, px_por_metro):
             continue
         for regla in zona.reglas.filter(activa=True):
             if _regla_vigente(regla, momento):
@@ -77,10 +102,12 @@ def evaluar_zona_horario(camara, punto, momento=None):
 def disparar_alerta(evento, regla):
     """Dispara la notificación de una alerta.
 
-    Stub por ahora: solo registra el intento en el log, con todo lo que
-    necesitaría un envío real (canal, destinatario, evento, zona). Conectar
-    un proveedor real de WhatsApp/correo es una decisión de proveedor aparte
-    que todavía no se ha tomado.
+    Canal "correo": envío real vía Brevo, con el resultado (éxito o el
+    motivo del error) guardado en evento.notificacion_enviada/_detalle para
+    que se vea en la bandeja de Alertas del dashboard.
+    Canal "whatsapp": sigue siendo un stub — solo el log de abajo. Conectar
+    un proveedor real de WhatsApp es una decisión de proveedor aparte que
+    todavía no se ha tomado.
     """
     logger.warning(
         "ALERTA disparada: evento_id=%s camara=%s zona=%s canal=%s destinatario=%s",
@@ -90,3 +117,59 @@ def disparar_alerta(evento, regla):
         regla.canal_notificacion,
         regla.destinatario,
     )
+
+    _enviar_push_alerta(evento)
+
+    evento.canal_notificacion = regla.canal_notificacion
+    if regla.canal_notificacion == "correo":  # ReglaAlerta.Canal.CORREO
+        _enviar_notificacion_correo(evento, regla)
+    else:
+        evento.notificacion_enviada = False
+        evento.notificacion_detalle = "Canal WhatsApp — integración de envío pendiente."
+        evento.save(update_fields=["canal_notificacion", "notificacion_enviada", "notificacion_detalle"])
+
+
+def _enviar_push_alerta(evento):
+    """Push al celular del personal interno — independiente del canal
+    correo/whatsapp de la regla, para que se entere aunque no tenga la app
+    abierta. Nunca rompe disparar_alerta si falla (ver core.push)."""
+    from core.push import enviar_push_a_personal_interno
+
+    zona_nombre = evento.zona.nombre if evento.zona else "zona restringida"
+    enviar_push_a_personal_interno(
+        "Alerta SST Bavaria — cámaras",
+        f"Se detectó una persona en {zona_nombre} (cámara {evento.camara.nombre}) fuera del horario permitido.",
+        url="/dashboard?ir=alertas",
+    )
+
+
+def _enviar_notificacion_correo(evento, regla):
+    zona_nombre = evento.zona.nombre if evento.zona else "zona restringida"
+    momento = timezone.localtime(evento.timestamp)
+    asunto = f"Alerta SST Bavaria — {zona_nombre}"
+    contenido_html = (
+        f"<p>Se detectó una persona en <strong>{zona_nombre}</strong> "
+        f"(cámara <strong>{evento.camara.nombre}</strong>) fuera del horario permitido.</p>"
+        f"<p>Fecha y hora: {momento:%Y-%m-%d %H:%M:%S}</p>"
+    )
+
+    adjunto_bytes = None
+    adjunto_nombre = None
+    if evento.snapshot:
+        try:
+            evento.snapshot.open("rb")
+            adjunto_bytes = evento.snapshot.read()
+            adjunto_nombre = evento.snapshot.name.rsplit("/", 1)[-1]
+        finally:
+            evento.snapshot.close()
+
+    try:
+        enviar_correo_brevo(regla.destinatario, asunto, contenido_html, adjunto_bytes, adjunto_nombre)
+    except ErrorEnvioCorreo as err:
+        logger.error("No se pudo enviar la alerta por correo (evento_id=%s): %s", evento.pk, err)
+        evento.notificacion_enviada = False
+        evento.notificacion_detalle = str(err)[:255]
+    else:
+        evento.notificacion_enviada = True
+        evento.notificacion_detalle = f"Correo enviado a {regla.destinatario}"[:255]
+    evento.save(update_fields=["canal_notificacion", "notificacion_enviada", "notificacion_detalle"])

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: 29.7cm 21cm; margin: 1.5cm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1a1a1a; text-align: center; }
+  table.marco { width: 100%; height: 17.5cm; border: 3pt solid #0b1f3a; border-collapse: collapse; }
+  table.marco td { text-align: center; vertical-align: middle; padding: 0 30pt; }
+  p.marca { font-size: 11pt; letter-spacing: 2pt; color: #0b1f3a; text-transform: uppercase; margin: 0 0 14pt 0; }
+  p.titulo { font-size: 26pt; font-weight: bold; color: #0b1f3a; margin: 0 0 6pt 0; }
+  p.subtitulo { font-size: 11pt; color: #444; margin: 0 0 16pt 0; }
+  p.nombre { font-size: 22pt; font-weight: bold; color: #0b1f3a; margin: 0 0 16pt 0; }
+  p.texto { font-size: 11pt; color: #333; margin: 0 0 4pt 0; }
+  p.curso { font-size: 13pt; font-weight: bold; color: #0b1f3a; margin: 0 0 20pt 0; }
+  p.datos { font-size: 9.5pt; color: #555; margin: 0; }
+</style>
+</head>
+<body>
+  <table class="marco">
+    <tr>
+      <td>
+        <p class="marca">SST Bavaria — Cámaras IA</p>
+        <p class="titulo">Certificado de Capacitación</p>
+        <p class="subtitulo">Se otorga el presente reconocimiento a</p>
+        <p class="nombre">{{ registro.nombres }}</p>
+        <p class="texto">Por haber completado y aprobado satisfactoriamente la inducción de</p>
+        <p class="curso">{{ titulo_curso }}</p>
+        <p class="datos">
+          Empresa: {{ registro.contratista.nombre }}
+          {% if registro.documento %}&nbsp;&nbsp;·&nbsp;&nbsp;Documento: {{ registro.documento }}{% endif %}
+          &nbsp;&nbsp;·&nbsp;&nbsp;Calificación: {{ registro.calificacion }}%
+          &nbsp;&nbsp;·&nbsp;&nbsp;Fecha de emisión: {{ registro.finalizado_en|date:"d/m/Y" }}
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

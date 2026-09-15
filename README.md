@@ -18,6 +18,317 @@ frontend en Vercel — pero viven en el mismo repositorio.
   Tablero de indicadores, Cámaras IA con overlays de zona sobre el último
   snapshot, editor visual de Zonas y horarios (dibujar el polígono haciendo
   clic sobre el encuadre de referencia), y la bandeja de Alertas.
+- **Contratistas y Declaración de Método** (completo): dos módulos de
+  cumplimiento SST para el personal de empresas contratistas, digitalizando
+  el proceso manual (Excel/PDF) que ya usa el cliente:
+  - **Contratistas**: empresas contratistas, su personal (con EPS/ARL/AFP y
+    cursos Safety Academy) y la radicación mensual del soporte de pago de
+    seguridad social (planilla PILA), con aprobación/rechazo por un
+    interventor. Cada trabajador tiene además dos campos opcionales —
+    vencimiento de examen médico ocupacional y de certificación de trabajo
+    en alturas (`Trabajador.fecha_vencimiento_examen_medico`/
+    `fecha_vencimiento_certificacion_alturas`) — solo para quienes hacen
+    trabajo en altura, con el mismo tratamiento de vencido/por vencer/
+    vigente que la planilla PILA (badge, aviso junto al nombre, conteo en
+    el banner y en `GET /api/contratistas/indicadores/`).
+  - **Declaración de Método**: formulario dinámico de secuencia de
+    actividades con evaluación de riesgo por el método Kinney
+    (R = Probabilidad × Frecuencia × Impacto, antes y después de mitigación),
+    permisos de trabajo y equipo de protección personal (EPP) requeridos
+    por actividad, y **firmas electrónicas** — basado en el formato real
+    `REG.MAZ.SAFE.2.5.2` que ya usa el cliente.
+  - Ambos módulos, además: vencimiento de la planilla PILA visible con
+    badge (Vigente/Por vencer/Vencida) y banner de aviso agregado; correo
+    automático (Brevo) al contacto de la empresa contratista al
+    aprobar/rechazar una radicación o una declaración de método; no se
+    puede aprobar una declaración sin al menos una firma vigente;
+    exportación a Excel de las radicaciones (`openpyxl`) y a PDF de la
+    declaración de método completa (`xhtml2pdf`).
+  - **Exportar Declaración de Método a Excel** (botón "Descargar Excel",
+    junto al de PDF; `contratistas/exportar_declaracion_excel.py`,
+    `openpyxl`). Dos caminos, según si la declaración tiene un Excel
+    original adjunto (ver "Archivo Excel original adjunto" abajo):
+    - **Con Excel original** (`generar_excel_desde_original`): reutiliza
+      tal cual el archivo que se subió al importar — mismo formato con el
+      que lo diligenció el contratista, sin reconstruirlo — y le agrega
+      una hoja "Decisión SST" al final (estado, fecha de la decisión,
+      observaciones/motivo). Así el archivo que se sube y el que se
+      descarga quedan en el mismo formato, con la decisión de SST
+      incluida.
+    - **Sin Excel original** (`generar_excel_declaracion`, declaraciones
+      llenadas a mano): genera el libro propio de 5 hojas que usa la
+      empresa contratista para sus propias declaraciones — Declaración de
+      Método (datos generales + actividades), Firmas/Permisos/EPP,
+      Catálogo de Peligros y Evaluación según Kinney (ambas hojas de
+      referencia estática, tomadas tal cual del formato real del cliente
+      vía `contratistas/catalogo_peligros.py`) y Control del Documento
+      (footer con los metadatos propios de SST Bavaria — deliberadamente
+      sin replicar el código de control documental interno de AB InBev,
+      para no dar a entender que el archivo es un documento emitido
+      oficialmente por ellos).
+  - **Importar Declaración de Método desde Excel** (botón "Importar desde
+    Excel" en el formulario, antes de guardar por primera vez;
+    `contratistas/importar_declaracion_excel.py`,
+    `POST /api/contratistas/declaraciones/importar-excel/`, `openpyxl`,
+    `IsAuthenticated` — contratista o personal interno): lee el libro de
+    Excel real que ya usa el cliente para diligenciar declaraciones a mano
+    (mismas 5 hojas del export, porque ese formato se construyó copiando
+    este) y devuelve los datos ya parseados — datos generales, secuencia de
+    actividades (una fila del formulario por cada fila de riesgo bajo una
+    misma actividad combinada) y permisos/EPP marcados, emparejados por
+    texto normalizado (sin tildes/mayúsculas/paréntesis) contra los
+    catálogos configurables — para precargar el formulario del frontend.
+    Solo lee datos: nunca crea ni guarda nada por su cuenta, no decide la
+    empresa contratista (la sigue eligiendo quien sube el archivo, en el
+    propio desplegable) y no importa firmas (una firma solo se puede crear
+    firmando de verdad, ligada a la cuenta autenticada). Lo que no se pueda
+    reconocer automáticamente se reporta en `avisos` para revisión manual
+    antes de guardar.
+  - **Archivo Excel original adjunto a la declaración** (campo
+    `DeclaracionMetodo.archivo_origen_excel`,
+    `POST /api/contratistas/declaraciones/<id>/archivo-origen/`,
+    `IsAuthenticated`, scopeado por contratista igual que el resto): al
+    crear una declaración importando un Excel, el frontend sube ese mismo
+    archivo a este endpoint justo después de guardarla por primera vez, y
+    queda disponible con un botón "Ver Excel original" (junto a
+    "Descargar PDF"/"Descargar Excel") para que quien revisa pueda abrir
+    el documento tal como llegó y compararlo contra lo que quedó cargado
+    en el formulario — pedido explícito del cliente para poder contrastar
+    la evaluación del sistema contra el archivo fuente. También es la base
+    del botón "Descargar Excel" cuando existe (ver más arriba).
+  - **Detalle de actividades colapsado en declaraciones importadas**
+    (`DeclaracionMetodoView.tsx`, pedido del cliente): cuando la
+    declaración tiene un Excel original adjunto, la tabla larga de
+    actividades (Kinney/permisos/EPP por actividad) no se muestra por
+    defecto — en su lugar aparece un resumen ("N actividades importadas…")
+    con un enlace "Ver detalle de actividades" que la despliega solo si
+    hace falta corregir algo puntual. Lo que queda siempre visible: Datos
+    generales, Alertas automáticas, Firmas electrónicas y el Excel
+    original. Es solo un `useState` de UI — las actividades ya están
+    cargadas en el estado del formulario y se guardan igual, se despliegue
+    o no la tabla; una declaración sin Excel de origen (llenada a mano)
+    sigue mostrando el detalle completo siempre, sin cambios.
+  - **Alertas automáticas** (`contratistas/alertas_automaticas.py`,
+    `GET /api/contratistas/declaraciones/<id>/alertas/`, solo
+    `EsPersonalInterno`): al revisar una declaración, un motor de reglas
+    basado en los SOP "Safety to Sustain" del cliente (trabajos en altura,
+    excavaciones, sistemas anticaída) genera advertencias.
+    **Fase A**, sobre datos que el formulario ya captura — permiso de
+    altura sin EPP contra caídas, excavación sin medidas de mitigación
+    detalladas, riesgo que sigue alto tras mitigar, texto que sugiere
+    trabajo en altura sin el permiso marcado. **Fase B**, sobre dos campos
+    numéricos opcionales por actividad (`altura_trabajo_metros`,
+    `profundidad_excavacion_metros` — solo disparan alerta si el
+    contratista los diligencia): más de 1.8 m sin permiso de altura, más de
+    4 m (exige aprobación previa de Zone Safety), excavación mayor a 1.2 m
+    (exige salida de emergencia), mayor a 1.3 m (exige retén exterior) y
+    mayor a 5 m (exige andamiaje). **Categorías GTC 45** (`CATEGORIAS_PELIGRO_TEXTO`
+    en el mismo archivo — pedido del cliente, cruzar la GTC 45 contra las
+    declaraciones): la misma heurística de texto que altura, generalizada a
+    riesgo eléctrico, espacios confinados, sustancias peligrosas, bloqueo y
+    etiquetado de energías (LOTO), trabajos en caliente, izaje de cargas,
+    manejo manual de cargas/riesgo biomecánico, seguridad vial y procesos de
+    alto riesgo (amoniaco, recipientes a presión, calderos) — cada una avisa
+    si el texto de la actividad menciona esa categoría pero el certificado
+    de apoyo correspondiente no está marcado. Cada alerta cita su fuente,
+    trae un motivo de rechazo sugerido (botón que solo copia ese texto al
+    campo Observaciones) y, para las categorías de texto y algunas reglas
+    numéricas, una **medida de control sugerida** (`medida_control_sugerida`)
+    con una recomendación concreta tomada del SOP correspondiente (ej. para
+    izaje: no exceder el 85% de la capacidad de la grúa) que el frontend
+    muestra junto al mensaje de la alerta.
+    **Regla dura: el motor nunca decide por sí solo** — no cambia el estado
+    de la declaración, no bloquea aprobar/rechazar, y el texto sugerido se
+    puede editar o descartar libremente; la aprobación o el rechazo siguen
+    siendo 100% una decisión humana.
+  - **Notas por alerta** (`contratistas.NotaAlerta`,
+    `GET/POST /api/contratistas/declaraciones/<id>/notas-alertas/`, solo
+    `EsPersonalInterno` — otro pedido del cliente): además del botón de
+    motivo de rechazo, cada alerta tiene su propio cuadro para dejar notas
+    de texto libre (por ejemplo, por qué se descartó o qué se validó en
+    sitio) con autor y fecha. Como las actividades se reemplazan por
+    completo en cada guardado (no tienen un id estable entre ediciones),
+    la alerta se identifica igual que ya la identifica el motor de
+    alertas: por su código más el orden de la actividad que la disparó.
+    No reemplaza el campo Observaciones general ni cambia el estado de la
+    declaración.
+  - **Firma electrónica de la Declaración de Método**: cada firma queda
+    ligada a la cuenta autenticada que la ejecutó (`FirmaMetodo.firmante_usuario`,
+    tomado de `request.user` — nunca del cliente) más un consentimiento
+    explícito (`consiento_firma`) y una huella sha256 del contenido de la
+    declaración en ese momento (`calcular_hash_declaracion`). Si la
+    declaración se edita después de firmada, la firma queda marcada
+    `documento_modificado_despues_de_firmar` y bloquea la aprobación hasta
+    que se vuelva a firmar sobre la versión actual.
+  - **Funcionarios firmantes** (`contratistas.Funcionario`): padrón de
+    personas de la empresa autorizadas a firmar por rol interno (Delegado,
+    Seguridad de Planta, Líder de Área, Dueño de Territorio — no incluye al
+    supervisor del contratista, que cambia por proyecto). El formulario de
+    firma ofrece un desplegable con estos nombres (con opción "Otro" para
+    texto libre) en vez de un campo abierto.
+  - **Indicadores** (`/api/contratistas/indicadores/dashboard/` +
+    sección "Indicadores" en el sidebar): panel tipo Power BI —
+    contratistas/trabajadores activos, riesgo Kinney promedio (sin vs. con
+    mitigación), tiempo promedio de aprobación, radicaciones/declaraciones
+    por estado, tendencia de los últimos 6 meses, cumplimiento por
+    contratista y el top 5 de actividades de mayor riesgo. Todo calculado
+    al vuelo, sin tablas de resumen que se puedan desincronizar.
+  - **Motor de reglas configurable** (pestaña "Reglas de contratistas" en
+    Sistema, solo Administrador): los cursos Safety Academy
+    (`contratistas.CursoSafetyAcademy`), los permisos de trabajo
+    (`contratistas.PermisoTrabajo`), el equipo de protección personal
+    (`contratistas.EquipoProteccionPersonal`) y los días de alerta de
+    vencimiento (`contratistas.ConfiguracionAlertas`) dejaron de ser
+    constantes fijas en el código — ahora son catálogos editables
+    (agregar/desactivar/eliminar) desde el dashboard. Las migraciones
+    `0008_sembrar_cursos_y_permisos` y `0016_sembrar_epp` siembran los
+    valores que antes estaban hardcodeados (el EPP tomado tal cual del
+    formato real de Declaración de Método del cliente), así los
+    trabajadores/actividades ya guardados siguen encontrando su curso,
+    permiso o EPP por la misma clave/nombre.
+  - **Validación de cursos obligatorios**: un curso Safety Academy se puede
+    marcar `obligatorio` (misma pestaña). El campo calculado
+    `Trabajador.cursos_pendientes` avisa (⚠ en la lista de trabajadores y
+    un KPI en amarillo en Indicadores) cuando un trabajador activo no
+    tiene completado algún curso obligatorio — es un aviso, no bloquea el
+    registro ni la radicación.
+  - **Aviso de pendiente por revisar** (dos canales independientes, ambos
+    disparados desde `contratistas/notificaciones.py`): al radicar
+    seguridad social (`RadicacionListaDashboard.perform_create`) y al pasar
+    una declaración de método a "Enviada"
+    (`DeclaracionMetodoDetalle.perform_update`/`perform_create`) se dispara
+    (1) una `NotificacionInterna` — la bandeja propia del dashboard (ícono
+    de campana en el header, contador de no leídas, `GET
+    /api/contratistas/notificaciones-internas/`), que no depende de
+    ninguna configuración, y (2) si hay un
+    `ConfiguracionAlertas.correo_revisor` configurado (Sistema → Reglas de
+    contratistas), un correo a ese destinatario. Una declaración
+    corregida y reenviada tras un rechazo (`rechazada` → `enviada`) se
+    distingue explícitamente de una declaración nueva —
+    `NotificacionInterna.Tipo.DECLARACION_SUBSANADA` vs.
+    `DECLARACION_PENDIENTE`, con su propio asunto de correo — para que
+    quien revisa sepa de un vistazo si ya la había visto antes. Es
+    independiente del aviso de aprobado/rechazado, que sigue yendo siempre
+    al contacto de la empresa contratista (sin bandeja interna — ese aviso
+    es para el contratista, no para el personal interno). Para que la
+    bandeja no crezca indefinidamente, cada notificación se puede eliminar
+    individualmente (`DELETE .../notificaciones-internas/<id>/`) o de una
+    sola vez todas las ya leídas (`DELETE
+    .../notificaciones-internas/eliminar-leidas/` — nunca toca las no
+    leídas). Un tercer canal, opcional (ver "Notificaciones push" más abajo):
+    Web Push al celular con la app cerrada, disparado desde el mismo lugar
+    en `_crear_notificacion_interna` y también desde `disparar_alerta` de
+    cámaras (`camaras_ia/services.py`) — cada quien lo activa desde su
+    propio dispositivo en la campanita.
+  - **Auditoría/trazabilidad** (pestaña "Auditoría" en Sistema, solo el
+    **superusuario real** — `core.permissions.EsSuperusuario`, ni siquiera
+    otra cuenta con rol Administrador tiene acceso): dos tablas, ambas
+    exportables a Excel con los mismos filtros aplicados
+    (`.../exportar/`, `openpyxl`).
+    - **Inicios de sesión** (`core.RegistroInicioSesion`): cada intento de
+      login al dashboard, exitoso o fallido, con usuario (o el username
+      escrito, si no existe/falla), IP y navegador — se registra desde
+      `core/views.py: login()`. La IP se toma de `X-Forwarded-For` (la
+      primera de la lista) porque Railway pone su propia IP en
+      `REMOTE_ADDR`; ver `_ip_cliente`. Filtrable por resultado y rango de
+      fechas (`GET .../inicios-sesion/?exitoso=&desde=&hasta=`).
+    - **Cambios, aprobaciones y rechazos** (`contratistas.RegistroAuditoria`):
+      cada creación, edición o eliminación de los 5 modelos críticos de
+      cumplimiento (empresas contratistas, trabajadores, radicaciones de
+      seguridad social, declaraciones de método y funcionarios firmantes)
+      queda registrada con quién la hizo (`request.user`), cuándo, y — en
+      las ediciones — qué campos cambiaron y sus valores antes/después
+      (`contratistas/auditoria.py: capturar_snapshot`/`registrar_auditoria`).
+      Incluye también la aprobación/rechazo de radicaciones y declaraciones,
+      que no pasan por el `perform_update` genérico de DRF. El registro
+      guarda una foto del objeto (`objeto_str`) para seguir siendo legible
+      aunque el registro original se elimine después.
+
+    Ambas tablas son de solo lectura — nada se edita ni se borra desde el
+    dashboard ni desde el admin de Django.
+  - **Autorización de Ingreso** (sección "Autorización de Ingreso" en el sidebar;
+    `contratistas.AutorizacionIngreso`/`TrabajadorAutorizacionIngreso`): réplica del
+    formato real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA" — vigencia
+    (fecha desde/hasta), horario, área de trabajo, sitio de encuentro en caso
+    de emergencia, responsable SISO del grupo, y la lista de
+    **inclusiones/exclusiones**: cada trabajador del contratista queda
+    explícitamente incluido o excluido del ingreso, con motivo obligatorio en
+    caso de exclusión (validado tanto en el serializer como en el formulario).
+    La lista de trabajadores se reemplaza completa en cada guardado, igual
+    que las actividades de una declaración de método. El badge de vigencia se
+    calcula al vuelo contra la fecha de hoy. Incluida en la auditoría de
+    cambios (Fase 6). **Descargar PDF** (`GET
+    /api/contratistas/autorizaciones-ingreso/<id>/pdf/`) genera el documento
+    con el mismo formato físico de la planta (código de documento, tabla de
+    inclusiones con EPS/ARL/AFP y fecha de inicio de contrato, tabla de
+    exclusiones con motivo, y las líneas de firma en blanco de la empresa
+    contratista y del interventor) — replicado a partir del formato Excel
+    real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA — INCLUSIONES/
+    EXCLUSIONES" de Bavaria.
+  - **Capacitación previa a ingreso** (sección "Capacitación" en el sidebar;
+    `contratistas.ConfiguracionCapacitacion`/`PreguntaCapacitacion`/
+    `RegistroCapacitacion`): reimplementación dentro del portal del "FDT
+    Evalúa visitantes" que el cliente tenía en Google Apps Script — registro
+    del participante → video de inducción (URL editable, catálogo
+    `ConfiguracionCapacitacion.obtener()`, singleton igual que
+    `ConfiguracionAlertas`) → evaluación de 10 preguntas (catálogo editable
+    `PreguntaCapacitacion`, sembrado con el contenido original de FDT en la
+    migración de datos `0021_seed_capacitacion_fdt`) → certificado si
+    aprueba. A diferencia del Apps Script original, la calificación se
+    calcula enteramente en el servidor (`calificar_capacitacion`) — el
+    índice de la respuesta correcta nunca viaja al navegador
+    (`PreguntaCapacitacionPublicaSerializer` la omite), ni antes ni durante
+    la evaluación. Solo queda habilitada por empresa contratista
+    (`EmpresaContratista.capacitacion_habilitada`, propiedad calculada) —
+    nunca por trabajador — cuando esa empresa tiene al menos una Declaración
+    de Método `aprobada`, o cuando un Administrador marca la casilla
+    `capacitacion_habilitada_manual` en su ficha (para trabajos que no
+    requieren declaración de método). Si el documento del participante
+    coincide con un `Trabajador` ya radicado en la misma empresa, al aprobar
+    se marca automáticamente `cursos_safety_academy["induccion_sst"]` con la
+    fecha de hoy — el mismo campo que ya alimenta "cursos pendientes" en
+    Contratistas, sin que nadie tenga que anotarlo a mano. El reporte
+    (`GET /api/contratistas/capacitacion/registros/`) lista todos los
+    intentos con su resultado; personal interno ve todas las empresas, el
+    portal de contratistas solo los suyos. Cada registro aprobado tiene un
+    **certificado en PDF** descargable en cualquier momento
+    (`GET .../<id>/certificado/`), y hay un botón para **exportar a Excel**
+    a todos los que aprobaron de una vez (`GET .../exportar/`, filtro
+    `?contratista=` para personal interno).
+  - **Portal de contratistas** (tercer rol `PerfilUsuario.Rol.CONTRATISTA`,
+    mismo dashboard y mismo login — no es una app aparte): una cuenta por
+    empresa contratista (`PerfilUsuario.contratista`, FK a
+    `EmpresaContratista`), con el sidebar reducido a Contratistas (de solo
+    lectura, scopeada a su empresa), Declaración de Método (lectura y
+    escritura completas), Autorización de Ingreso (de solo lectura) y
+    Capacitación (puede registrar e iniciar capacitaciones de su empresa y
+    ver su propio reporte); todo lo demás (indicadores comparativos,
+    cámaras, sistema, usuarios, etc.) requiere ser personal interno
+    (`core.permissions.EsPersonalInterno`/`EsPersonalInternoOSoloLectura`).
+    Implementa el flujo que pidió el cliente: el contratista sube su
+    Declaración de Método y la deja en estado "Enviada" → se notifica por
+    correo al personal de SST/interventoría (reutiliza
+    `notificar_declaracion_pendiente`) → el interno la revisa y la aprueba o
+    la rechaza con un motivo obligatorio (`DeclaracionMetodoSerializer.
+    validate`, mismo patrón que el rechazo de radicaciones) → el contratista
+    ve el motivo, corrige y vuelve a poner "Enviada" — así las veces que
+    haga falta hasta la aprobación. Un usuario del portal nunca puede
+    aprobarse/rechazarse a sí mismo (bloqueado en `perform_create`/
+    `perform_update` de `DeclaracionMetodoListaDashboard`/`Detalle`), no
+    puede elegir otra empresa contratista (se fuerza server-side a la suya),
+    y al firmar solo puede hacerlo como "Supervisor de Seguridad del
+    Contratista" — las demás firmas quedan reservadas al personal interno de
+    Bavaria (`firmar_declaracion`). **Pendiente, fuera de este alcance**: el
+    cruce automático de la declaración contra las políticas de seguridad de
+    Bavaria — el cliente todavía no ha enviado ese documento/esas reglas.
+- **Política de privacidad / Habeas Data** (borrador): el registro de un
+  trabajador exige marcar la autorización de tratamiento de sus datos
+  personales (Ley 1581 de 2012), con fecha registrada
+  (`Trabajador.autorizacion_datos`/`autorizacion_datos_en`). El texto de la
+  política es público, sin necesidad de sesión, en `/politica-privacidad`
+  (enlazado desde el formulario de trabajador y desde el login) — es un
+  borrador técnico: le faltan los datos propios de la empresa (NIT, razón
+  social, contacto) y revisión legal antes de considerarse definitivo.
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 
@@ -29,8 +340,20 @@ Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
   `ReglaAlerta`, `EventoDetectado`; lógica de negocio en `services.py`
   (`punto_en_poligono`, `evaluar_zona_horario`, `disparar_alerta`); y los
   endpoints de API descritos abajo.
+- `contratistas/` — modelos `EmpresaContratista`, `Trabajador`,
+  `RadicacionSeguridadSocial`, `DeclaracionMetodo`, `ActividadMetodo`
+  (con el cálculo de riesgo Kinney), `FirmaMetodo`; endpoints descritos abajo.
 - `frontend/` — dashboard Next.js (App Router + TypeScript + Tailwind),
   instalable como PWA. Ver su propia sección más abajo.
+- `equipo_local/` — programa Python independiente (no es una app Django) que
+  corre en un PC dedicado en sitio (no hace falta DVR/NVR): se conecta por
+  RTSP a cada cámara, detecta personas con YOLOv8n y reporta eventos al
+  backend de arriba. Corre como servicio en segundo plano, y trae un
+  instalador de un clic (`instalar.bat`/`instalar.sh`) pensado para que lo
+  pueda dejar corriendo alguien sin conocimientos técnicos. También graba a
+  disco (con retención automática) y expone un visor web local (cámaras en
+  vivo + grabaciones, `http://<ip-del-pc>:8090`, solo accesible en la red de
+  la planta). Ver `equipo_local/README.md`.
 
 ## Backend — correr en local
 
@@ -58,13 +381,24 @@ Admin en `http://127.0.0.1:8000/admin/`. En `DEBUG=True` el backend ya
 acepta llamadas CORS desde `http://localhost:3000` (el frontend) sin
 configurar nada más.
 
+**Tests**: siempre con las apps explícitas —
+`python manage.py test camaras_ia contratistas core` — nunca
+`python manage.py test` a secas. Sin argumentos, Django descubre tests en
+todo el árbol del proyecto (no solo en `INSTALLED_APPS`), lo que incluye
+`equipo_local/tests/`, un programa Python aparte con sus propias
+dependencias (`requests`, `opencv`, etc.) que no están en el venv de Django
+— y el intento de importarlas revienta la corrida. `equipo_local/` tiene su
+propia suite, independiente (ver `equipo_local/README.md`).
+
 ### Login del dashboard, perfil y gestión de usuarios
 
 Estos endpoints los usa el frontend — no el equipo local (que usa su propia
 API key, ver más abajo). El primer usuario (`createsuperuser`) recibe
 automáticamente el rol **Administrador**; todo usuario creado después desde
 el dashboard o el admin recibe **Operador** por defecto y el administrador
-le puede cambiar el rol.
+le puede cambiar el rol — incluido el tercer rol, **Contratista**, que exige
+elegir además la `EmpresaContratista` a la que representa
+(`PerfilUsuario.contratista`) — ver "Portal de contratistas" más arriba.
 
 - **`POST /api/auth/login/`** — `{"username", "password"}` → `{"token", "usuario"}`.
 - **`POST /api/auth/logout/`** — invalida el token actual (header `Authorization: Token <token>`).
@@ -73,6 +407,9 @@ le puede cambiar el rol.
 - **`GET/POST /api/auth/usuarios/`** y **`GET/PATCH/DELETE /api/auth/usuarios/<id>/`** —
   gestión de usuarios. Solo Administradores; un usuario no puede desactivarse
   ni eliminarse a sí mismo.
+- **`GET /api/auth/push/vapid-public-key/`**, **`POST /api/auth/push/suscribir/`**,
+  **`DELETE /api/auth/push/desuscribir/`** — notificaciones push (Web Push) al
+  celular con la app cerrada. Ver "Notificaciones push (Web Push)" más abajo.
 
 Todos (salvo login) requieren el header `Authorization: Token <token>`.
 
@@ -126,8 +463,28 @@ eliminar) requiere rol Administrador.
 | `PATCH /api/camaras-ia/dashboard/eventos/<id>/` | Marcar un evento como revisado (o de vuelta a nuevo) |
 | `GET /api/camaras-ia/dashboard/camaras/` | Cámaras con sus zonas y el último evento — usado por Cámaras IA y por el editor de Zonas |
 | `POST /api/camaras-ia/dashboard/camaras/<id>/snapshot-referencia/` | Sube/reemplaza el encuadre fijo sobre el que se dibujan las zonas (multipart, campo `snapshot_referencia`) |
-| `GET/POST /api/camaras-ia/dashboard/zonas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/zonas/<id>/` | CRUD de `ZonaRestringida` — el polígono se dibuja haciendo clic sobre el snapshot de referencia, en las mismas coordenadas de píxel de esa imagen |
+| `POST /api/camaras-ia/dashboard/camaras/<id>/calibrar/` | Calibra la cámara: `punto1`/`punto2` (píxeles) + `distancia_metros` real entre ellos → calcula `Camara.px_por_metro`, usado por las zonas tipo Punto y radio |
+| `GET/POST /api/camaras-ia/dashboard/zonas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/zonas/<id>/` | CRUD de `ZonaRestringida` — tipo Polígono (se dibuja haciendo clic sobre el snapshot de referencia, en las mismas coordenadas de píxel de esa imagen) o tipo Punto y radio (`centro_x`/`centro_y` + `radio_metros`, requiere la cámara calibrada) |
 | `GET/POST /api/camaras-ia/dashboard/reglas/`, `GET/PATCH/DELETE /api/camaras-ia/dashboard/reglas/<id>/` | CRUD de `ReglaAlerta` (horario/días/canal/destinatario) de una zona |
+
+### Endpoints de `contratistas` (autenticados por token de usuario)
+
+| Endpoint | Qué hace |
+|---|---|
+| `GET /api/contratistas/catalogos/` | Listas fijas para los formularios: cursos Safety Academy, permisos de trabajo, roles de firma |
+| `GET/POST /api/contratistas/empresas/`, `GET/PATCH/DELETE /api/contratistas/empresas/<id>/` | CRUD de `EmpresaContratista` |
+| `GET/POST /api/contratistas/trabajadores/`, `GET/PATCH/DELETE /api/contratistas/trabajadores/<id>/` | CRUD de `Trabajador`; filtro `?contratista=` |
+| `GET/POST /api/contratistas/radicaciones/`, `GET/PATCH/DELETE /api/contratistas/radicaciones/<id>/` | CRUD de `RadicacionSeguridadSocial` (multipart para el soporte de pago); filtros `?trabajador=&contratista=&estado=` |
+| `POST /api/contratistas/radicaciones/<id>/aprobar/`, `POST .../rechazar/` | Decisión del interventor sobre una radicación (`observaciones` opcional) |
+| `GET/POST /api/contratistas/declaraciones/`, `GET/PATCH/DELETE /api/contratistas/declaraciones/<id>/` | `DeclaracionMetodo` con sus `actividades` anidadas (se reemplazan todas en cada guardado) |
+| `POST /api/contratistas/declaraciones/<id>/firmar/` | Agrega/reemplaza la firma de un rol (`rol`, `nombre_firmante`) |
+| `GET/PATCH /api/contratistas/capacitacion/configuracion/` | Título/video/puntaje mínimo de la inducción — lectura abierta, escritura solo Administrador |
+| `GET /api/contratistas/capacitacion/preguntas/` | Las 10 preguntas activas, sin `respuesta_correcta` |
+| `GET /api/contratistas/capacitacion/registros/` | Reporte de capacitaciones hechas; filtro `?contratista=` |
+| `POST /api/contratistas/capacitacion/iniciar/` | Arranca un intento — 403 si la empresa no tiene la capacitación habilitada |
+| `POST /api/contratistas/capacitacion/<id>/calificar/` | Califica en el servidor (`respuestas`); marca `induccion_sst` en el trabajador si aprueba y hay coincidencia por documento |
+| `GET /api/contratistas/capacitacion/<id>/certificado/` | PDF del certificado de un registro aprobado (400 si no está aprobado) |
+| `GET /api/contratistas/capacitacion/exportar/` | Excel con todos los aprobados; filtro `?contratista=` |
 
 ## Frontend — correr en local
 
@@ -146,16 +503,26 @@ Abre `http://localhost:3000` (redirige a `/login`). Con el backend corriendo
 en local (`DEBUG=True`), el login ya funciona con el superusuario que hayas
 creado ahí.
 
-- **Secciones del sidebar**: Tablero, Cámaras, Zonas y horarios, Alertas —
-  para todos los roles — y Usuarios, solo para Administrador. Ninguna tiene
-  URL propia; son secciones dentro de `/dashboard` manejadas por estado.
+- **Secciones del sidebar**: Tablero, Cámaras, Zonas y horarios, Alertas,
+  Contratistas, Declaración de Método — para Administrador/Operador — y
+  Usuarios, solo para Administrador. Ninguna tiene URL propia; son secciones
+  dentro de `/dashboard` manejadas por estado. Un usuario con rol
+  Contratista ve un sidebar aparte, reducido a Contratistas (solo lectura),
+  Declaración de Método (lectura y escritura), Autorización de Ingreso
+  (solo lectura) y Capacitación — ver "Portal de contratistas" más arriba.
 - **Roles**: el primer usuario (`createsuperuser`) es Administrador y ve la
   sección "Usuarios" en el sidebar; desde ahí crea al resto del equipo con
-  su rol (Administrador u Operador) — no hay pantalla de registro público.
-  Operador puede ver todo pero no editar zonas/reglas ni gestionar usuarios.
+  su rol (Administrador, Operador o Contratista) — no hay pantalla de
+  registro público. Operador puede ver todo pero no editar zonas/reglas ni
+  gestionar usuarios; Contratista solo ve y opera dentro de su propia
+  empresa.
 - **Editor de zonas**: en "Zonas y horarios", selecciona una cámara, sube su
   snapshot de referencia si no tiene, y haz clic sobre la imagen para ir
-  agregando los vértices del polígono (mínimo 3). Las coordenadas se
+  agregando los vértices del polígono (mínimo 3) — o, tipo "Punto y radio",
+  marca un solo punto (ej. una estiba) y un radio en metros reales, útil si
+  ese punto se puede mover sin tener que redibujar nada. Este segundo tipo
+  necesita calibrar la cámara antes (botón "Calibrar cámara": marcar 2
+  puntos y decir la distancia real entre ellos). Las coordenadas se
   guardan en el sistema de píxeles naturales de esa imagen — el mismo que
   debe usar el equipo local al reportar `punto_x`/`punto_y` de un evento.
 - **Responsive**: sidebar fijo y colapsable en desktop, drawer deslizante en
@@ -183,8 +550,14 @@ creado ahí.
    | `DEBUG` | `False` |
    | `ALLOWED_HOSTS` | el dominio que asigna Railway, ej. `sstbavaria-cctv-production.up.railway.app` |
    | `CSRF_TRUSTED_ORIGINS` | `https://<mismo-dominio-de-arriba>` |
-   | `CORS_ALLOWED_ORIGINS` | el dominio de Vercel del frontend, ej. `https://sstbavaria-cctv.vercel.app` (agrega también el dominio de preview si lo vas a usar) |
+   | `CORS_ALLOWED_ORIGINS` | los dominios donde vive el frontend, separados por coma si son varios — el dominio propio `https://sst-cctv.com` y `https://www.sst-cctv.com`, más el de Vercel `https://sstbavaria-cctv.vercel.app` como respaldo (agrega también el dominio de preview si lo vas a usar) |
    | `DATABASE_URL` | la inyecta Railway automáticamente al agregar Postgres |
+   | `BREVO_API_KEY` | API key de [Brevo](https://app.brevo.com) (Settings → SMTP & API → API Keys) — opcional: también se puede digitar desde el dashboard (Sistema → Brevo), que tiene prioridad sobre esta variable; sin ninguna de las dos, las alertas por correo quedan registradas como error pero no rompen nada |
+   | `BREVO_REMITENTE_EMAIL` | correo remitente verificado en Brevo (Settings → Senders) — también configurable desde el dashboard |
+   | `BREVO_REMITENTE_NOMBRE` | nombre que aparece como remitente, ej. `SST Bavaria — Cámaras IA` — también configurable desde el dashboard |
+   | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL` | Cloudflare R2 para que los archivos subidos (`media/`) sobrevivan a los despliegues — ver la sección "Almacenamiento de archivos (`media/`) en Cloudflare R2" más abajo. Sin estas 4 variables, cae a disco local (se pierde en cada deploy) |
+   | `SENTRY_DSN` | opcional — monitoreo de errores con [Sentry](https://sentry.io). DSN del proyecto (Settings → Projects → tu proyecto → Client Keys (DSN)). Sin esta variable, Sentry simplemente no se activa |
+   | `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` | opcional — clasificación de eventos de cámaras con IA (ver "Clasificación de eventos con IA" más abajo). También configurable desde el dashboard (Sistema → Inteligencia Artificial), que tiene prioridad sobre estas variables |
 
 4. Railway detecta `railway.json` (build con Nixpacks) y corre
    automáticamente `migrate`, `collectstatic` y levanta `gunicorn` según el
@@ -230,16 +603,387 @@ apuntando a ese dominio, y por último vuelve a Railway a completar
 `CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` con el dominio de Vercel ya
 generado.
 
-### Nota sobre `media/` (fotos de eventos)
+## Backend en Hostinger con Coolify (frontend se queda en Vercel)
 
-El disco de Railway no es persistente entre despliegues. Ahora que el
-endpoint de eventos ya guarda snapshots de verdad, antes de recibir eventos
-reales en producción hay que decidir un storage externo (S3 u otro) — es
-una decisión de alcance/costo aparte, no un default de esta fase.
+Solo el **backend** se migró de Railway a un VPS propio de Hostinger con
+[Coolify](https://coolify.io) (self-hosted, corre en el propio servidor —
+no es un servicio de terceros como Railway). El **frontend sigue en
+Vercel** tal cual estaba — decisión explícita del cliente, no hace falta
+Dockerfile de frontend ni desplegarlo en Coolify.
+
+El repo trae `Dockerfile` (raíz del repo) listo para que Coolify construya
+el backend directo desde GitHub.
+
+**Orden recomendado — no cortes tráfico real hasta el último paso.** Todo
+lo de abajo corre en paralelo a Railway, que sigue sirviendo producción
+sin tocarse hasta el paso 7. Si algo sale mal en el camino, no hay
+downtime: simplemente no cambias la variable de Vercel todavía.
+
+### 1. Instalar Coolify en el VPS
+
+Por SSH al VPS de Hostinger (como root o con sudo):
+
+```bash
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+```
+
+Al terminar, imprime la URL del panel (`http://<IP-del-VPS>:8000`) — entra
+ahí, crea tu cuenta de administrador y, en el asistente inicial, deja que
+Coolify configure su propio proxy (Traefik) y certificados HTTPS
+automáticos (Let's Encrypt) — los necesitas para los dos pasos siguientes.
+
+### 2. Base de datos: crear el Postgres en Coolify
+
+**+ New → Database → PostgreSQL** en un proyecto nuevo (ej. "SST Bavaria
+CCTV"). Coolify genera las credenciales solas — cópialas, las necesitas en
+el paso 3 (`DATABASE_URL`) y en el paso 5 (migrar los datos).
+
+### 3. Backend: nueva app en Coolify
+
+**+ New → Application → Public Repository** (o conecta tu cuenta de
+GitHub si prefieres repos privados) apuntando a este repositorio, rama
+`main` (o la que tengas en producción).
+
+- **Build Pack**: `Dockerfile` (Coolify lo detecta solo al ver
+  `Dockerfile` en la raíz).
+- **Base Directory**: `/` (default).
+- **Port**: `8000`.
+- Variables de entorno (**Environment Variables** de la app) — la misma
+  tabla que usa Railway arriba, con estos cambios:
+
+  | Variable | Valor |
+  |---|---|
+  | `SECRET_KEY` | genera una **nueva** — no reuses la de Railway |
+  | `DEBUG` | `False` |
+  | `ALLOWED_HOSTS` | el dominio que le vayas a poner a esta app en Coolify, ej. `api.sst-cctv.com` (defínelo ahora aunque el DNS todavía no apunte ahí — lo conectas en el paso 8) |
+  | `CSRF_TRUSTED_ORIGINS` | `https://api.sst-cctv.com` (mismo dominio, con `https://`) |
+  | `CORS_ALLOWED_ORIGINS` | `https://sst-cctv.com,https://www.sst-cctv.com` (el dominio del frontend nuevo) |
+  | `DATABASE_URL` | `postgresql://<usuario>:<password>@<host-interno-que-da-coolify>:5432/<db>` — Coolify te muestra la cadena de conexión completa en la pantalla del recurso Postgres del paso 2 |
+  | `BREVO_API_KEY`, `BREVO_REMITENTE_EMAIL`, `BREVO_REMITENTE_NOMBRE` | copia los mismos valores de Railway |
+  | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL` | copia los mismos 4 de Railway — R2 es un servicio externo (Cloudflare), no depende de dónde corra el backend, así que los archivos ya subidos siguen funcionando igual sin migrar nada |
+  | `SENTRY_DSN` | copia el mismo de Railway |
+  | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CLAIMS_EMAIL` | copia los mismos de Railway — **no regeneres las llaves**, si cambian se invalidan todas las suscripciones push que ya tiene la gente instalada |
+
+- **Domains**: agrega primero la URL temporal que asigna Coolify
+  (`<algo>.sslip.io`) para probar — más adelante, cuando tengas el
+  dominio real (`api.sst-cctv.com`) apuntando por DNS, agrégalo también y
+  ponlo en `https://`; Coolify emite el certificado Let's Encrypt solo en
+  cuanto el DNS resuelve.
+- Deploy. El `Dockerfile` corre `migrate` y `collectstatic` solo en cada
+  arranque (mismo comportamiento que tenía el `Procfile` de Railway).
+
+### 4. Migrar los datos de Railway al Postgres nuevo
+
+El repo ya tiene `python manage.py backup_db` (`core/management/commands/
+backup_db.py`), que vuelca toda la base con `dumpdata` y lo sube directo a
+R2 — el mismo mecanismo sirve para migrar, sin necesitar `pg_dump`/
+`pg_restore` ni copiar archivos a mano (R2 es externo, tanto Railway como
+el backend nuevo de Coolify lo pueden leer con las mismas credenciales):
+
+1. Desde la consola de **Railway** (pestaña "Console"/Shell del servicio
+   del backend):
+   ```bash
+   python manage.py backup_db
+   ```
+   Imprime el nombre exacto del archivo que subió, ej.
+   `backups/db_2026-09-11_16-01-08.json.gz` — cópialo, lo necesitas en el
+   siguiente paso.
+2. Desde el **Terminal** del contenedor del backend en Coolify (menú
+   lateral **Terminal**, o "Terminal" dentro de la app → elige el
+   contenedor que empiece con el mismo prefijo del dominio temporal de la
+   app), con el nombre del paso anterior:
+   ```bash
+   python manage.py shell -c "
+   import gzip
+   from django.core.files.storage import default_storage
+   from django.core.management import call_command
+
+   nombre = 'backups/db_2026-09-11_16-01-08.json.gz'  # <- el de tu paso 1
+   with default_storage.open(nombre, 'rb') as f:
+       contenido = gzip.decompress(f.read()).decode('utf-8')
+   with open('/tmp/respaldo.json', 'w') as out:
+       out.write(contenido)
+   call_command('loaddata', '/tmp/respaldo.json')
+   "
+   ```
+3. Verifica en `https://<dominio-temporal-del-backend>/admin/` (o ya en
+   `https://api.sst-cctv.com/admin/` si el DNS ya resuelve) que los
+   contratistas, declaraciones y usuarios de verdad están ahí, entrando
+   con un usuario real — antes de seguir.
+
+**Ojo con `crear_perfil_usuario`** (`core/models.py`): esa señal
+`post_save` crea un `PerfilUsuario` apenas se guarda un `User` — sin el
+guard `if raw: return`, `loaddata` choca con `UniqueViolation` en
+`usuario_id` porque el propio respaldo también trae su `PerfilUsuario`. Ya
+está corregido en el código (commit "Evitar que crear_perfil_usuario
+choque al restaurar un respaldo con loaddata"), pero si alguna vez
+restauras contra una versión más vieja del repo, revisa ese guard primero.
+
+### 5. Notificaciones push y Web Push
+
+Las suscripciones push (`SuscripcionPush`) quedan migradas con el paso 4
+igual que el resto de los datos — como reutilizaste las mismas
+`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, siguen siendo válidas en el
+servidor nuevo sin que la gente tenga que reinstalar la PWA.
+
+### 6. Respaldo automático de la base de datos
+
+El `backup_db` que corría como Cron Job de Railway se recrea en Coolify
+con **Scheduled Tasks** (dentro de la app del backend, no como recurso
+aparte): comando `python manage.py backup_db`, misma expresión cron
+(`0 7 * * *`, 2:00 a.m. Bogotá) — usa las mismas variables de R2 que ya
+tiene la app, no hace falta configurarlas de nuevo.
+
+### 7. Dominio real del backend + conectar el frontend (Vercel)
+
+1. En el DNS de `sst-cctv.com` (Porkbun), agrega un registro **A**:
+   Host `api`, valor la IP del VPS de Hostinger. El dominio del frontend
+   (`sst-cctv.com`/`www.sst-cctv.com`, apuntando a Vercel) **no se toca**.
+2. En Coolify, agrega `https://api.sst-cctv.com` como Domain de la app del
+   backend y actualiza `ALLOWED_HOSTS` para incluirlo — luego Deploy, para
+   que Coolify emita el certificado Let's Encrypt.
+3. En **Vercel** (proyecto del frontend) → Settings → Environment
+   Variables: cambia `NEXT_PUBLIC_API_URL` a `https://api.sst-cctv.com` —
+   créala como tipo **"Config"**, no "Secret" (un secreto no se puede
+   editar ni convertir después, y esta variable de todas formas queda
+   visible en el navegador por ser `NEXT_PUBLIC_*`). Guarda y redeploy
+   (es una variable de build, hay que reconstruir, no basta con
+   reiniciar).
+
+   **Antes de este paso**, confirma que `frontend/next.config.ts` **no**
+   tenga `output: "standalone"` — esa opción es solo para un Dockerfile de
+   frontend que ya no se usa (el frontend se quedó en Vercel), y si queda
+   puesta rompe el build de Vercel con
+   `Error: ENOENT ... next-server.js.nft.json`.
+4. Prueba `https://sst-cctv.com` a fondo (login, Declaración de Método,
+   Contratistas, Alertas) antes de considerar esto terminado.
+
+### 8. Apagar Railway
+
+Solo cuando lleves unos días viendo tráfico real y estable en el backend
+nuevo (revisa Sentry para confirmar que no hay errores nuevos): pausa o
+borra el proyecto de Railway. Guarda un respaldo final (`backup_db`)
+desde Railway antes de borrar su Postgres, por si acaso.
+
+### Dominio propio (`sst-cctv.com`)
+
+El frontend en producción vive en **`https://www.sst-cctv.com`** (dominio
+propio comprado en Porkbun, `sst-cctv.com` redirige ahí con 308) además del
+dominio gratis `sstbavaria-cctv.vercel.app` que Vercel asigna por defecto.
+Para conectar un dominio propio nuevo: agregarlo en Vercel (**Settings →
+Domains → Add Existing**, no "Buy") y crear en el DNS del registrador los
+registros que Vercel indique — típicamente un **A** en la raíz (`@`) hacia
+la IP que muestre Vercel, y un **CNAME** en `www` hacia el destino
+`*.vercel-dns-*.com` que también muestre Vercel (varían por proyecto, hay
+que copiar los valores exactos de la pantalla "View DNS configuration" de
+cada dominio, no reusar los de otro dominio). En Porkbun, si el dominio
+trae parking/forwarding por defecto, primero hay que borrar el registro
+`ALIAS`/`A` de la raíz que apunta a la página de parking de Porkbun antes
+de crear el `A` nuevo — y en el campo "Host" del formulario dejar el campo
+**vacío** para la raíz (escribir el propio dominio ahí lo duplica, ej.
+`sst-cctv.com.sst-cctv.com`, y la validación en Vercel no cierra). Una vez
+que el dominio queda en "Valid Configuration" en Vercel, hay que sumarlo a
+`CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` en Railway (ver tabla
+arriba) — sin ese paso el login funciona por IP/vercel.app pero falla en
+el dominio propio.
+
+### Almacenamiento de archivos (`media/`) en Cloudflare R2
+
+El disco de Railway no es persistente entre despliegues — cualquier
+archivo subido a `media/` (Excel original de declaraciones, PDFs de
+autorización de datos, fotos de referencia de cámaras) desaparece en el
+próximo deploy si no se configura un storage externo. El backend usa
+[Cloudflare R2](https://developers.cloudflare.com/r2/) (compatible con la
+API de S3, sin costo de salida de datos) en cuanto estas 4 variables están
+puestas en Railway — sin ellas, cae automáticamente a disco local (sirve
+para desarrollo, no para producción):
+
+| Variable | Valor |
+|---|---|
+| `R2_ACCESS_KEY_ID` | Access Key ID del token de API de R2 |
+| `R2_SECRET_ACCESS_KEY` | Secret Access Key del mismo token |
+| `R2_BUCKET_NAME` | nombre del bucket, ej. `sstbavaria-cctv-media` |
+| `R2_ENDPOINT_URL` | `https://<Account ID>.r2.cloudflarestorage.com` — el Account ID está en R2 Object Storage → Overview, en "Account Details" |
+| `R2_PUBLIC_BASE_URL` | opcional — dominio público del bucket (el subdominio `.r2.dev` que da Cloudflare al activar "Public access" en el bucket, o un dominio propio conectado a él). Sin esta variable, cada link a un archivo se firma con una URL temporal (expira en 1 hora) en vez de exigir que el bucket sea público — más seguro y no requiere configurar nada adicional |
+
+Pasos en el dashboard de Cloudflare (**R2 Object Storage**):
+1. **Create bucket** — nombre a elección (ej. `sstbavaria-cctv-media`),
+   dejarlo privado (no hace falta "Public access" si no vas a usar
+   `R2_PUBLIC_BASE_URL`).
+2. **Manage API Tokens → Create API Token** (o desde el bucket: Settings →
+   API Tokens) — permisos "Object Read & Write", limitado a ese bucket.
+   Copia el **Access Key ID** y el **Secret Access Key** que muestra (el
+   Secret solo se ve una vez, en la creación).
+3. Copia esas 4-5 variables en Railway (Settings → Variables del servicio
+   web) y redeploy.
+
+Con las variables puestas, tanto los archivos que se suban desde ahora
+como todos los flujos que ya usaban `media/` (Excel original de
+declaraciones importadas, PDFs de autorización de datos de trabajadores,
+fotos de referencia de cámaras) quedan en R2 automáticamente — no hace
+falta cambiar nada más en el código (`config/settings.py`, `USANDO_R2`).
+
+### Respaldo automático de la base de datos
+
+`python manage.py backup_db` (`core/management/commands/backup_db.py`)
+vuelca toda la base (`dumpdata`, excepto sesiones/permisos/tipos de
+contenido que se regeneran solos) comprimida en `.json.gz` y la sube al
+storage configurado — R2 si `USANDO_R2` está activo (ver arriba), disco
+local si no. Borra automáticamente los respaldos con más de 30 días
+(`DIAS_RETENCION` en el comando) para no crecer sin límite.
+
+El comando no se dispara solo — hay que programarlo como **Cron Job de
+Railway**, un tipo de servicio aparte que corre el comando y se apaga (no
+queda como servidor web escuchando):
+
+1. En el proyecto de Railway: **+ New → Empty Service**, conectarlo al
+   mismo repositorio de GitHub (mismo Root Directory que el backend).
+2. En **Settings** del servicio nuevo: **Cron Schedule** → `0 7 * * *`
+   (2:00 a.m. hora de Bogotá — Railway programa en UTC, y Bogotá es
+   UTC-5, así que 07:00 UTC = 2:00 a.m. Bogotá).
+3. **Custom Start Command** → `python manage.py backup_db`.
+4. **Variables**: copia las mismas variables del servicio web —
+   `DATABASE_URL` (o conéctalo al mismo Postgres del proyecto),
+   `SECRET_KEY`, `DEBUG=False` y las 4 de R2 de arriba (sin R2 el
+   respaldo se guarda en el disco efímero del propio Cron Job y se pierde
+   igual, así que para que sirva de algo hace falta R2 configurado acá
+   también).
+5. Deploy. Railway va a correr el comando todos los días a esa hora — se
+   puede probar de inmediato con el botón "Trigger" del servicio en vez
+   de esperar al horario programado.
+
+### Clasificación de eventos de cámaras con IA
+
+Además de la regla de zona+horario (¿hay alguien parado en un sitio
+restringido en un horario prohibido?), el sistema puede analizar el snapshot
+del evento con un modelo de visión (Claude o Gemini) para identificar *qué*
+está pasando — EPP faltante, una caída, humo/incendio, o cualquier otro
+evento que el cliente defina. Es opcional y aditivo: nunca reemplaza la
+regla de zona/horario, solo la enriquece.
+
+- **Dónde corre**: en el backend (`camaras_ia/ia_deteccion.py`), justo
+  después de crear el `EventoDetectado` en `recibir_evento_camara`. La API
+  key nunca sale del servidor — el equipo local no necesita saber nada de
+  esto.
+- **Configuración** (dashboard, Sistema → Inteligencia Artificial):
+  proveedor (`Claude` o `Gemini`), API key, y opcionalmente el modelo
+  exacto (por defecto `claude-opus-5` o `gemini-flash-latest`). Sin API key
+  configurada (ni acá ni en `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`), la
+  clasificación simplemente no corre — el resto del sistema sigue igual.
+- **Catálogo de eventos** (`TipoEventoIA`, misma pestaña): cada fila es una
+  descripción en lenguaje natural de qué debe buscar la IA en la imagen —
+  el cliente lo edita libremente desde el dashboard, sin tocar código. Sin
+  ningún evento en el catálogo, tampoco corre la clasificación (no hay qué
+  buscar).
+- **Resultado**: se guarda en el propio evento (`tipos_ia`, `descripcion_ia`)
+  y se ve como badges de color (por severidad) en la columna "IA" de la
+  bandeja de Alertas.
+- **Alcance actual**: solo analiza el snapshot de eventos que ya dispara el
+  flujo existente (persona detectada en una zona restringida configurada).
+  No hace muestreo continuo de video para eventos independientes de una
+  zona (ej. un incendio en un punto sin zona dibujada) — eso requeriría un
+  disparador nuevo en `equipo_local` y tiene implicaciones de costo por el
+  volumen de llamadas, así que quedó fuera de este alcance a propósito.
+- Si falla (red, créditos agotados, respuesta inesperada), queda registrado
+  en `evento.ia_error` y el evento sigue su curso normal — nunca bloquea ni
+  retrasa una alerta real de zona/horario.
+
+### Notificaciones push (Web Push) al celular
+
+La PWA instalada puede avisar con la app cerrada — como WhatsApp, un banner
+en el celular en vez de tener que abrir el dashboard para enterarse. Es Web
+Push estándar con VAPID (`core/push.py`), sin ningún servicio de terceros de
+por medio.
+
+- **Qué la dispara**: los mismos eventos que ya generan una
+  `NotificacionInterna` (declaración pendiente/subsanada, radicación
+  pendiente — `contratistas/notificaciones.py`) y una alerta de cámara
+  disparada (`camaras_ia/services.py: disparar_alerta`, cualquier canal).
+- **A quién le llega**: solo al personal de SST/interventoría
+  (Administrador/Operador) — nunca al portal de contratistas, mismo público
+  que ya ve la campanita (`core.push.enviar_push_a_personal_interno`).
+- **Cómo se activa**: cada quien la prende desde su propio celular/navegador,
+  con el enlace "🔔 Activar notificaciones en este dispositivo" al pie de la
+  campanita — es por dispositivo, no una casilla global; sin las 3 variables
+  `VAPID_*` configuradas en el servidor ese enlace no aparece.
+- **Sin configurar**: igual que Brevo sin API key, el envío simplemente no
+  hace nada — nunca rompe el flujo que lo dispara.
+
+Variables de entorno (Railway y `.env` local):
+
+| Variable | Qué es |
+|---|---|
+| `VAPID_PUBLIC_KEY` | Llave pública — el navegador la usa para suscribirse |
+| `VAPID_PRIVATE_KEY` | Llave privada — firma cada envío, nunca sale del backend |
+| `VAPID_CLAIMS_EMAIL` | Correo de contacto que exige el estándar VAPID (no es una llave) |
+
+Generar un par de llaves nuevo:
+
+```bash
+python manage.py generar_claves_vapid
+```
+
+Imprime `VAPID_PUBLIC_KEY=...` y `VAPID_PRIVATE_KEY=...` listos para copiar
+a las variables de entorno. Se genera una sola vez por despliegue — cambiar
+las llaves invalida todas las suscripciones que ya tenía guardadas la gente
+(`core.SuscripcionPush`), que tendrían que volver a activarla.
 
 ### Nota sobre `disparar_alerta`
 
-Por ahora es un stub: registra el intento de notificación en el log
-(`camaras_ia.alertas`) pero no envía WhatsApp/correo de verdad. Conectar un
-proveedor real (o el sistema de notificaciones del proyecto principal, vía
-API) es una decisión de proveedor aparte, todavía no tomada.
+Canal **correo**: envío real vía la API HTTP de Brevo (`camaras_ia/notificaciones.py`,
+sin SDK ni dependencias nuevas — una sola llamada REST con `urllib`). La API
+key y el remitente se leen primero de `ConfiguracionNotificaciones` (fila
+única editable desde el dashboard en Sistema → Brevo) y si está vacía, caen
+de vuelta a `settings.BREVO_*` (variables de entorno). El resultado (éxito
+o el motivo del error) queda en
+`EventoDetectado.notificacion_enviada`/`notificacion_detalle`, visible en
+Notificaciones → Envíos del dashboard. Si falta la API key en ambos lados o
+Brevo responde con error, se registra el error y sigue sin romper
+`recibir_evento_camara`.
+
+Canal **whatsapp**: sigue siendo un stub — solo registra el intento en el
+log (`camaras_ia.alertas`). Conectar un proveedor real de WhatsApp (o el
+sistema de notificaciones del proyecto principal, vía API) es una decisión
+de proveedor aparte, todavía no tomada.
+
+## Seguridad (OWASP Top 10)
+
+Controles aplicados, con su categoría OWASP correspondiente:
+
+- **A05 Configuración de seguridad**: `SECRET_KEY` ya no tiene un valor por
+  defecto conocido en producción — si `DEBUG=False` y falta la variable de
+  entorno, el arranque falla explícitamente en vez de correr con un secreto
+  público. Cabeceras HTTP de refuerzo activas siempre
+  (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`) y
+  HSTS en producción; el frontend agrega las mismas cabeceras equivalentes
+  vía `next.config.ts` (Vercel ya agrega HSTS por su cuenta).
+- **A01 Control de acceso roto**: `DEFAULT_PERMISSION_CLASSES` es
+  `IsAuthenticated` (no `AllowAny`) — cualquier vista nueva queda protegida
+  por defecto. Los dos endpoints del equipo local (que se autentican con su
+  propia API key, no con el login de usuario) declaran `AllowAny`
+  explícitamente. Eliminar contratistas, trabajadores, radicaciones y
+  declaraciones de método requiere rol Administrador
+  (`EsAdministradorParaEliminar`) — crear/editar sigue abierto a cualquier
+  usuario autenticado, para no frenar el trabajo operativo diario. En
+  Declaración de Método, el enlace "Eliminar" de la lista (solo visible
+  para Administrador) usa el modal de confirmación del sistema
+  (`DialogProvider`) antes de mandar el DELETE.
+- **A07 Fallas de identificación y autenticación**: el login tiene límite de
+  intentos por IP (`core.throttling.LoginRateThrottle`, 10/min) para
+  dificultar fuerza bruta de contraseñas — solo en ese endpoint, no en el
+  resto de la API, para no interferir con el polling normal del equipo
+  local.
+- **A04/A05 Archivos subidos**: el soporte de pago de seguridad social
+  (`RadicacionSeguridadSocial.soporte_pago`) valida extensión permitida
+  (pdf/jpg/jpeg/png) y tamaño máximo (10 MB, `core.validators`). Los
+  snapshots de cámara ya se validaban como imagen real (Pillow, vía
+  `ImageField`); ahora también tienen tope de tamaño.
+- **A03/A06**: sin SQL crudo en todo el proyecto (solo ORM), sin
+  `eval`/`exec`/deserialización insegura. `pip-audit` y `npm audit` no
+  reportan vulnerabilidades conocidas en las dependencias actuales.
+
+Pendiente, fuera de alcance de este pase (se puede retomar cuando haga
+falta): tokens de sesión con expiración (DRF `TokenAuthentication` no expira
+por defecto), Content-Security-Policy en el frontend, y cifrado en reposo de
+`password_onvif` (hoy se guarda en texto plano porque el equipo local
+necesita leerlo para conectarse a la cámara).

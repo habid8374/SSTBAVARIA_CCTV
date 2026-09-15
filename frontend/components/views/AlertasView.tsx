@@ -2,12 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import {
-  actualizarEvento,
-  listarEventos,
-  type EstadoEvento,
-  type EventoDashboard,
-} from "@/lib/api";
+import { actualizarEvento, listarEventos, type EstadoEvento, type EventoDashboard } from "@/lib/api";
 
 type FiltroDisparo = "todas" | "con_alerta" | "sin_alerta";
 
@@ -72,7 +67,7 @@ export default function AlertasView({ token }: { token: string }) {
       )}
 
       <div className="mt-6 overflow-x-auto rounded-xl border border-corp-border bg-white">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[680px] text-left text-sm">
           <thead className="border-b border-corp-border bg-corp-blue-light text-xs uppercase text-corp-muted">
             <tr>
               <th className="px-4 py-3">Foto</th>
@@ -80,6 +75,7 @@ export default function AlertasView({ token }: { token: string }) {
               <th className="px-4 py-3">Zona</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Alerta</th>
+              <th className="px-4 py-3">IA</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -118,6 +114,30 @@ export default function AlertasView({ token }: { token: string }) {
                   </span>
                 </td>
                 <td className="px-4 py-3">
+                  {evento.tipos_ia.length > 0 ? (
+                    <div className="flex flex-wrap gap-1" title={evento.descripcion_ia}>
+                      {evento.tipos_ia.map((tipo) => (
+                        <span
+                          key={tipo.id}
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            tipo.severidad === "alta"
+                              ? "bg-red-100 text-red-700"
+                              : tipo.severidad === "media"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-zinc-100 text-zinc-600"
+                          }`}
+                        >
+                          {tipo.nombre}
+                        </span>
+                      ))}
+                    </div>
+                  ) : evento.ia_analizado_en ? (
+                    <span className="text-xs text-corp-muted">Nada detectado</span>
+                  ) : (
+                    <span className="text-xs text-corp-muted">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       evento.estado === "nuevo" ? "bg-amber-100 text-amber-700" : "bg-zinc-100 text-zinc-500"
@@ -140,7 +160,11 @@ export default function AlertasView({ token }: { token: string }) {
           </tbody>
         </table>
         {eventos?.length === 0 && (
-          <p className="px-4 py-6 text-center text-sm text-corp-muted">No hay eventos con estos filtros.</p>
+          <p className="px-4 py-6 text-center text-sm text-corp-muted">
+            {filtroEstado === "todos" && filtroDisparo === "todas"
+              ? "Todavía no ha llegado ningún evento — aparecen aquí automáticamente en cuanto una cámara reporte movimiento."
+              : "No hay eventos con estos filtros."}
+          </p>
         )}
       </div>
 

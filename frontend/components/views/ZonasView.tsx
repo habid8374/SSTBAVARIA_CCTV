@@ -2,35 +2,52 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from "react";
 
+import FormularioRegla, { DIAS } from "@/components/FormularioRegla";
 import PoligonoOverlay from "@/components/PoligonoOverlay";
+import CirculoOverlay from "@/components/CirculoOverlay";
+import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
+  actualizarInstruccionSeguridad,
   actualizarRegla,
   actualizarZona,
-  crearRegla,
+  calibrarCamara,
+  crearInstruccionSeguridad,
   crearZona,
+  eliminarInstruccionSeguridad,
   eliminarRegla,
+  eliminarSnapshotReferencia,
   eliminarZona,
   listarCamarasDashboard,
+  listarInstruccionesSeguridad,
   subirSnapshotReferencia,
   type CamaraDashboard,
+  type EstadoInstruccion,
+  type InstruccionSeguridad,
   type Rol,
+  type TipoZona,
   type ZonaDashboard,
 } from "@/lib/api";
 
-const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
-
 export default function ZonasView({ token, rol }: { token: string; rol: Rol | null }) {
   const esAdmin = rol === "administrador";
+  const { confirmar } = useDialog();
   const [camaras, setCamaras] = useState<CamaraDashboard[] | null>(null);
   const [camaraId, setCamaraId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dimensiones, setDimensiones] = useState<{ w: number; h: number } | null>(null);
   const [dibujando, setDibujando] = useState(false);
+  const [tipoDraft, setTipoDraft] = useState<TipoZona>("poligono");
   const [puntosDraft, setPuntosDraft] = useState<number[][]>([]);
+  const [radioMetrosDraft, setRadioMetrosDraft] = useState("");
   const [nombreZona, setNombreZona] = useState("");
   const [guardandoZona, setGuardandoZona] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const [eliminandoReferencia, setEliminandoReferencia] = useState(false);
+  const [calibrando, setCalibrando] = useState(false);
+  const [puntosCalibracion, setPuntosCalibracion] = useState<number[][]>([]);
+  const [distanciaCalibracion, setDistanciaCalibracion] = useState("");
+  const [guardandoCalibracion, setGuardandoCalibracion] = useState(false);
 
   function cargar() {
     listarCamarasDashboard(token)
@@ -47,30 +64,88 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
 
   function cancelarDibujo() {
     setDibujando(false);
+    setTipoDraft("poligono");
     setPuntosDraft([]);
+    setRadioMetrosDraft("");
     setNombreZona("");
   }
 
-  function handleClickImagen(event: ReactMouseEvent<HTMLDivElement>) {
-    if (!dibujando || !dimensiones) return;
+  function cancelarCalibracion() {
+    setCalibrando(false);
+    setPuntosCalibracion([]);
+    setDistanciaCalibracion("");
+  }
+
+  function coordenadasDesdeClick(event: ReactMouseEvent<HTMLDivElement>): [number, number] | null {
+    if (!dimensiones) return null;
     const rect = event.currentTarget.getBoundingClientRect();
     const x = Math.round(((event.clientX - rect.left) / rect.width) * dimensiones.w);
     const y = Math.round(((event.clientY - rect.top) / rect.height) * dimensiones.h);
-    setPuntosDraft((prev) => [...prev, [x, y]]);
+    return [x, y];
+  }
+
+  function handleClickImagen(event: ReactMouseEvent<HTMLDivElement>) {
+    if (calibrando) {
+      const punto = coordenadasDesdeClick(event);
+      if (!punto) return;
+      setPuntosCalibracion((prev) => (prev.length >= 2 ? [punto] : [...prev, punto]));
+      return;
+    }
+    if (!dibujando) return;
+    const punto = coordenadasDesdeClick(event);
+    if (!punto) return;
+    if (tipoDraft === "punto_radio") {
+      setPuntosDraft([punto]); // un solo punto: cada clic reemplaza el centro marcado
+    } else {
+      setPuntosDraft((prev) => [...prev, punto]);
+    }
   }
 
   async function guardarZona(event: FormEvent) {
     event.preventDefault();
-    if (!camara || puntosDraft.length < 3) return;
+    if (!camara) return;
+    if (tipoDraft === "poligono" && puntosDraft.length < 3) return;
+    if (tipoDraft === "punto_radio" && (puntosDraft.length === 0 || !radioMetrosDraft)) return;
     setGuardandoZona(true);
     try {
-      await crearZona(token, { camara: camara.id, nombre: nombreZona, poligono: puntosDraft });
+      if (tipoDraft === "punto_radio") {
+        const [centro_x, centro_y] = puntosDraft[0];
+        await crearZona(token, {
+          camara: camara.id,
+          nombre: nombreZona,
+          tipo: "punto_radio",
+          centro_x,
+          centro_y,
+          radio_metros: Number(radioMetrosDraft),
+        });
+      } else {
+        await crearZona(token, { camara: camara.id, nombre: nombreZona, tipo: "poligono", poligono: puntosDraft });
+      }
       cancelarDibujo();
       cargar();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la zona.");
     } finally {
       setGuardandoZona(false);
+    }
+  }
+
+  async function guardarCalibracion(event: FormEvent) {
+    event.preventDefault();
+    if (!camara || puntosCalibracion.length < 2 || !distanciaCalibracion) return;
+    setGuardandoCalibracion(true);
+    try {
+      await calibrarCamara(token, camara.id, {
+        punto1: puntosCalibracion[0] as [number, number],
+        punto2: puntosCalibracion[1] as [number, number],
+        distancia_metros: Number(distanciaCalibracion),
+      });
+      cancelarCalibracion();
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar la calibración.");
+    } finally {
+      setGuardandoCalibracion(false);
     }
   }
 
@@ -87,33 +162,77 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
     }
   }
 
+  async function eliminarReferencia() {
+    if (!camara) return;
+    const ok = await confirmar({
+      titulo: "Eliminar snapshot de referencia",
+      mensaje:
+        camara.zonas.length > 0
+          ? `¿Eliminar el snapshot de "${camara.nombre}"? Ya tiene ${camara.zonas.length} zona(s) dibujada(s) sobre esta foto — se quedan igual en el equipo local, pero acá dejarás de verlas hasta subir una nueva.`
+          : `¿Eliminar el snapshot de "${camara.nombre}"?`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    setEliminandoReferencia(true);
+    try {
+      await eliminarSnapshotReferencia(token, camara.id);
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar el snapshot de referencia.");
+    } finally {
+      setEliminandoReferencia(false);
+    }
+  }
+
   return (
     <div>
+      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <strong>Esto ahora se configura en el equipo local, no acá.</strong> El PC de la planta hace de NVR:
+        entra desde un navegador de la misma red a{" "}
+        <code className="rounded bg-amber-100 px-1">http://&lt;ese-pc&gt;:8090/configurar</code> para dibujar
+        zonas y definir horarios de verdad. Lo que se ve abajo es un espejo de lectura — si editas algo acá, el
+        equipo local lo puede volver a pisar en su próxima sincronización (cada ~60s).
+      </div>
+      <InstruccionesSeguridadPanel token={token} camaras={camaras} esAdmin={esAdmin} />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
-          Dibuja el polígono de la zona restringida sobre el encuadre fijo de la cámara.
+          Dibuja el polígono de la zona restringida sobre el encuadre fijo de la cámara, o marca un punto y un
+          radio en metros reales (ej. &quot;3m alrededor de la estiba&quot;) para zonas que se deban recalcular
+          solas si ese punto se mueve.
         </p>
-        <select
-          value={camaraId ?? ""}
-          onChange={(e) => {
-            setCamaraId(Number(e.target.value));
-            cancelarDibujo();
-            setDimensiones(null);
-          }}
-          className="rounded-md border border-corp-border px-3 py-1.5 text-sm"
-        >
-          {camaras?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
+        {camaras && camaras.length > 0 && (
+          <select
+            value={camaraId ?? ""}
+            onChange={(e) => {
+              setCamaraId(Number(e.target.value));
+              cancelarDibujo();
+              cancelarCalibracion();
+              setDimensiones(null);
+            }}
+            className="rounded-md border border-corp-border px-3 py-1.5 text-sm"
+          >
+            {camaras.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
+      )}
+
+      {camaras && camaras.length === 0 && (
+        <p className="mt-6 text-sm text-corp-muted">
+          Todavía no hay cámaras registradas — créalas primero en la sección{" "}
+          <span className="font-medium text-corp-navy">Cámaras</span> del menú.
+        </p>
       )}
 
       {camara && (
@@ -141,18 +260,41 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-corp-navy">
-                  {dibujando
-                    ? `Haz clic para agregar puntos (${puntosDraft.length} agregados, mínimo 3)`
-                    : "Encuadre de referencia"}
+                  {calibrando
+                    ? `Haz clic para marcar 2 puntos de una distancia real conocida (${puntosCalibracion.length}/2)`
+                    : dibujando && tipoDraft === "punto_radio"
+                      ? puntosDraft.length === 0
+                        ? "Haz clic para marcar el centro (ej. la estiba)"
+                        : "Centro marcado — puedes hacer clic de nuevo para moverlo"
+                      : dibujando
+                        ? `Haz clic para agregar puntos (${puntosDraft.length} agregados, mínimo 3)`
+                        : "Encuadre de referencia"}
                 </p>
-                {esAdmin && !dibujando && (
-                  <button
-                    type="button"
-                    onClick={() => setDibujando(true)}
-                    className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
-                  >
-                    + Nueva zona
-                  </button>
+                {esAdmin && !dibujando && !calibrando && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCalibrando(true)}
+                      className="rounded-lg border border-corp-border px-3 py-1.5 text-xs font-semibold text-corp-navy hover:border-corp-blue"
+                    >
+                      {camara.px_por_metro ? "Recalibrar cámara" : "Calibrar cámara"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDibujando(true)}
+                      className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
+                    >
+                      + Nueva zona
+                    </button>
+                    <button
+                      type="button"
+                      onClick={eliminarReferencia}
+                      disabled={eliminandoReferencia}
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:border-red-400 disabled:opacity-50"
+                    >
+                      {eliminandoReferencia ? "Eliminando…" : "Eliminar snapshot"}
+                    </button>
+                  </div>
                 )}
                 {dibujando && (
                   <div className="flex gap-2">
@@ -173,11 +315,55 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                     </button>
                   </div>
                 )}
+                {calibrando && (
+                  <button
+                    type="button"
+                    onClick={cancelarCalibracion}
+                    className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy"
+                  >
+                    Cancelar
+                  </button>
+                )}
               </div>
+
+              <p className="mt-1 text-xs text-corp-muted">
+                {camara.px_por_metro
+                  ? `Cámara calibrada — 1 metro real ≈ ${camara.px_por_metro.toFixed(1)}px en esta foto.`
+                  : "Cámara sin calibrar — necesario solo para zonas tipo Punto y radio."}
+              </p>
+
+              {esAdmin && dibujando && puntosDraft.length === 0 && (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipoDraft("poligono")}
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium ${
+                      tipoDraft === "poligono"
+                        ? "border-corp-blue bg-corp-blue-light text-corp-blue"
+                        : "border-corp-border text-corp-navy"
+                    }`}
+                  >
+                    Polígono
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoDraft("punto_radio")}
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium ${
+                      tipoDraft === "punto_radio"
+                        ? "border-corp-blue bg-corp-blue-light text-corp-blue"
+                        : "border-corp-border text-corp-navy"
+                    }`}
+                  >
+                    Punto y radio
+                  </button>
+                </div>
+              )}
 
               <div
                 data-testid="lienzo-zona"
-                className={`relative mt-3 overflow-hidden rounded-lg bg-zinc-100 ${dibujando ? "cursor-crosshair" : ""}`}
+                className={`relative mt-3 overflow-hidden rounded-lg bg-zinc-100 ${
+                  dibujando || calibrando ? "cursor-crosshair" : ""
+                }`}
                 onClick={handleClickImagen}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -191,16 +377,42 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                   }
                 />
                 {dimensiones &&
-                  camara.zonas.map((zona) => (
-                    <PoligonoOverlay
-                      key={zona.id}
-                      puntos={zona.poligono}
-                      naturalWidth={dimensiones.w}
-                      naturalHeight={dimensiones.h}
-                      color="#3b82f6"
-                    />
-                  ))}
-                {dimensiones && puntosDraft.length > 0 && (
+                  camara.zonas.map((zona) =>
+                    zona.tipo === "punto_radio" ? (
+                      zona.centro_x !== null && zona.centro_y !== null && camara.px_por_metro ? (
+                        <CirculoOverlay
+                          key={zona.id}
+                          centro={[zona.centro_x, zona.centro_y]}
+                          radioPx={(zona.radio_metros ?? 0) * camara.px_por_metro}
+                          naturalWidth={dimensiones.w}
+                          naturalHeight={dimensiones.h}
+                          color="#3b82f6"
+                        />
+                      ) : null
+                    ) : (
+                      <PoligonoOverlay
+                        key={zona.id}
+                        puntos={zona.poligono}
+                        naturalWidth={dimensiones.w}
+                        naturalHeight={dimensiones.h}
+                        color="#3b82f6"
+                      />
+                    )
+                  )}
+                {dimensiones && tipoDraft === "punto_radio" && puntosDraft.length > 0 && (
+                  <CirculoOverlay
+                    centro={[puntosDraft[0][0], puntosDraft[0][1]]}
+                    radioPx={
+                      camara.px_por_metro && radioMetrosDraft
+                        ? Number(radioMetrosDraft) * camara.px_por_metro
+                        : dimensiones.w * 0.008
+                    }
+                    naturalWidth={dimensiones.w}
+                    naturalHeight={dimensiones.h}
+                    color="#eab308"
+                  />
+                )}
+                {dimensiones && tipoDraft === "poligono" && puntosDraft.length > 0 && (
                   <PoligonoOverlay
                     puntos={puntosDraft}
                     naturalWidth={dimensiones.w}
@@ -208,26 +420,97 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                     color="#eab308"
                   />
                 )}
+                {dimensiones && puntosCalibracion.length === 1 && (
+                  <CirculoOverlay
+                    centro={[puntosCalibracion[0][0], puntosCalibracion[0][1]]}
+                    radioPx={dimensiones.w * 0.008}
+                    naturalWidth={dimensiones.w}
+                    naturalHeight={dimensiones.h}
+                    color="#10b981"
+                    dashed={false}
+                  />
+                )}
+                {dimensiones && puntosCalibracion.length === 2 && (
+                  <PoligonoOverlay
+                    puntos={puntosCalibracion}
+                    naturalWidth={dimensiones.w}
+                    naturalHeight={dimensiones.h}
+                    color="#10b981"
+                    dashed={false}
+                  />
+                )}
               </div>
 
-              {dibujando && puntosDraft.length >= 3 && (
-                <form onSubmit={guardarZona} className="mt-4 flex flex-wrap items-end gap-3">
-                  <div className="flex-1 space-y-1.5">
-                    <label className="text-sm font-medium text-corp-navy">Nombre de la zona</label>
+              {dibujando &&
+                ((tipoDraft === "poligono" && puntosDraft.length >= 3) ||
+                  (tipoDraft === "punto_radio" && puntosDraft.length === 1)) && (
+                  <form onSubmit={guardarZona} className="mt-4 space-y-3">
+                    {tipoDraft === "punto_radio" && !camara.px_por_metro && (
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        Esta cámara no está calibrada — esta zona se guardará, pero nunca disparará una alerta
+                        hasta que calibres la cámara (botón &quot;Calibrar cámara&quot; arriba).
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-sm font-medium text-corp-navy">Nombre de la zona</label>
+                        <input
+                          required
+                          value={nombreZona}
+                          onChange={(e) => setNombreZona(e.target.value)}
+                          placeholder="Ej. Muelle de recepción"
+                          className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+                        />
+                      </div>
+                      {tipoDraft === "punto_radio" && (
+                        <div className="w-32 space-y-1.5">
+                          <label className="text-sm font-medium text-corp-navy">Radio (metros)</label>
+                          <input
+                            required
+                            type="number"
+                            min="0.1"
+                            step="0.1"
+                            value={radioMetrosDraft}
+                            onChange={(e) => setRadioMetrosDraft(e.target.value)}
+                            placeholder="3"
+                            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+                          />
+                        </div>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={guardandoZona}
+                        className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white hover:bg-corp-navy disabled:opacity-60"
+                      >
+                        {guardandoZona ? "Guardando…" : "Guardar zona"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+              {calibrando && puntosCalibracion.length === 2 && (
+                <form onSubmit={guardarCalibracion} className="mt-4 flex flex-wrap items-end gap-3">
+                  <div className="w-48 space-y-1.5">
+                    <label className="text-sm font-medium text-corp-navy">
+                      Distancia real entre esos 2 puntos (metros)
+                    </label>
                     <input
                       required
-                      value={nombreZona}
-                      onChange={(e) => setNombreZona(e.target.value)}
-                      placeholder="Ej. Muelle de recepción"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={distanciaCalibracion}
+                      onChange={(e) => setDistanciaCalibracion(e.target.value)}
+                      placeholder="Ej. 1.2"
                       className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
                     />
                   </div>
                   <button
                     type="submit"
-                    disabled={guardandoZona}
+                    disabled={guardandoCalibracion}
                     className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white hover:bg-corp-navy disabled:opacity-60"
                   >
-                    {guardandoZona ? "Guardando…" : "Guardar zona"}
+                    {guardandoCalibracion ? "Guardando…" : "Guardar calibración"}
                   </button>
                 </form>
               )}
@@ -263,6 +546,173 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
   );
 }
 
+const ETIQUETA_ESTADO_INSTRUCCION: Record<EstadoInstruccion, string> = {
+  pendiente: "Pendiente de revisar",
+  configurada: "Ya configurada como zona",
+  requiere_desarrollo: "Necesita desarrollo aparte",
+};
+
+const ESTILO_ESTADO_INSTRUCCION: Record<EstadoInstruccion, string> = {
+  pendiente: "bg-amber-100 text-amber-700",
+  configurada: "bg-green-100 text-green-700",
+  requiere_desarrollo: "bg-zinc-100 text-zinc-600",
+};
+
+function InstruccionesSeguridadPanel({
+  token,
+  camaras,
+  esAdmin,
+}: {
+  token: string;
+  camaras: CamaraDashboard[] | null;
+  esAdmin: boolean;
+}) {
+  const [instrucciones, setInstrucciones] = useState<InstruccionSeguridad[] | null>(null);
+  const [texto, setTexto] = useState("");
+  const [camaraSeleccionada, setCamaraSeleccionada] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { confirmar } = useDialog();
+
+  function cargar() {
+    listarInstruccionesSeguridad(token)
+      .then(setInstrucciones)
+      .catch(() => setError("No se pudo cargar la lista de instrucciones."));
+  }
+
+  useEffect(cargar, [token]);
+
+  async function agregar(e: FormEvent) {
+    e.preventDefault();
+    if (!texto.trim()) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await crearInstruccionSeguridad(token, {
+        texto: texto.trim(),
+        camara: camaraSeleccionada ? Number(camaraSeleccionada) : undefined,
+      });
+      setTexto("");
+      setCamaraSeleccionada("");
+      cargar();
+    } catch {
+      setError("No se pudo guardar la instrucción.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function cambiarEstado(instruccion: InstruccionSeguridad, estado: EstadoInstruccion) {
+    try {
+      await actualizarInstruccionSeguridad(token, instruccion.id, { estado });
+      cargar();
+    } catch {
+      setError("No se pudo actualizar el estado.");
+    }
+  }
+
+  async function eliminar(instruccion: InstruccionSeguridad) {
+    const ok = await confirmar({
+      titulo: "Eliminar instrucción",
+      mensaje: `¿Eliminar "${instruccion.texto}"? Esta acción no se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminarInstruccionSeguridad(token, instruccion.id);
+      cargar();
+    } catch {
+      setError("No se pudo eliminar la instrucción.");
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-corp-border bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-corp-navy">Instrucciones de seguridad</h3>
+      <p className="mt-1 text-sm text-corp-muted">
+        Escribe acá cualquier restricción de seguridad, aunque todavía no sepamos cómo detectarla automáticamente
+        (ej. &quot;no pararse en el transportador&quot;, &quot;las guardas no pueden estar abiertas con la
+        máquina trabajando&quot;) — queda anotada para no perderla, y el equipo técnico la revisa.
+      </p>
+
+      <form onSubmit={agregar} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Ej: No debe estar cerca de la zona de químicos"
+          rows={2}
+          className="flex-1 rounded-md border border-corp-border px-3 py-1.5 text-sm"
+        />
+        <div className="flex gap-2">
+          <select
+            value={camaraSeleccionada}
+            onChange={(e) => setCamaraSeleccionada(e.target.value)}
+            className="rounded-md border border-corp-border px-3 py-1.5 text-sm"
+          >
+            <option value="">Sin cámara asignada</option>
+            {(camaras ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            disabled={guardando || !texto.trim()}
+            className="rounded-md bg-corp-navy px-3 py-1.5 text-sm font-medium text-white hover:bg-corp-navy/90 disabled:opacity-50"
+          >
+            Guardar
+          </button>
+        </div>
+      </form>
+
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+
+      {instrucciones && instrucciones.length > 0 && (
+        <ul className="mt-4 divide-y divide-corp-border">
+          {instrucciones.map((instruccion) => (
+            <li key={instruccion.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+              <div>
+                <p className="text-sm text-corp-navy">{instruccion.texto}</p>
+                <p className="text-xs text-corp-muted">
+                  {instruccion.camara_nombre ?? "Sin cámara asignada"}
+                  {instruccion.zona_nombre ? ` · zona "${instruccion.zona_nombre}"` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={instruccion.estado}
+                  onChange={(e) => cambiarEstado(instruccion, e.target.value as EstadoInstruccion)}
+                  className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium ${ESTILO_ESTADO_INSTRUCCION[instruccion.estado]}`}
+                >
+                  {(Object.keys(ETIQUETA_ESTADO_INSTRUCCION) as EstadoInstruccion[]).map((estado) => (
+                    <option key={estado} value={estado}>
+                      {ETIQUETA_ESTADO_INSTRUCCION[estado]}
+                    </option>
+                  ))}
+                </select>
+                {esAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => eliminar(instruccion)}
+                    className="rounded-md border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                  >
+                    Eliminar
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {instrucciones && instrucciones.length === 0 && (
+        <p className="mt-3 text-xs text-corp-muted">Todavía no hay instrucciones anotadas.</p>
+      )}
+    </div>
+  );
+}
+
 function ZonaCard({
   zona,
   token,
@@ -277,23 +727,30 @@ function ZonaCard({
   const [expandida, setExpandida] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirmar } = useDialog();
 
   async function alternarActiva() {
     try {
       await actualizarZona(token, zona.id, { activa: !zona.activa });
       onCambio();
-    } catch {
-      setError("No se pudo actualizar la zona.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la zona.");
     }
   }
 
   async function eliminar() {
-    if (!window.confirm(`¿Eliminar la zona "${zona.nombre}"? También se eliminan sus reglas.`)) return;
+    const ok = await confirmar({
+      titulo: "Eliminar zona",
+      mensaje: `¿Eliminar la zona "${zona.nombre}"? También se eliminan sus reglas.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
     try {
       await eliminarZona(token, zona.id);
       onCambio();
-    } catch {
-      setError("No se pudo eliminar la zona.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar la zona.");
     }
   }
 
@@ -301,8 +758,8 @@ function ZonaCard({
     try {
       await eliminarRegla(token, reglaId);
       onCambio();
-    } catch {
-      setError("No se pudo eliminar la regla.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar la regla.");
     }
   }
 
@@ -310,8 +767,8 @@ function ZonaCard({
     try {
       await actualizarRegla(token, reglaId, { activa: !activa });
       onCambio();
-    } catch {
-      setError("No se pudo actualizar la regla.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la regla.");
     }
   }
 
@@ -333,6 +790,11 @@ function ZonaCard({
           >
             {zona.activa ? "Activa" : "Inactiva"}
           </span>
+          {zona.tipo === "punto_radio" && (
+            <span className="ml-2 rounded-full bg-corp-blue-light px-2 py-0.5 text-xs font-medium text-corp-blue">
+              Punto y radio · {zona.radio_metros}m
+            </span>
+          )}
           <span className="ml-2 text-xs text-corp-muted">
             {zona.reglas.length} regla{zona.reglas.length === 1 ? "" : "s"}
           </span>
@@ -425,129 +887,3 @@ function ZonaCard({
   );
 }
 
-function FormularioRegla({
-  token,
-  zonaId,
-  onCerrar,
-  onCreada,
-}: {
-  token: string;
-  zonaId: number;
-  onCerrar: () => void;
-  onCreada: () => void;
-}) {
-  const [horaInicio, setHoraInicio] = useState("22:00");
-  const [horaFin, setHoraFin] = useState("06:00");
-  const [dias, setDias] = useState<number[]>([0, 1, 2, 3, 4]);
-  const [canal, setCanal] = useState<"whatsapp" | "correo">("whatsapp");
-  const [destinatario, setDestinatario] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState(false);
-
-  function alternarDia(dia: number) {
-    setDias((prev) => (prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia].sort()));
-  }
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setEnviando(true);
-    try {
-      await crearRegla(token, {
-        zona: zonaId,
-        nombre: "",
-        hora_inicio: horaInicio,
-        hora_fin: horaFin,
-        dias_semana: dias,
-        canal_notificacion: canal,
-        destinatario,
-      });
-      onCreada();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo crear la regla.");
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-corp-border bg-zinc-50 p-3">
-      <div className="flex flex-wrap gap-3">
-        <div>
-          <label className="text-xs font-medium text-corp-navy">Desde</label>
-          <input
-            type="time"
-            required
-            value={horaInicio}
-            onChange={(e) => setHoraInicio(e.target.value)}
-            className="mt-1 block rounded-md border border-corp-border px-2 py-1 text-sm"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-corp-navy">Hasta</label>
-          <input
-            type="time"
-            required
-            value={horaFin}
-            onChange={(e) => setHoraFin(e.target.value)}
-            className="mt-1 block rounded-md border border-corp-border px-2 py-1 text-sm"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-corp-navy">Canal</label>
-          <select
-            value={canal}
-            onChange={(e) => setCanal(e.target.value as "whatsapp" | "correo")}
-            className="mt-1 block rounded-md border border-corp-border px-2 py-1 text-sm"
-          >
-            <option value="whatsapp">WhatsApp</option>
-            <option value="correo">Correo</option>
-          </select>
-        </div>
-        <div className="min-w-[10rem] flex-1">
-          <label className="text-xs font-medium text-corp-navy">Destinatario</label>
-          <input
-            required
-            value={destinatario}
-            onChange={(e) => setDestinatario(e.target.value)}
-            placeholder="+57... o correo@empresa.com"
-            className="mt-1 block w-full rounded-md border border-corp-border px-2 py-1 text-sm"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="text-xs font-medium text-corp-navy">Días</label>
-        <div className="mt-1 flex gap-1.5">
-          {DIAS.map((letra, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => alternarDia(i)}
-              className={`h-7 w-7 rounded-full text-xs font-semibold transition ${
-                dias.includes(i) ? "bg-corp-blue text-white" : "bg-white text-corp-muted ring-1 ring-corp-border"
-              }`}
-            >
-              {letra}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {error && <p className="text-xs text-red-600">{error}</p>}
-
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCerrar} className="rounded-md px-3 py-1.5 text-xs text-corp-muted">
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={enviando}
-          className="rounded-md bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy disabled:opacity-60"
-        >
-          {enviando ? "Guardando…" : "Guardar regla"}
-        </button>
-      </div>
-    </form>
-  );
-}

@@ -13,6 +13,17 @@ centralizarlo ahí), no compartiendo código directamente. Si más adelante
 conviene fusionarlos en un solo backend, es una decisión a tomar con datos
 reales de uso, no un default de arranque.
 
+## ⚠️ Regla permanente: mantener actualizado el manual de Ayuda
+
+`frontend/components/views/AyudaView.tsx` es el manual de usuario dentro de
+la app (sección **Ayuda** del sidebar, visible para todos los roles). El
+cliente pidió explícitamente que se mantenga al día. **Toda tarea que
+agregue o cambie una funcionalidad visible para el usuario (una sección
+nueva, un flujo, un botón, un comportamiento) debe terminar actualizando
+también el tema correspondiente en `AyudaView.tsx`** (o agregando uno nuevo
+si no encaja en ninguno existente) — no es opcional, es parte de "terminar"
+la tarea, igual que correr los tests o actualizar el README.
+
 ## Qué hace este módulo
 
 Conecta 10 cámaras PTZ y detecta automáticamente cuándo hay una persona en una
@@ -20,23 +31,129 @@ zona restringida durante un horario configurado, generando una alerta. Dos parte
 que no se mezclan:
 
 - **En el sitio (equipo local, junto a las cámaras)**: conexión a cámaras,
-  detección (propia de la cámara o modelo local), cruce zona+horario, control PTZ.
-- **En la nube (este backend)**: configuración de zonas/horarios, recepción de
-  eventos, historial, alertas, dashboard. **Nunca recibe video crudo, solo eventos
-  con una foto.**
+  detección (propia de la cámara o modelo local), grabación de video,
+  **configuración de zonas/horarios** (rol de NVR — ver "Equipo local como
+  NVR" abajo) y cruce zona+horario para decidir si dispara alerta.
+- **En la nube (este backend)**: recepción de eventos, historial, alertas,
+  dashboard — y un espejo de solo lectura de la configuración de
+  zonas/horarios (para poder verla sin entrar al PC de la planta). **Nunca
+  recibe video crudo, solo eventos con una foto.**
 
 ## Cámara de referencia
 
-Confirmada en sitio: **Dahua PTZ Pico A2** (pendiente documentar specs
-ONVIF/ISAPI exactas del modelo en la visita técnica). Se mantiene el mismo
-supuesto de diseño que con la referencia Hikvision original evaluada antes de
-la confirmación: la detección de movimiento la hace la cámara/equipo local,
-pero **la lógica de "¿cayó dentro del polígono restringido?" la resuelve el
-backend**, cruzando el punto detectado contra `ZonaRestringida` — la cámara
-no define zonas internamente. Esto hace que el backend (Fase 2, ver abajo)
-sea agnóstico a la marca/modelo exacto de cámara: solo necesita un punto
-(x, y) en el mismo sistema de coordenadas del encuadre de referencia usado
-para dibujar el polígono.
+**Comprada y en uso: Dahua Picoo B1, modelo `DH-P3B-PV` (3MP)** — misma
+familia Wi-Fi de consumo/prosumer que la Picoo A2 (evaluada antes, ver
+abajo, pero no la que se terminó comprando). Encendida y configurada por
+primera vez en septiembre 2026 (ver verificaciones confirmadas abajo);
+el resto es investigación de fuentes externas (foro IPCamTalk, datasheet
+oficial Dahua) sin confirmar en sitio:
+
+- Wi-Fi 2.4GHz + Ethernet 10/100 (RJ-45), movimiento motorizado pan/tilt,
+  IR nocturno + luz LED inteligente.
+- Detección de humano/vehículo con IA propia, con seguimiento automático
+  **disponible pero desactivable** — ver verificación confirmada abajo.
+- **RTSP sí soportado**: puerto 554, formato estándar Dahua
+  `rtsp://usuario:password@IP:554/cam/realmonitor?channel=1&subtype=1`
+  — el mismo patrón que ya usa por defecto `Camara.rtsp_url_efectiva`, así
+  que en teoría no hace falta tocar código, solo registrar IP/credenciales
+  (pendiente de probar con VLC, ver abajo).
+- **ONVIF sí soportado** (a diferencia de la Picoo A2, donde probablemente
+  no lo está) — no lo usa el equipo local hoy (toma RTSP directo), pero
+  deja la puerta abierta a simplificar más adelante si hiciera falta.
+- Sin interfaz web — se configura por la app móvil DMSS (conexión inicial a
+  WiFi, credenciales, ajustes), no por un panel tipo ONVIF/NVR empresarial.
+- **Impacto en Fase 2 (equipo local, `equipo_local/` en este repo)**: se
+  construyó asumiendo que no hay ONVIF — toma el stream RTSP directo y
+  corre la detección con un modelo propio (YOLOv8n) en el mini-PC del
+  sitio, en vez de recibir eventos nativos de la cámara.
+
+### ✅ Confirmado con hardware real: el seguimiento automático se puede apagar
+
+Era el riesgo más urgente de este proyecto (ver historial): si la cámara
+se mueve sola para seguir a una persona, el encuadre en vivo deja de
+coincidir con la foto de referencia sobre la que se dibujan las zonas
+restringidas, y la detección de zonas queda mal calibrada. **Confirmado en
+la DH-P3B-PV real** (app DMSS → dispositivo → **IA** → pestaña
+**Detección**): hay un interruptor **"Seguimiento automático"** ("Sigue y
+enfoca los objetivos mientras se mueven"), separado de los interruptores
+de detección de Humano/Vehículo — se puede dejar apagado sin perder la
+detección. **Debe quedar siempre apagado** en cada cámara que se configure
+para este sistema — si alguien lo prende sin saber, rompe la calibración
+de zonas de esa cámara.
+
+### ✅ Confirmado con hardware real: el RTSP conecta con el patrón por defecto
+
+Probado con VLC contra la DH-P3B-PV real en la red local, usuario `admin` y
+la contraseña del dispositivo (no la de la cuenta DMSS/cloud, son cosas
+distintas): `rtsp://admin:contraseña@IP:554/cam/realmonitor?channel=1&subtype=1`
+— **el mismo patrón exacto que ya arma `Camara.rtsp_url_efectiva` por
+defecto**. Video en vivo confirmado en VLC — no hace falta tocar el campo
+`rtsp_url` explícito para esta cámara, con solo IP + usuario + contraseña
+alcanza.
+
+### 🐛 Bug real encontrado y corregido: el modelo YOLO no cargaba en Windows
+
+Instalando en sitio (PC con `C:\equipo_local`, corrido correctamente desde
+`C:\` como exige `-m equipo_local.main`): `DetectorPersonas` fallaba con
+`ConnectionError` / `Permission denied` al intentar descargar `yolov8n.pt`
+la primera vez. Causa: `Config.MODELO_YOLO` guardaba solo el nombre suelto
+`"yolov8n.pt"`, y ultralytics resuelve (y descarga, si falta) ese archivo
+relativo a la **carpeta de trabajo del proceso**, no a la carpeta del
+programa — y esa carpeta de trabajo es, por diseño (ver `rutas.py`), la
+carpeta *padre* de `equipo_local`, que en este caso era literalmente la
+raíz del disco (`C:\`). Escribir ahí sin ser Administrador falla siempre en
+Windows. Corregido en `config.py`: `MODELO_YOLO` ahora es una ruta absoluta
+por defecto (`equipo_local/yolov8n.pt`), así la descarga y las cargas
+siguientes caen siempre en el mismo lugar sin importar desde dónde se
+arranque el programa. Este mismo bug explica por qué la Tarea Programada de
+Windows tampoco arrancaba (moría con esa misma excepción no manejada antes
+de llegar a conectar con la nube).
+
+### Pendiente de verificar con hardware real
+
+- Calidad real de la detección YOLOv8n con la cámara instalada: iluminación
+  del sitio, ángulo, distancia, y si `subtype=1` (substream) da suficiente
+  resolución o hace falta el canal principal.
+- Calibración del escalado de coordenadas (frame RTSP → snapshot de
+  referencia) con la resolución real del stream.
+- **Altavoz de disuasión (luz + sirena)**: el datasheet oficial de la
+  DH-P3B-PV confirma que trae "sound and light alarms to actively deter
+  intruders" incorporados, pero Dahua no publica API oficial para esa línea
+  de consumo. Investigación (ver `equipo_local/disuasion.py`): una
+  integración de Home Assistant de código abierto ampliamente usada con
+  cámaras Dahua (github.com/rroller/dahua) implementa el encendido remoto
+  de sirena/luz vía `GET /cgi-bin/coaxialControlIO.cgi?action=control&channel=1&info[0].Type=2&info[0].IO=1`
+  (`Type=1` luz, `Type=2` sirena, `IO=1` encender — la cámara la apaga sola
+  a los 10-15s), autenticando con HTTP Digest y las mismas credenciales
+  ONVIF ya guardadas en `Camara`. Quedó implementado y con tests
+  (`activar_disuasion()`, disparado desde `CamaraMonitor._reportar()` en
+  cada alerta real) pero **apagado por defecto**
+  (`ALTAVOZ_DISUASION_ACTIVO=false`) porque el endpoint no está confirmado
+  contra la Picoo B1 real — falta probarlo en sitio antes de prender el
+  flag en producción, mismo criterio que se usó con RTSP/calibración.
+
+<details>
+<summary>Investigación previa: Dahua Picoo A2 (evaluada, no comprada)</summary>
+
+Modelos `DH-P3AE-PV` (3MP) / `DH-P5AE-PV` (5MP), SKU internacional
+`SD2A500HB-GN-AW-PV-S2`. Wi-Fi + Ethernet, movimiento motorizado pan/tilt
+(lente fijo de 4mm, no es zoom óptico real pese al nombre "PTZ" usado
+coloquialmente), detección de humano/vehículo con IA propia ("Smart Dual
+Light") con el mismo seguimiento automático que la B1. RTSP soportado
+(puerto 554, patrón estándar Dahua), ONVIF probablemente NO implementado
+en esta serie (a diferencia de la B1). Se mantiene documentada por si se
+compran unidades adicionales de este modelo más adelante.
+
+</details>
+
+Se mantiene el mismo supuesto de diseño de siempre: la detección de
+movimiento la hace la cámara/equipo local, pero **la lógica de "¿cayó
+dentro del polígono restringido?" la resuelve el backend**, cruzando el
+punto detectado contra `ZonaRestringida` — la cámara no define zonas
+internamente. Esto hace que el backend (Fase 2, ver abajo) sea agnóstico a
+la marca/modelo exacto de cámara y al protocolo que use el equipo local
+para capturar el punto: solo necesita un punto (x, y) en el mismo sistema
+de coordenadas del encuadre de referencia usado para dibujar el polígono.
 
 ## Proyecto Django
 
@@ -58,14 +175,158 @@ Proyecto nuevo (no una app dentro de otro proyecto). Apps internas:
 
 ## Modelos clave
 
-- `Camara`: nombre, IP, credenciales ONVIF, ubicación, empresa (tenant)
+- `Camara`: nombre, IP, credenciales ONVIF, ubicación, empresa (tenant).
+  `px_por_metro` (property): escala de la cámara en píxeles por metro real,
+  calculada de dos puntos de calibración marcados sobre el snapshot de
+  referencia + la distancia real entre ellos (ver "Zonas tipo Punto y
+  radio" abajo) — None si no está calibrada.
 - `EquipoLocal`: identifica el mini-PC/equipo en sitio que reporta eventos —
   autenticado por API key propia, no por usuario/clave de persona
-- `ZonaRestringida`: FK a Camara, polígono (lista de coordenadas), nombre
+- `ZonaRestringida`: FK a Camara, `tipo` (Polígono, por defecto, o Punto y
+  radio), nombre. Polígono: lista de coordenadas. Punto y radio: un punto
+  (`centro_x`/`centro_y`) más un radio en metros reales (`radio_metros`) —
+  útil para "no debe haber nadie a menos de N metros de X" cuando X (ej. una
+  estiba) se puede mover, sin tener que redibujar el polígono cada vez, solo
+  volver a marcar el punto. Requiere que `Camara.px_por_metro` no sea None
+  (ver abajo) — si la cámara no está calibrada, esas zonas nunca disparan.
 - `ReglaAlerta`: FK a ZonaRestringida, horario de inicio/fin, días de la semana,
   canal de notificación (WhatsApp/correo), destinatario
 - `EventoDetectado`: FK a Camara y ZonaRestringida (si aplica), timestamp,
   snapshot (imagen), si disparó alerta o no, estado (nuevo/revisado)
+- `ConfiguracionNotificaciones`: fila única (singleton) con la API key de
+  Brevo y el remitente — editable desde el dashboard (Sistema → Brevo) en
+  vez de solo por variable de entorno; si queda vacía, cae de vuelta a
+  settings.BREVO_* (compatibilidad con quien sí las maneja por Railway)
+
+### Zonas tipo "Punto y radio" (distancia real a un objeto que se mueve)
+
+Pensado para reglas del tipo "nadie a menos de 3 metros de la estiba":
+en vez de redibujar el polígono cada vez que el objeto de referencia se
+mueve, el administrador marca un solo punto sobre el snapshot (un clic) y
+un radio en metros — el sistema calcula el círculo de esa distancia real
+alrededor del punto.
+
+Para convertir metros reales en píxeles hace falta calibrar la cámara una
+vez: marcar dos puntos sobre el snapshot y decir la distancia real (en
+metros) entre ellos (ej. el ancho de la estiba, o dos baldosas del piso).
+De ahí sale `Camara.px_por_metro` = distancia en píxeles entre esos dos
+puntos / distancia real en metros.
+
+**Limitación deliberada, documentada a propósito**: esto es una escala
+constante (un solo número), no una homografía completa de perspectiva. Es
+precisa cerca de los puntos de calibración y pierde precisión a medida que
+el punto marcado se aleja de ellos, sobre todo con cámaras muy inclinadas
+o zonas que abarcan mucha profundidad de la escena. Se eligió así a
+propósito frente a una homografía de 4 puntos (más precisa en toda la
+imagen) porque: (a) el caso de uso real (una zona acotada cerca de un
+punto fijo, tipo "3m de la estiba") no lo necesita, y (b) calibrar con 2
+clics + un número es mucho más simple de explicar a un usuario sin
+conocimientos técnicos que calibrar con 4 puntos + entender qué es un
+plano de referencia. Si en el futuro hace falta más precisión en toda la
+escena, migrar a homografía es un cambio localizado en
+`Camara.px_por_metro` (y su equivalente en `equipo_local/geometria.py`),
+no en el resto del pipeline.
+
+Se decidió explícitamente **no entrenar un modelo de IA para detectar el
+objeto de referencia (ej. la estiba) automáticamente** — habría requerido
+juntar y etiquetar fotos reales del sitio y entrenar un modelo aparte
+(YOLOv8n de fábrica no lo reconoce, solo las ~80 clases genéricas de
+COCO), sin garantía de buena precisión sin muchas fotos de entrenamiento.
+Marcar el punto a mano es la opción que ya funciona hoy con la
+infraestructura existente.
+
+### Equipo local como NVR (zonas/horarios se configuran en sitio, no en la nube)
+
+Decisión de arquitectura (cambio deliberado sobre el diseño original, donde
+la nube era la fuente de verdad): el cliente pidió que el equipo local haga
+el papel de NVR — cada zona/horario se configura físicamente en el PC del
+sitio (`equipo_local/`, sección **Configurar** del visor web, puerto 8090),
+no en el dashboard cloud. La nube pasa a ser un **espejo de solo lectura**
+de esa configuración, no quien la define.
+
+- **Almacenamiento**: `equipo_local/almacenamiento_local.py` — SQLite
+  propio del equipo (`configuracion_local.sqlite3`, junto al programa),
+  independiente de la base de datos del backend. Cada zona/regla local
+  tiene un `cloud_id` (None hasta que se sincroniza por primera vez) y
+  marcas de tiempo (`actualizada_en`/`sincronizada_en`) para saber qué hay
+  pendiente de subir sin necesitar un flag "sucio" aparte.
+- **UI de configuración**: `equipo_local/visor_web.py`, rutas
+  `/configurar` y `/configurar/<camara_id>` — un editor de zonas
+  (dibujadas con canvas sobre un frame en vivo real de la cámara, no un
+  snapshot subido a mano) y horarios, servido por el mismo Flask del
+  visor. Soporta ambos tipos de zona: Polígono (clic por vértice) y Punto
+  y radio (un clic marca el centro, se pide el radio en metros al
+  guardar). El círculo de Punto y radio se dibuja a escala real usando
+  `px_por_metro` — que `/api/camaras` expone leyéndolo de
+  `CamaraMonitor.px_por_metro`, ya sincronizado desde la nube en cada
+  ciclo de `obtener_reglas_activas` — y cae a un marcador aproximado si la
+  cámara todavía no está calibrada (la calibración en sí sigue siendo
+  solo desde el dashboard cloud, `calibrar_camara`, no está duplicada
+  acá).
+- **Sincronización hacia la nube**: `equipo_local/sincronizacion_config.py`
+  — en cada ciclo de `main.py` (SincronizadorCamaras.sincronizar), empuja
+  lo que cambió localmente hacia `POST
+  /api/camaras-ia/equipo-local/sincronizar-zonas/` y
+  `.../sincronizar-reglas/` (`camaras_ia/views.py`), que hacen upsert por
+  `cloud_id` sobre los mismos modelos `ZonaRestringida`/`ReglaAlerta` de
+  siempre — no hubo que crear modelos nuevos en el backend, la nube sigue
+  guardando lo mismo, solo que ahora se lo escriben en vez de definirlo.
+- **Migración de lo ya configurado**: si un equipo local arranca sin nada
+  en su base local para una cámara, `sincronizacion_config.py:
+  importar_configuracion_desde_cloud` importa lo que ya existía en el
+  dashboard (de `obtener_reglas_activas`) para no perder configuración
+  previa — a partir de ahí, la edición local es la que manda.
+- **Detección**: `CamaraMonitor` (equipo_local/camara.py) no cambió — sigue
+  recibiendo un dict `camara_datos["zonas"]`. Lo que cambió es quién arma
+  ese dict: antes venía tal cual de `obtener_reglas_activas`, ahora
+  `SincronizadorCamaras.sincronizar()` lo sobrescribe con
+  `almacenamiento.listar_zonas_por_camara(camara_id)` antes de pasarlo al
+  monitor — así la detección corre 100% contra la configuración local,
+  incluso si la sincronización hacia la nube falla (se reintenta sola).
+
+**Resuelto**: como la sincronización es de un solo sentido (local → nube,
+nunca al revés), un cambio hecho en el dashboard cloud se pisaba solo en el
+próximo ciclo de sincronización del equipo local (~60s), sin avisar a
+quien lo editó. Además del aviso visible en `ZonasView.tsx` y en el tema
+"Zonas y horarios" de `AyudaView.tsx`, se bloqueó en el backend la
+escritura: `_verificar_editable_por_dashboard()` en `camaras_ia/views.py`
+revisa, en `perform_create`/`perform_update`/`perform_destroy` de
+`ZonaListaCrear`/`ZonaDetalle`/`ReglaListaCrear`/`ReglaDetalle`, si la
+`Camara.empresa` de la zona/regla tiene algún `EquipoLocal` activo — si lo
+tiene, responde `403 Forbidden` con un mensaje explicando dónde editar de
+verdad, en vez de aceptar un cambio que se iba a perder solo.
+
+### Instrucciones de seguridad (bitácora de reglas en texto libre)
+
+El cliente pidió, además de las zonas dibujadas, poder anotar restricciones
+de seguridad que **todavía no sabemos automatizar** (ej. "las guardas no
+pueden estar abiertas mientras la máquina trabaja", "no tan cerca de un
+montacargas en movimiento") — para no perder la idea mientras se define
+cómo construirla, y para dejar el sistema abierto a más tipos de regla sin
+tener que adivinarlos todos de entrada.
+
+- `InstruccionSeguridad` (modelo nuevo): `texto` libre, `camara` opcional
+  (se puede escribir sin saber a qué cámara aplica todavía), `estado`
+  (Pendiente / Configurada / Requiere desarrollo aparte), `zona` opcional
+  (se enlaza una vez que sí se convierte en una zona real), `notas` para
+  el equipo técnico.
+- Endpoints dashboard: `dashboard/instrucciones-seguridad/` (lista/crea) y
+  `.../<id>/` (edita/borra) — cualquier Administrador u Operador puede
+  crear/editar (es solo dejarlo anotado, sin riesgo), borrar es solo
+  Administrador (`EsAdministradorParaEliminar`).
+- UI: tarjeta "Instrucciones de seguridad" arriba de todo en `ZonasView.tsx`
+  (no depende de qué cámara esté seleccionada) — texto libre + cámara
+  opcional + selector de estado por instrucción.
+
+**No es** un mecanismo de interpretación automática (no hay IA/NLU
+convirtiendo el texto en una zona) — es solo un registro para no perder
+requisitos mientras se van definiendo. Las que sí encajan en el modelo
+actual (una zona fija con un motivo, ej. "no pararse en el transportador")
+se convierten a mano en una zona real y se marcan `Configurada`; las que
+necesitan capacidades nuevas (detectar el estado de un objeto — guarda/
+puerta abierta o cerrada —, una condición de tiempo, o el estado de otra
+máquina vía sensor/PLC) quedan en `Requiere desarrollo aparte` hasta
+diseñarse.
 
 ## Funciones/servicios clave
 
@@ -100,36 +361,80 @@ También la Fase 4 completa (ver más abajo):
   su zona dibujado encima (SVG) y un banner verde/rojo según si el último
   evento disparó alerta — el mismo estilo de las fotos de referencia del
   cliente (persona detectada en verde, alerta en rojo, zona en amarillo).
-- **Zonas y horarios**: editor visual — seleccionar cámara, subir su
-  snapshot de referencia, dibujar el polígono haciendo clic sobre la imagen
-  (coordenadas en píxeles naturales de esa foto) y configurar sus reglas de
-  horario (días, franja, canal, destinatario) sin tocar el admin de Django.
+- **Zonas y horarios**: editor visual — seleccionar cámara, subir (o
+  eliminar) su snapshot de referencia, dibujar el polígono haciendo clic
+  sobre la imagen
+  (coordenadas en píxeles naturales de esa foto) — o, alternativa, marcar un
+  punto y un radio en metros reales (ver "Zonas tipo Punto y radio" abajo)
+  — y configurar sus reglas de horario (días, franja, canal, destinatario)
+  sin tocar el admin de Django.
 - **Alertas**: bandeja de `EventoDetectado` con foto, filtros por
-  estado/disparo de alerta, y marcar revisado.
+  estado/disparo de alerta, y marcar revisado — solo triage, sin datos de
+  notificación.
+- **Notificaciones**: sección propia, separada de Alertas. Pestaña "Envíos":
+  historial de eventos con `disparo_alerta=true`, su `canal_notificacion`
+  (correo/whatsapp), estado del envío (Enviada/Error/N-D) y detalle —
+  filtrable por canal. Pestaña "Configuración": la misma
+  `ConfiguracionAlertasView` de siempre (horario/canal/destinatario por
+  zona), movida aquí desde lo que antes era "Alertas → Configuración".
+- **Sistema** (solo Administrador): dos pestañas.
+  - "Brevo (correo)": formulario para digitar/actualizar la API key y el
+    remitente sin tocar variables de entorno en Railway. La API key nunca
+    se devuelve al navegador (write-only) — el formulario solo muestra si
+    hay una configurada o no.
+  - "Equipo local": alta/listado/baja de `EquipoLocal` (antes solo existía
+    por el admin de Django) — nombre, `api_key` generado (para copiar al
+    `.env` del equipo local), activar/desactivar, eliminar, y un badge de
+    "Conectado" si `ultima_conexion` fue hace menos de 5 minutos.
 
-Operador ve las cuatro secciones pero no puede crear/editar/eliminar zonas
-ni reglas (`EsAdministradorOSoloLectura` en el backend) ni gestionar
-usuarios — solo Administrador.
+- **Ayuda**: manual de usuario dentro de la app — tabla de contenidos con un
+  tema por sección del dashboard, más un tema dedicado al flujo completo del
+  equipo local (cómo se conectan las cámaras, mDNS, grabaciones) y preguntas
+  frecuentes. Ver la regla permanente arriba: se actualiza con cada cambio
+  visible al usuario.
+
+Operador ve todas las secciones excepto Sistema y Usuarios (tampoco ve esos
+dos temas dentro de Ayuda). No puede crear/editar/eliminar zonas ni reglas
+(`EsAdministradorOSoloLectura` en el backend) ni gestionar usuarios,
+credenciales de Brevo o equipos locales — todo eso es solo Administrador.
 
 ## Fases de entrega (del alcance cotizado al cliente)
 
 1. **Análisis de zonas y reglas** — visita/levantamiento de qué cámara ve qué
    zona y en qué horario aplica cada alerta. Modelo de datos + panel de
    administración para registrar lo levantado en la visita. **Completa.**
-2. **Integración con las cámaras (ONVIF/RTSP reales)** — dividida en dos
-   partes que no se mezclan (ver "Qué hace este módulo" arriba):
+2. **Integración con las cámaras (RTSP real)** — dividida en dos partes que
+   no se mezclan (ver "Qué hace este módulo" arriba):
    - **Backend en la nube — completa**: `evaluar_zona_horario` (cruce punto
      detectado + polígono + horario, con ray casting y manejo de horarios
-     que cruzan medianoche), `disparar_alerta` (stub con logging, sin
-     proveedor de WhatsApp/correo real todavía), `recibir_evento_camara`
-     (recibe cámara + punto + snapshot, valida ownership por empresa, crea
-     `EventoDetectado`) y `obtener_reglas_activas` (el equipo local
-     sincroniza cámaras/zonas/reglas activas de su empresa por API key).
-   - **Equipo local en sitio (ONVIF/RTSP/PTZ real contra la Dahua PTZ Pico
-     A2)** — pendiente, es un desarrollo aparte (posiblemente otro repo),
-     no parte de este backend Django.
-3. Motor de detección y reglas funcionando end-to-end (requiere el equipo
-   local de sitio integrado con el backend de arriba)
+     que cruzan medianoche), `disparar_alerta` (canal correo: envío real vía
+     Brevo; WhatsApp sigue siendo stub con logging, sin proveedor real
+     todavía), `recibir_evento_camara` (recibe cámara + punto + snapshot,
+     valida ownership por empresa, crea `EventoDetectado`) y
+     `obtener_reglas_activas` (el equipo local sincroniza cámaras/zonas/
+     reglas activas de su empresa por API key, con `rtsp_url` ya resuelta y
+     el snapshot de referencia para escalar coordenadas).
+   - **Equipo local en sitio — completo**, en `equipo_local/` (mismo repo,
+     programa Python independiente, no es una app Django): se conecta por
+     RTSP a cada cámara (no ONVIF — ver más abajo por qué), detecta personas
+     con YOLOv8n y reporta al backend de arriba. Corre como servicio en
+     segundo plano (systemd/Tarea Programada) en un PC dedicado en sitio —no
+     hace falta DVR/NVR, sirve cualquier PC/mini-PC común— con un instalador
+     de un clic (`equipo_local/instalar.bat`/`instalar.sh`) pensado para
+     alguien sin conocimientos técnicos. También
+     graba a disco, solo alrededor de eventos reales con alerta (16s antes +
+     16s después por defecto, no todo el tiempo — ver
+     `equipo_local/grabador.py:GrabadorEventos`), con retención automática y
+     borrado manual por fecha, y expone un visor web propio en esa red local
+     (`http://<ip-del-pc>:8090`, o `http://sstbavaria-camaras.local:8090`
+     por el anuncio mDNS/Bonjour) para ver las cámaras en vivo y revisar
+     grabaciones — nunca sube video a internet, solo eventos con una foto
+     (igual que el resto del módulo). Ver `equipo_local/README.md` para
+     instalación y las secciones "Grabaciones y visor en vivo" y "Nombre en
+     la red en vez de IP".
+3. Motor de detección y reglas funcionando end-to-end — **construido**;
+   falta la puesta a prueba con cámaras reales en sitio (ver "Pendiente de
+   verificar con hardware real" más abajo).
 4. **Panel en el dashboard (zonas dibujadas, tablero de indicadores) —
    completo** del lado del dashboard (Tablero, Cámaras IA, Zonas y
    horarios, Alertas). Sigue pendiente que datos *reales* del equipo local

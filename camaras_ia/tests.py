@@ -1,18 +1,60 @@
 import datetime
+import io
+import urllib.error
+import zipfile
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.cache import cache
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from core.models import Empresa
 
-from .models import Camara, EquipoLocal, EventoDetectado, ReglaAlerta, ZonaRestringida
-from .services import _regla_vigente, evaluar_zona_horario, punto_en_poligono
+from .ia_deteccion import _parsear_json, clasificar_evento
+from .models import (
+    Camara,
+    ConfiguracionIA,
+    ConfiguracionNotificaciones,
+    EquipoLocal,
+    EventoDetectado,
+    InstruccionSeguridad,
+    ReglaAlerta,
+    TipoEventoIA,
+    ZonaRestringida,
+)
+from .services import _regla_vigente, disparar_alerta, evaluar_zona_horario, punto_en_circulo, punto_en_poligono, punto_en_zona
 
 Usuario = get_user_model()
 
 CUADRADO = [[0, 0], [10, 0], [10, 10], [0, 10]]
+
+
+class RtspUrlEfectivaTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+
+    def test_usa_rtsp_url_explicita_si_esta_configurada(self):
+        camara = Camara.objects.create(
+            empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1", rtsp_url="rtsp://otra-marca.example/stream"
+        )
+        self.assertEqual(camara.rtsp_url_efectiva, "rtsp://otra-marca.example/stream")
+
+    def test_construye_patron_dahua_con_credenciales(self):
+        camara = Camara.objects.create(
+            empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1", usuario_onvif="admin", password_onvif="clave123"
+        )
+        self.assertEqual(
+            camara.rtsp_url_efectiva,
+            "rtsp://admin:clave123@10.0.0.1:554/cam/realmonitor?channel=1&subtype=1",
+        )
+
+    def test_construye_patron_dahua_sin_credenciales(self):
+        camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.assertEqual(
+            camara.rtsp_url_efectiva, "rtsp://10.0.0.1:554/cam/realmonitor?channel=1&subtype=1"
+        )
 
 
 class PuntoEnPoligonoTests(TestCase):
@@ -24,6 +66,87 @@ class PuntoEnPoligonoTests(TestCase):
 
     def test_poligono_invalido(self):
         self.assertFalse(punto_en_poligono((1, 1), [[0, 0], [1, 1]]))
+
+
+class PuntoEnCirculoTests(TestCase):
+    def test_punto_dentro(self):
+        self.assertTrue(punto_en_circulo((3, 4), (0, 0), 5))
+
+    def test_punto_fuera(self):
+        self.assertFalse(punto_en_circulo((10, 10), (0, 0), 5))
+
+    def test_radio_none_nunca_contiene_nada(self):
+        self.assertFalse(punto_en_circulo((0, 0), (0, 0), None))
+
+
+class PuntoEnZonaTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+
+    def test_tipo_poligono(self):
+        zona = ZonaRestringida(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.assertTrue(punto_en_zona((5, 5), zona))
+        self.assertFalse(punto_en_zona((50, 50), zona))
+
+    def test_tipo_punto_radio_con_calibracion(self):
+        zona = ZonaRestringida(
+            camara=self.camara,
+            nombre="3m de la estiba",
+            tipo=ZonaRestringida.Tipo.PUNTO_RADIO,
+            centro_x=100,
+            centro_y=100,
+            radio_metros=3,
+        )
+        # px_por_metro=10 -> radio de 30px
+        self.assertTrue(punto_en_zona((110, 100), zona, px_por_metro=10))
+        self.assertFalse(punto_en_zona((200, 200), zona, px_por_metro=10))
+
+    def test_tipo_punto_radio_sin_calibrar_nunca_dispara(self):
+        zona = ZonaRestringida(
+            camara=self.camara,
+            nombre="3m de la estiba",
+            tipo=ZonaRestringida.Tipo.PUNTO_RADIO,
+            centro_x=100,
+            centro_y=100,
+            radio_metros=3,
+        )
+        self.assertFalse(punto_en_zona((100, 100), zona, px_por_metro=None))
+
+
+class PxPorMetroTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+
+    def test_sin_calibrar_devuelve_none(self):
+        camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.assertIsNone(camara.px_por_metro)
+
+    def test_calibrada_calcula_la_escala(self):
+        camara = Camara.objects.create(
+            empresa=self.empresa,
+            nombre="Cam 1",
+            ip="10.0.0.1",
+            calibracion_punto1_x=0,
+            calibracion_punto1_y=0,
+            calibracion_punto2_x=100,
+            calibracion_punto2_y=0,
+            calibracion_distancia_metros=2,
+        )
+        self.assertEqual(camara.px_por_metro, 50)
+
+    def test_distancia_cero_devuelve_none(self):
+        camara = Camara.objects.create(
+            empresa=self.empresa,
+            nombre="Cam 1",
+            ip="10.0.0.1",
+            calibracion_punto1_x=0,
+            calibracion_punto1_y=0,
+            calibracion_punto2_x=100,
+            calibracion_punto2_y=0,
+            calibracion_distancia_metros=0,
+        )
+        self.assertIsNone(camara.px_por_metro)
 
 
 class ReglaVigenteTests(TestCase):
@@ -101,6 +224,149 @@ class EvaluarZonaHorarioTests(TestCase):
         zona, regla = evaluar_zona_horario(self.camara, (5, 5))
         self.assertIsNone(zona)
         self.assertIsNone(regla)
+
+
+class EvaluarZonaHorarioPuntoRadioTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.camara_calibrada = Camara.objects.create(
+            empresa=self.empresa,
+            nombre="Cam calibrada",
+            ip="10.0.0.1",
+            calibracion_punto1_x=0,
+            calibracion_punto1_y=0,
+            calibracion_punto2_x=100,
+            calibracion_punto2_y=0,
+            calibracion_distancia_metros=10,  # 10px = 1m
+        )
+        self.zona = ZonaRestringida.objects.create(
+            camara=self.camara_calibrada,
+            nombre="3m de la estiba",
+            tipo=ZonaRestringida.Tipo.PUNTO_RADIO,
+            centro_x=200,
+            centro_y=200,
+            radio_metros=3,  # radio de 30px con esta calibración
+        )
+        ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            destinatario="+573000000000",
+        )
+
+    def test_punto_dentro_del_radio_dispara(self):
+        zona, regla = evaluar_zona_horario(self.camara_calibrada, (215, 200))  # a 15px del centro
+        self.assertEqual(zona, self.zona)
+        self.assertIsNotNone(regla)
+
+    def test_punto_fuera_del_radio_no_dispara(self):
+        zona, regla = evaluar_zona_horario(self.camara_calibrada, (500, 500))
+        self.assertIsNone(zona)
+        self.assertIsNone(regla)
+
+    def test_camara_sin_calibrar_nunca_dispara(self):
+        camara_sin_calibrar = Camara.objects.create(empresa=self.empresa, nombre="Cam 2", ip="10.0.0.2")
+        ZonaRestringida.objects.create(
+            camara=camara_sin_calibrar,
+            nombre="3m de la estiba",
+            tipo=ZonaRestringida.Tipo.PUNTO_RADIO,
+            centro_x=200,
+            centro_y=200,
+            radio_metros=3,
+        )
+        zona, regla = evaluar_zona_horario(camara_sin_calibrar, (200, 200))
+        self.assertIsNone(zona)
+        self.assertIsNone(regla)
+
+
+@override_settings(BREVO_API_KEY="clave-de-prueba", BREVO_REMITENTE_EMAIL="a@x.com", BREVO_REMITENTE_NOMBRE="Test")
+class DispararAlertaCorreoTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.regla_correo = ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            canal_notificacion=ReglaAlerta.Canal.CORREO,
+            destinatario="seguridad@bavaria.com",
+        )
+        self.regla_whatsapp = ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            canal_notificacion=ReglaAlerta.Canal.WHATSAPP,
+            destinatario="+573000000000",
+        )
+        self.evento = EventoDetectado.objects.create(camara=self.camara, zona=self.zona, punto_x=1, punto_y=1)
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_correo_exitoso_marca_evento(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        disparar_alerta(self.evento, self.regla_correo)
+        self.evento.refresh_from_db()
+        self.assertTrue(self.evento.notificacion_enviada)
+        self.assertEqual(self.evento.canal_notificacion, "correo")
+        self.assertIn("seguridad@bavaria.com", self.evento.notificacion_detalle)
+        mock_urlopen.assert_called_once()
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_correo_fallido_registra_el_error(self, mock_urlopen):
+        mock_urlopen.side_effect = urllib.error.URLError("timeout")
+        disparar_alerta(self.evento, self.regla_correo)
+        self.evento.refresh_from_db()
+        self.assertFalse(self.evento.notificacion_enviada)
+        self.assertTrue(self.evento.notificacion_detalle)
+
+    @override_settings(BREVO_API_KEY="")
+    def test_sin_api_key_no_rompe_y_queda_registrado(self):
+        disparar_alerta(self.evento, self.regla_correo)
+        self.evento.refresh_from_db()
+        self.assertFalse(self.evento.notificacion_enviada)
+        self.assertIn("Brevo", self.evento.notificacion_detalle)
+
+    @override_settings(BREVO_API_KEY="desde-variable-de-entorno")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_api_key_de_la_bd_tiene_prioridad_sobre_settings(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        config = ConfiguracionNotificaciones.obtener()
+        config.brevo_api_key = "desde-la-bd"
+        config.save()
+
+        disparar_alerta(self.evento, self.regla_correo)
+
+        # urlopen(request, timeout=...) — la Request enviada queda en args[0]
+        request_enviado = mock_urlopen.call_args[0][0]
+        self.assertEqual(request_enviado.get_header("Api-key"), "desde-la-bd")
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_canal_whatsapp_no_intenta_enviar_correo(self, mock_urlopen):
+        disparar_alerta(self.evento, self.regla_whatsapp)
+        mock_urlopen.assert_not_called()
+        self.evento.refresh_from_db()
+        self.assertFalse(self.evento.notificacion_enviada)
+        self.assertEqual(self.evento.canal_notificacion, "whatsapp")
+        self.assertTrue(self.evento.notificacion_detalle)
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_dispara_push_al_personal_interno(self, mock_urlopen, mock_push):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        disparar_alerta(self.evento, self.regla_correo)
+        mock_push.assert_called_once()
+        titulo, mensaje = mock_push.call_args[0][:2]
+        self.assertIn("cámaras", titulo.lower())
+        self.assertIn("Bodega", mensaje)
+        self.assertEqual(mock_push.call_args.kwargs.get("url"), "/dashboard?ir=alertas")
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    def test_dispara_push_tambien_en_canal_whatsapp(self, mock_push):
+        disparar_alerta(self.evento, self.regla_whatsapp)
+        mock_push.assert_called_once()
 
 
 class RecibirEventoCamaraViewTests(TestCase):
@@ -184,6 +450,19 @@ class ObtenerReglasActivasViewTests(TestCase):
         self.assertEqual(len(camaras[0]["zonas"][0]["reglas"]), 1)
         self.assertEqual(camaras[0]["zonas"][0]["reglas"][0]["id"], self.regla.pk)
 
+    def test_incluye_rtsp_url_efectiva(self):
+        response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
+        self.assertEqual(response.data["camaras"][0]["rtsp_url"], self.camara.rtsp_url_efectiva)
+
+    def test_snapshot_referencia_es_url_absoluta(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.camara.snapshot_referencia = SimpleUploadedFile("ref.jpg", b"contenido-jpeg-falso")
+        self.camara.save()
+        response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
+        url_snapshot = response.data["camaras"][0]["snapshot_referencia"]
+        self.assertTrue(url_snapshot.startswith("http://testserver/"), url_snapshot)
+
     def test_zona_inactiva_no_aparece(self):
         self.zona.activa = False
         self.zona.save()
@@ -191,8 +470,197 @@ class ObtenerReglasActivasViewTests(TestCase):
         self.assertEqual(response.data["camaras"][0]["zonas"], [])
 
 
+class SincronizarZonasEquipoLocalViewTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.otra_empresa = Empresa.objects.create(nombre="Otra Empresa")
+        self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.url = reverse("camaras_ia:sincronizar_zonas_equipo_local")
+
+    def test_sin_api_key_devuelve_401(self):
+        response = self.client.post(self.url, {"zonas": []}, content_type="application/json")
+        self.assertEqual(response.status_code, 401)
+
+    def test_crea_zona_nueva_y_devuelve_cloud_id(self):
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": None, "camara": self.camara.pk, "nombre": "Bodega",
+                        "tipo": "poligono", "poligono": CUADRADO, "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["errores"], [])
+        self.assertEqual(len(response.data["ids"]), 1)
+        self.assertEqual(response.data["ids"][0]["cliente_id"], "z-1")
+        zona = ZonaRestringida.objects.get(pk=response.data["ids"][0]["cloud_id"])
+        self.assertEqual(zona.nombre, "Bodega")
+        self.assertEqual(zona.camara, self.camara)
+
+    def test_actualiza_zona_existente_con_cloud_id(self):
+        zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Vieja", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": zona.pk, "camara": self.camara.pk, "nombre": "Renombrada",
+                        "tipo": "poligono", "poligono": CUADRADO, "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        zona.refresh_from_db()
+        self.assertEqual(zona.nombre, "Renombrada")
+
+    def test_camara_de_otra_empresa_devuelve_error_en_esa_entrada(self):
+        camara_ajena = Camara.objects.create(empresa=self.otra_empresa, nombre="Ajena", ip="10.0.0.9")
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": None, "camara": camara_ajena.pk, "nombre": "X",
+                        "tipo": "poligono", "poligono": CUADRADO, "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["ids"], [])
+        self.assertEqual(len(response.data["errores"]), 1)
+
+    def test_zona_poligono_con_menos_de_3_puntos_devuelve_error(self):
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": None, "camara": self.camara.pk, "nombre": "X",
+                        "tipo": "poligono", "poligono": [[0, 0], [1, 1]], "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["errores"]), 1)
+
+    def test_no_puede_actualizar_zona_de_otra_empresa_por_cloud_id_ajeno(self):
+        camara_ajena = Camara.objects.create(empresa=self.otra_empresa, nombre="Ajena", ip="10.0.0.9")
+        zona_ajena = ZonaRestringida.objects.create(camara=camara_ajena, nombre="Ajena", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"zonas": [{"cliente_id": "z-1", "cloud_id": zona_ajena.pk, "camara": self.camara.pk, "nombre": "X",
+                        "tipo": "poligono", "poligono": CUADRADO, "activa": True}]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(len(response.data["errores"]), 1)
+
+    def test_eliminar_borra_zonas_por_cloud_id(self):
+        zona = ZonaRestringida.objects.create(camara=self.camara, nombre="A borrar", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"zonas": [], "eliminar": [zona.pk]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["eliminadas"], 1)
+        self.assertFalse(ZonaRestringida.objects.filter(pk=zona.pk).exists())
+
+    def test_eliminar_no_borra_zona_de_otra_empresa(self):
+        camara_ajena = Camara.objects.create(empresa=self.otra_empresa, nombre="Ajena", ip="10.0.0.9")
+        zona_ajena = ZonaRestringida.objects.create(camara=camara_ajena, nombre="Ajena", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"zonas": [], "eliminar": [zona_ajena.pk]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.data["eliminadas"], 0)
+        self.assertTrue(ZonaRestringida.objects.filter(pk=zona_ajena.pk).exists())
+
+
+class SincronizarReglasEquipoLocalViewTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.otra_empresa = Empresa.objects.create(nombre="Otra Empresa")
+        self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.url = reverse("camaras_ia:sincronizar_reglas_equipo_local")
+
+    def _regla_payload(self, **overrides):
+        payload = {
+            "cliente_id": "r-1",
+            "cloud_id": None,
+            "zona": self.zona.pk,
+            "nombre": "Turno noche",
+            "hora_inicio": "22:00:00",
+            "hora_fin": "06:00:00",
+            "dias_semana": [0, 1, 2, 3, 4],
+            "canal_notificacion": "correo",
+            "destinatario": "x@y.com",
+            "activa": True,
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_sin_api_key_devuelve_401(self):
+        response = self.client.post(self.url, {"reglas": []}, content_type="application/json")
+        self.assertEqual(response.status_code, 401)
+
+    def test_crea_regla_nueva_y_devuelve_cloud_id(self):
+        response = self.client.post(
+            self.url,
+            {"reglas": [self._regla_payload()]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["errores"], [])
+        regla = ReglaAlerta.objects.get(pk=response.data["ids"][0]["cloud_id"])
+        self.assertEqual(regla.zona, self.zona)
+        self.assertEqual(regla.destinatario, "x@y.com")
+
+    def test_actualiza_regla_existente(self):
+        regla = ReglaAlerta.objects.create(
+            zona=self.zona, hora_inicio=datetime.time(8, 0), hora_fin=datetime.time(17, 0),
+            dias_semana=[0], destinatario="viejo@x.com",
+        )
+        response = self.client.post(
+            self.url,
+            {"reglas": [self._regla_payload(cloud_id=regla.pk, destinatario="nuevo@x.com")]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        regla.refresh_from_db()
+        self.assertEqual(regla.destinatario, "nuevo@x.com")
+
+    def test_zona_de_otra_empresa_devuelve_error(self):
+        camara_ajena = Camara.objects.create(empresa=self.otra_empresa, nombre="Ajena", ip="10.0.0.9")
+        zona_ajena = ZonaRestringida.objects.create(camara=camara_ajena, nombre="Ajena", poligono=CUADRADO)
+        response = self.client.post(
+            self.url,
+            {"reglas": [self._regla_payload(zona=zona_ajena.pk)]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.data["ids"], [])
+        self.assertEqual(len(response.data["errores"]), 1)
+
+    def test_eliminar_borra_reglas_por_cloud_id(self):
+        regla = ReglaAlerta.objects.create(
+            zona=self.zona, hora_inicio=datetime.time(8, 0), hora_fin=datetime.time(17, 0),
+            dias_semana=[0], destinatario="x@y.com",
+        )
+        response = self.client.post(
+            self.url,
+            {"reglas": [], "eliminar": [regla.pk]},
+            content_type="application/json",
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.data["eliminadas"], 1)
+        self.assertFalse(ReglaAlerta.objects.filter(pk=regla.pk).exists())
+
+
 class DashboardEndpointsTests(TestCase):
     def setUp(self):
+        # El throttle de login cuenta por IP y el test client siempre usa la
+        # misma — sin esto, los _token() de tests anteriores se acumularían.
+        cache.clear()
         self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
@@ -208,6 +676,7 @@ class DashboardEndpointsTests(TestCase):
         self.evento = EventoDetectado.objects.create(
             camara=self.camara, zona=self.zona, punto_x=5, punto_y=5, disparo_alerta=True
         )
+        self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
 
     def _token(self, user):
         response = self.client.post(
@@ -273,6 +742,8 @@ class DashboardEndpointsTests(TestCase):
         self.assertEqual(len(response.data), 1)
 
     def test_admin_crea_zona(self):
+        self.equipo.activo = False
+        self.equipo.save()
         response = self.client.post(
             reverse("camaras_ia:zonas_lista"),
             {"camara": self.camara.pk, "nombre": "Nueva zona", "poligono": CUADRADO},
@@ -282,7 +753,125 @@ class DashboardEndpointsTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(ZonaRestringida.objects.filter(nombre="Nueva zona").exists())
 
+    def test_admin_no_puede_crear_zona_con_equipo_local_activo(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {"camara": self.camara.pk, "nombre": "Nueva zona", "poligono": CUADRADO},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertFalse(ZonaRestringida.objects.filter(nombre="Nueva zona").exists())
+
+    def test_admin_no_puede_editar_zona_con_equipo_local_activo(self):
+        response = self.client.patch(
+            reverse("camaras_ia:zonas_detalle", args=[self.zona.pk]),
+            {"nombre": "Renombrada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+
+    def test_admin_no_puede_crear_regla_con_equipo_local_activo(self):
+        response = self.client.post(
+            reverse("camaras_ia:reglas_lista"),
+            {
+                "zona": self.zona.pk,
+                "hora_inicio": "22:00",
+                "hora_fin": "06:00",
+                "dias_semana": [4, 5],
+                "destinatario": "seguridad@bavaria.com",
+            },
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+
+    def test_admin_crea_zona_tipo_punto_radio(self):
+        self.equipo.activo = False
+        self.equipo.save()
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {
+                "camara": self.camara.pk,
+                "nombre": "3m de la estiba",
+                "tipo": "punto_radio",
+                "centro_x": 100,
+                "centro_y": 100,
+                "radio_metros": 3,
+            },
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_crear_zona_punto_radio_sin_centro_falla(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {"camara": self.camara.pk, "nombre": "Sin centro", "tipo": "punto_radio", "radio_metros": 3},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_crear_zona_poligono_con_menos_de_3_puntos_falla(self):
+        response = self.client.post(
+            reverse("camaras_ia:zonas_lista"),
+            {"camara": self.camara.pk, "nombre": "Muy chica", "poligono": [[0, 0], [1, 1]]},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_admin_calibra_camara(self):
+        url = reverse("camaras_ia:calibrar_camara", args=[self.camara.pk])
+        response = self.client.post(
+            url,
+            {"punto1": [0, 0], "punto2": [100, 0], "distancia_metros": 2},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["px_por_metro"], 50)
+        self.camara.refresh_from_db()
+        self.assertEqual(self.camara.px_por_metro, 50)
+
+    def test_operador_no_puede_calibrar_camara(self):
+        url = reverse("camaras_ia:calibrar_camara", args=[self.camara.pk])
+        response = self.client.post(
+            url,
+            {"punto1": [0, 0], "punto2": [100, 0], "distancia_metros": 2},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_elimina_snapshot_referencia(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.camara.snapshot_referencia = SimpleUploadedFile("ref.jpg", b"contenido-jpeg-falso")
+        self.camara.save()
+        url = reverse("camaras_ia:subir_snapshot_referencia", args=[self.camara.pk])
+        response = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIsNone(response.data["snapshot_referencia"])
+        self.camara.refresh_from_db()
+        self.assertFalse(self.camara.snapshot_referencia)
+
+    def test_operador_no_puede_eliminar_snapshot_referencia(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.camara.snapshot_referencia = SimpleUploadedFile("ref.jpg", b"contenido-jpeg-falso")
+        self.camara.save()
+        url = reverse("camaras_ia:subir_snapshot_referencia", args=[self.camara.pk])
+        response = self.client.delete(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
+        self.camara.refresh_from_db()
+        self.assertTrue(self.camara.snapshot_referencia)
+
     def test_admin_crea_regla_para_zona(self):
+        self.equipo.activo = False
+        self.equipo.save()
         response = self.client.post(
             reverse("camaras_ia:reglas_lista"),
             {
@@ -304,10 +893,531 @@ class DashboardEndpointsTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_admin_elimina_zona(self):
+        self.equipo.activo = False
+        self.equipo.save()
         url = reverse("camaras_ia:zonas_detalle", args=[self.zona.pk])
         response = self.client.delete(url, **self._auth(self.admin))
         self.assertEqual(response.status_code, 204)
 
+    def test_admin_no_puede_eliminar_zona_con_equipo_local_activo(self):
+        url = reverse("camaras_ia:zonas_detalle", args=[self.zona.pk])
+        response = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(ZonaRestringida.objects.filter(pk=self.zona.pk).exists())
+
+    def test_operador_puede_crear_instruccion_de_seguridad(self):
+        response = self.client.post(
+            reverse("camaras_ia:instrucciones_seguridad_lista"),
+            {"texto": "No pararse en el transportador", "camara": self.camara.pk},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["estado"], "pendiente")
+        self.assertTrue(InstruccionSeguridad.objects.filter(texto="No pararse en el transportador").exists())
+
+    def test_crear_instruccion_sin_camara_es_valido(self):
+        response = self.client.post(
+            reverse("camaras_ia:instrucciones_seguridad_lista"),
+            {"texto": "No debe estar cerca de químicos"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(response.data["camara"])
+
+    def test_lista_instrucciones_incluye_nombres_de_camara_y_zona(self):
+        InstruccionSeguridad.objects.create(
+            empresa=self.empresa, camara=self.camara, zona=self.zona, texto="Ya configurada", estado="configurada"
+        )
+        response = self.client.get(reverse("camaras_ia:instrucciones_seguridad_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["camara_nombre"], "Cam 1")
+        self.assertEqual(response.data[0]["zona_nombre"], "Bodega")
+
+    def test_operador_puede_editar_estado_de_instruccion(self):
+        instruccion = InstruccionSeguridad.objects.create(empresa=self.empresa, texto="Algo por revisar")
+        response = self.client.patch(
+            reverse("camaras_ia:instrucciones_seguridad_detalle", args=[instruccion.pk]),
+            {"estado": "requiere_desarrollo", "notas": "Necesita detectar el estado de una guarda"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        instruccion.refresh_from_db()
+        self.assertEqual(instruccion.estado, "requiere_desarrollo")
+
+    def test_operador_no_puede_eliminar_instruccion(self):
+        instruccion = InstruccionSeguridad.objects.create(empresa=self.empresa, texto="Algo")
+        response = self.client.delete(
+            reverse("camaras_ia:instrucciones_seguridad_detalle", args=[instruccion.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(InstruccionSeguridad.objects.filter(pk=instruccion.pk).exists())
+
+    def test_admin_elimina_instruccion(self):
+        instruccion = InstruccionSeguridad.objects.create(empresa=self.empresa, texto="Algo")
+        response = self.client.delete(
+            reverse("camaras_ia:instrucciones_seguridad_detalle", args=[instruccion.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+
+    def test_instrucciones_sin_autenticar_devuelve_401(self):
+        response = self.client.get(reverse("camaras_ia:instrucciones_seguridad_lista"))
+        self.assertEqual(response.status_code, 401)
+
     def test_sin_autenticar_devuelve_401(self):
         response = self.client.get(reverse("camaras_ia:indicadores_dashboard"))
         self.assertEqual(response.status_code, 401)
+
+    def test_operador_no_puede_crear_camara(self):
+        response = self.client.post(
+            reverse("camaras_ia:camaras_lista"),
+            {"nombre": "Cam nueva", "ip": "10.0.0.9"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_crea_camara_sin_empresa_previa(self):
+        Camara.objects.all().delete()
+        Empresa.objects.all().delete()
+        response = self.client.post(
+            reverse("camaras_ia:camaras_lista"),
+            {"nombre": "Cam nueva", "ip": "10.0.0.9", "ubicacion": "Bodega 2"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        camara = Camara.objects.get(nombre="Cam nueva")
+        self.assertIsNotNone(camara.empresa)
+        self.assertEqual(camara.ip, "10.0.0.9")
+
+    def test_admin_edita_camara(self):
+        url = reverse("camaras_ia:camaras_detalle", args=[self.camara.pk])
+        response = self.client.patch(
+            url,
+            {"ubicacion": "Nueva ubicación", "activa": False},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.camara.refresh_from_db()
+        self.assertEqual(self.camara.ubicacion, "Nueva ubicación")
+        self.assertFalse(self.camara.activa)
+
+    def test_operador_no_puede_editar_camara(self):
+        url = reverse("camaras_ia:camaras_detalle", args=[self.camara.pk])
+        response = self.client.patch(
+            url, {"activa": False}, content_type="application/json", **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_elimina_camara(self):
+        camara_id = self.camara.pk
+        zona_id = self.zona.pk
+        url = reverse("camaras_ia:camaras_detalle", args=[camara_id])
+        response = self.client.delete(url, **self._auth(self.admin))
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Camara.objects.filter(pk=camara_id).exists())
+        self.assertFalse(ZonaRestringida.objects.filter(pk=zona_id).exists())
+
+    def test_operador_no_puede_eliminar_camara(self):
+        url = reverse("camaras_ia:camaras_detalle", args=[self.camara.pk])
+        response = self.client.delete(url, **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Camara.objects.filter(pk=self.camara.pk).exists())
+
+    # --- Sección Sistema: configuración de notificaciones ---
+
+    def test_operador_puede_leer_configuracion_notificaciones(self):
+        response = self.client.get(
+            reverse("camaras_ia:configuracion_notificaciones"), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("brevo_api_key_configurada", response.data)
+        self.assertNotIn("brevo_api_key", response.data)  # write_only: nunca se devuelve el secreto
+
+    def test_operador_no_puede_editar_configuracion_notificaciones(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_notificaciones"),
+            {"brevo_api_key": "xkeysib-nueva"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_guarda_api_key_de_brevo(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_notificaciones"),
+            {
+                "brevo_api_key": "xkeysib-nueva",
+                "brevo_remitente_email": "alertas@bavaria.com",
+                "brevo_remitente_nombre": "Bavaria SST",
+            },
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["brevo_api_key_configurada"])
+        self.assertEqual(response.data["brevo_remitente_email"], "alertas@bavaria.com")
+
+        config = ConfiguracionNotificaciones.obtener()
+        self.assertEqual(config.brevo_api_key, "xkeysib-nueva")
+
+    def test_sin_configurar_reporta_no_configurada(self):
+        response = self.client.get(
+            reverse("camaras_ia:configuracion_notificaciones"), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["brevo_api_key_configurada"])
+
+    @override_settings(BREVO_API_KEY="desde-variable-de-entorno")
+    def test_configurada_por_variable_de_entorno_cuenta_como_configurada(self):
+        response = self.client.get(
+            reverse("camaras_ia:configuracion_notificaciones"), **self._auth(self.admin)
+        )
+        self.assertTrue(response.data["brevo_api_key_configurada"])
+
+    # --- Sección Sistema: equipos locales ---
+
+    def test_operador_puede_listar_equipos_locales(self):
+        EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
+        response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)  # el de setUp + el de este test
+        self.assertIn("api_key", response.data[0])
+
+    def test_operador_no_puede_crear_equipo_local(self):
+        response = self.client.post(
+            reverse("camaras_ia:equipos_locales_lista"),
+            {"nombre": "Equipo Bodega"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_crea_equipo_local_sin_empresa_previa(self):
+        response = self.client.post(
+            reverse("camaras_ia:equipos_locales_lista"),
+            {"nombre": "Equipo Bodega"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        equipo = EquipoLocal.objects.get(nombre="Equipo Bodega")
+        self.assertIsNotNone(equipo.empresa)
+        self.assertTrue(equipo.api_key)
+        self.assertFalse(response.data["conectado"])
+
+    def test_conectado_true_con_conexion_reciente(self):
+        equipo = EquipoLocal.objects.create(
+            empresa=self.empresa, nombre="Equipo Bodega", ultima_conexion=timezone.now()
+        )
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.admin)
+        )
+        self.assertTrue(response.data["conectado"])
+
+    def test_conectado_false_con_conexion_vieja(self):
+        equipo = EquipoLocal.objects.create(
+            empresa=self.empresa,
+            nombre="Equipo Bodega",
+            ultima_conexion=timezone.now() - datetime.timedelta(minutes=10),
+        )
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.admin)
+        )
+        self.assertFalse(response.data["conectado"])
+
+    def test_admin_desactiva_equipo_local(self):
+        equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
+        response = self.client.patch(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]),
+            {"activo": False},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        equipo.refresh_from_db()
+        self.assertFalse(equipo.activo)
+
+    def test_operador_no_puede_eliminar_equipo_local(self):
+        equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
+        response = self.client.delete(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_elimina_equipo_local(self):
+        equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
+        response = self.client.delete(
+            reverse("camaras_ia:equipos_locales_detalle", args=[equipo.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+
+    def test_operador_puede_descargar_el_zip_de_equipo_local(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        contenido = zipfile.ZipFile(io.BytesIO(response.content))
+        nombres = contenido.namelist()
+        self.assertIn("equipo_local/instalar.bat", nombres)
+        self.assertIn("equipo_local/instalar.sh", nombres)
+        self.assertIn("equipo_local/main.py", nombres)
+        self.assertIn("equipo_local/.env", nombres)
+        self.assertNotIn("equipo_local/.env.example", nombres)
+        self.assertTrue(all(not n.startswith("equipo_local/venv/") for n in nombres))
+        self.assertTrue(all("__pycache__" not in n for n in nombres))
+        self.assertTrue(all(not n.startswith("equipo_local/tests/") for n in nombres))
+        self.assertTrue(all(not n.startswith("equipo_local/grabaciones/") for n in nombres))
+
+    def test_env_generado_trae_url_y_api_key_reales(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.admin),
+        )
+        contenido = zipfile.ZipFile(io.BytesIO(response.content))
+        env = contenido.read("equipo_local/.env").decode("utf-8")
+        self.assertIn(f"API_KEY={self.equipo.api_key}", env)
+        self.assertIn("API_BASE_URL=http://testserver", env)
+
+    def test_descargar_zip_sin_equipo_id_falla(self):
+        response = self.client.get(reverse("camaras_ia:equipos_locales_descargar_zip"), **self._auth(self.admin))
+        self.assertEqual(response.status_code, 400)
+
+    def test_descargar_zip_con_equipo_id_inexistente_falla(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + "?equipo_id=99999", **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_anonimo_no_puede_descargar_el_zip_de_equipo_local(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}"
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_zip_de_equipo_local_conserva_el_bit_ejecutable_de_instalar_sh(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.admin),
+        )
+        contenido = zipfile.ZipFile(io.BytesIO(response.content))
+        info = contenido.getinfo("equipo_local/instalar.sh")
+        modo = (info.external_attr >> 16) & 0o777
+        self.assertTrue(modo & 0o111)
+
+
+class ParsearJsonTests(TestCase):
+    def test_json_puro(self):
+        self.assertEqual(_parsear_json('{"eventos": [1, 2], "descripcion": "ok"}'), {"eventos": [1, 2], "descripcion": "ok"})
+
+    def test_json_envuelto_en_fence_markdown(self):
+        texto = '```json\n{"eventos": [3], "descripcion": "con casco no puesto"}\n```'
+        self.assertEqual(_parsear_json(texto), {"eventos": [3], "descripcion": "con casco no puesto"})
+
+    def test_json_invalido_devuelve_vacio(self):
+        self.assertEqual(_parsear_json("esto no es json"), {"eventos": [], "descripcion": ""})
+
+    def test_json_que_no_es_un_objeto_devuelve_vacio(self):
+        self.assertEqual(_parsear_json("[1, 2, 3]"), {"eventos": [], "descripcion": ""})
+
+
+class ClasificarEventoTests(TestCase):
+    def setUp(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
+        self.evento = EventoDetectado.objects.create(
+            camara=self.camara,
+            zona=self.zona,
+            punto_x=1,
+            punto_y=1,
+            snapshot=SimpleUploadedFile("evento.jpg", b"contenido-jpeg-falso"),
+        )
+        self.tipo_casco = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Sin casco", descripcion="Persona sin casco puesto"
+        )
+        self.tipo_caida = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Caída", descripcion="Persona en el suelo"
+        )
+
+    def test_sin_snapshot_no_hace_nada(self):
+        evento_sin_foto = EventoDetectado.objects.create(camara=self.camara, zona=self.zona, punto_x=1, punto_y=1)
+        clasificar_evento(evento_sin_foto)
+        self.assertIsNone(evento_sin_foto.ia_analizado_en)
+
+    def test_sin_api_key_no_hace_nada(self):
+        clasificar_evento(self.evento)
+        self.evento.refresh_from_db()
+        self.assertIsNone(self.evento.ia_analizado_en)
+        self.assertEqual(self.evento.tipos_ia.count(), 0)
+
+    @override_settings(ANTHROPIC_API_KEY="desde-settings")
+    def test_sin_catalogo_no_hace_nada(self):
+        TipoEventoIA.objects.all().delete()
+        clasificar_evento(self.evento)
+        self.evento.refresh_from_db()
+        self.assertIsNone(self.evento.ia_analizado_en)
+
+    @override_settings(ANTHROPIC_API_KEY="desde-settings")
+    @patch("anthropic.Anthropic")
+    def test_clasifica_con_claude_y_guarda_resultado(self, mock_anthropic_cls):
+        bloque_texto = type("Bloque", (), {"type": "text", "text": '{"eventos": [%d], "descripcion": "sin casco"}' % self.tipo_casco.id})()
+        mock_respuesta = type("Respuesta", (), {"content": [bloque_texto]})()
+        mock_anthropic_cls.return_value.messages.create.return_value = mock_respuesta
+
+        clasificar_evento(self.evento)
+
+        self.evento.refresh_from_db()
+        self.assertIsNotNone(self.evento.ia_analizado_en)
+        self.assertEqual(self.evento.ia_error, "")
+        self.assertEqual(list(self.evento.tipos_ia.all()), [self.tipo_casco])
+        self.assertEqual(self.evento.descripcion_ia, "sin casco")
+        mock_anthropic_cls.assert_called_once_with(api_key="desde-settings")
+        _, kwargs = mock_anthropic_cls.return_value.messages.create.call_args
+        self.assertEqual(kwargs["model"], "claude-opus-5")
+
+    @override_settings(GEMINI_API_KEY="desde-settings")
+    @patch("google.genai.Client")
+    def test_clasifica_con_gemini_y_guarda_resultado(self, mock_genai_cls):
+        ConfiguracionIA.obtener()  # crea la fila singleton
+        config = ConfiguracionIA.objects.get(pk=1)
+        config.proveedor = ConfiguracionIA.Proveedor.GEMINI
+        config.save()
+
+        mock_respuesta = type(
+            "Respuesta", (), {"text": '{"eventos": [%d], "descripcion": "persona caída"}' % self.tipo_caida.id}
+        )()
+        mock_genai_cls.return_value.models.generate_content.return_value = mock_respuesta
+
+        clasificar_evento(self.evento)
+
+        self.evento.refresh_from_db()
+        self.assertEqual(list(self.evento.tipos_ia.all()), [self.tipo_caida])
+        self.assertEqual(self.evento.descripcion_ia, "persona caída")
+        mock_genai_cls.assert_called_once_with(api_key="desde-settings")
+
+    @override_settings(ANTHROPIC_API_KEY="")
+    @patch("anthropic.Anthropic")
+    def test_api_key_de_la_bd_tiene_prioridad_sobre_settings(self, mock_anthropic_cls):
+        config = ConfiguracionIA.obtener()
+        config.api_key = "desde-la-bd"
+        config.save()
+        bloque_texto = type("Bloque", (), {"type": "text", "text": '{"eventos": [], "descripcion": ""}'})()
+        mock_anthropic_cls.return_value.messages.create.return_value = type("R", (), {"content": [bloque_texto]})()
+
+        clasificar_evento(self.evento)
+
+        mock_anthropic_cls.assert_called_once_with(api_key="desde-la-bd")
+
+    @override_settings(ANTHROPIC_API_KEY="desde-settings")
+    @patch("anthropic.Anthropic")
+    def test_error_de_api_no_rompe_y_queda_registrado(self, mock_anthropic_cls):
+        mock_anthropic_cls.return_value.messages.create.side_effect = RuntimeError("timeout de red")
+
+        clasificar_evento(self.evento)  # no debe lanzar
+
+        self.evento.refresh_from_db()
+        self.assertIn("timeout de red", self.evento.ia_error)
+        self.assertIsNotNone(self.evento.ia_analizado_en)
+        self.assertEqual(self.evento.tipos_ia.count(), 0)
+
+    @override_settings(ANTHROPIC_API_KEY="desde-settings")
+    @patch("anthropic.Anthropic")
+    def test_ids_no_validos_se_ignoran(self, mock_anthropic_cls):
+        id_inexistente = self.tipo_casco.id + self.tipo_caida.id + 999
+        bloque_texto = type(
+            "Bloque", (), {"type": "text", "text": '{"eventos": [%d, %d], "descripcion": "x"}' % (self.tipo_casco.id, id_inexistente)}
+        )()
+        mock_anthropic_cls.return_value.messages.create.return_value = type("R", (), {"content": [bloque_texto]})()
+
+        clasificar_evento(self.evento)
+
+        self.evento.refresh_from_db()
+        self.assertEqual(list(self.evento.tipos_ia.all()), [self.tipo_casco])
+
+
+class ConfiguracionIAYTipoEventoIAEndpointsTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+
+    def _auth(self, user):
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        )
+        return {"HTTP_AUTHORIZATION": f"Token {response.data['token']}"}
+
+    def test_operador_puede_ver_configuracion_ia_pero_no_editarla(self):
+        response = self.client.get(reverse("camaras_ia:configuracion_ia"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("api_key", response.data)  # write-only, nunca se devuelve
+
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_ia"),
+            {"proveedor": "gemini"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_configura_proveedor_y_api_key(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_ia"),
+            {"proveedor": "gemini", "api_key": "una-clave-secreta"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["api_key_configurada"])
+        config = ConfiguracionIA.obtener()
+        self.assertEqual(config.proveedor, "gemini")
+        self.assertEqual(config.api_key, "una-clave-secreta")
+
+    def test_admin_crea_tipo_evento_ia(self):
+        response = self.client.post(
+            reverse("camaras_ia:tipos_evento_ia_lista"),
+            {"nombre": "Sin casco", "descripcion": "Persona sin casco puesto", "severidad": "alta"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(TipoEventoIA.objects.count(), 1)
+        self.assertEqual(TipoEventoIA.objects.first().empresa, self.empresa)
+
+    def test_operador_puede_crear_tipo_evento_ia_pero_no_eliminarlo(self):
+        # Mismo criterio que InstruccionSeguridad: cualquier personal interno
+        # puede crear/editar contenido operativo, pero borrar (irreversible)
+        # requiere Administrador — ver EsAdministradorParaEliminar.
+        response = self.client.post(
+            reverse("camaras_ia:tipos_evento_ia_lista"),
+            {"nombre": "Sin casco", "descripcion": "x"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+        response = self.client.delete(
+            reverse("camaras_ia:tipos_evento_ia_detalle", args=[response.data["id"]]),
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_elimina_tipo_evento_ia(self):
+        tipo = TipoEventoIA.objects.create(empresa=self.empresa, nombre="Sin casco", descripcion="x")
+        response = self.client.delete(
+            reverse("camaras_ia:tipos_evento_ia_detalle", args=[tipo.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(TipoEventoIA.objects.count(), 0)

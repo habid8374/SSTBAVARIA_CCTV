@@ -1,6 +1,23 @@
+from datetime import timedelta
+
+from django.conf import settings
+from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Camara, EventoDetectado, ReglaAlerta, ZonaRestringida
+from core.models import Empresa
+from core.validators import validar_tamano_archivo
+
+from .models import (
+    Camara,
+    ConfiguracionIA,
+    ConfiguracionNotificaciones,
+    EquipoLocal,
+    EventoDetectado,
+    InstruccionSeguridad,
+    ReglaAlerta,
+    TipoEventoIA,
+    ZonaRestringida,
+)
 
 
 class EventoEntradaSerializer(serializers.Serializer):
@@ -14,7 +31,26 @@ class EventoEntradaSerializer(serializers.Serializer):
     camara = serializers.PrimaryKeyRelatedField(queryset=Camara.objects.filter(activa=True))
     punto_x = serializers.FloatField()
     punto_y = serializers.FloatField()
-    snapshot = serializers.ImageField(required=False, allow_null=True)
+    snapshot = serializers.ImageField(required=False, allow_null=True, validators=[validar_tamano_archivo])
+
+
+class SnapshotReferenciaSerializer(serializers.Serializer):
+    """Validación del archivo subido para el encuadre de referencia de una
+    cámara (mismos límites de tamaño/tipo que el ImageField del modelo, pero
+    esto se guarda con .save() directo en vez de por un ModelSerializer, así
+    que hay que declarar los validadores acá también)."""
+
+    snapshot_referencia = serializers.ImageField(validators=[validar_tamano_archivo])
+
+
+class CamaraCalibracionSerializer(serializers.Serializer):
+    """Entrada del flujo de calibración: dos puntos marcados sobre el
+    snapshot de referencia y la distancia real (en metros) entre ellos —
+    de ahí sale Camara.px_por_metro (ver esa property)."""
+
+    punto1 = serializers.ListField(child=serializers.FloatField(), min_length=2, max_length=2)
+    punto2 = serializers.ListField(child=serializers.FloatField(), min_length=2, max_length=2)
+    distancia_metros = serializers.FloatField(min_value=0.01)
 
 
 class ReglaAlertaActivaSerializer(serializers.ModelSerializer):
@@ -36,7 +72,7 @@ class ZonaActivaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ZonaRestringida
-        fields = ["id", "nombre", "poligono", "reglas"]
+        fields = ["id", "nombre", "tipo", "poligono", "centro_x", "centro_y", "radio_metros", "reglas"]
 
     def get_reglas(self, zona):
         reglas_activas = zona.reglas.filter(activa=True)
@@ -44,11 +80,34 @@ class ZonaActivaSerializer(serializers.ModelSerializer):
 
 
 class CamaraActivaSerializer(serializers.ModelSerializer):
+    """Lo que consume el equipo local (obtener_reglas_activas): además de las
+    credenciales, incluye la URL RTSP ya resuelta y el snapshot de referencia
+    — con esto y las zonas (en coordenadas de píxel de ese snapshot) el
+    equipo local tiene todo lo necesario para conectarse, escalar las
+    coordenadas de sus detecciones y reportar eventos. `px_por_metro` ya
+    viene calculado (ver Camara.px_por_metro) para que el equipo local no
+    tenga que repetir la cuenta de calibración — null si la cámara no está
+    calibrada, en cuyo caso sus zonas tipo "punto y radio" simplemente nunca
+    disparan (ver services.punto_en_zona)."""
+
     zonas = serializers.SerializerMethodField()
+    rtsp_url = serializers.CharField(source="rtsp_url_efectiva", read_only=True)
+    px_por_metro = serializers.FloatField(read_only=True, allow_null=True)
 
     class Meta:
         model = Camara
-        fields = ["id", "nombre", "ip", "puerto_onvif", "usuario_onvif", "password_onvif", "zonas"]
+        fields = [
+            "id",
+            "nombre",
+            "ip",
+            "puerto_onvif",
+            "usuario_onvif",
+            "password_onvif",
+            "rtsp_url",
+            "snapshot_referencia",
+            "px_por_metro",
+            "zonas",
+        ]
 
     def get_zonas(self, camara):
         zonas_activas = camara.zonas.filter(activa=True).prefetch_related("reglas")
@@ -83,7 +142,44 @@ class ZonaDashboardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ZonaRestringida
-        fields = ["id", "camara", "camara_nombre", "nombre", "poligono", "activa", "reglas"]
+        fields = [
+            "id",
+            "camara",
+            "camara_nombre",
+            "nombre",
+            "tipo",
+            "poligono",
+            "centro_x",
+            "centro_y",
+            "radio_metros",
+            "activa",
+            "reglas",
+        ]
+
+    def validate(self, datos):
+        tipo = datos.get("tipo", getattr(self.instance, "tipo", ZonaRestringida.Tipo.POLIGONO))
+        if tipo == ZonaRestringida.Tipo.POLIGONO:
+            poligono = datos.get("poligono", getattr(self.instance, "poligono", None))
+            if not poligono or len(poligono) < 3:
+                raise serializers.ValidationError(
+                    {"poligono": "Una zona tipo Polígono necesita al menos 3 puntos."}
+                )
+        else:
+            centro_x = datos.get("centro_x", getattr(self.instance, "centro_x", None))
+            centro_y = datos.get("centro_y", getattr(self.instance, "centro_y", None))
+            radio_metros = datos.get("radio_metros", getattr(self.instance, "radio_metros", None))
+            faltantes = [
+                nombre
+                for nombre, valor in (("centro_x", centro_x), ("centro_y", centro_y), ("radio_metros", radio_metros))
+                if valor is None
+            ]
+            if faltantes:
+                raise serializers.ValidationError(
+                    {campo: "Obligatorio para una zona tipo Punto y radio." for campo in faltantes}
+                )
+            if radio_metros <= 0:
+                raise serializers.ValidationError({"radio_metros": "Debe ser mayor que cero."})
+        return datos
 
 
 class EventoDashboardSerializer(serializers.ModelSerializer):
@@ -92,6 +188,7 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
 
     camara_nombre = serializers.CharField(source="camara.nombre", read_only=True)
     zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
+    tipos_ia = serializers.SerializerMethodField()
 
     class Meta:
         model = EventoDetectado
@@ -106,7 +203,14 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
             "punto_x",
             "punto_y",
             "disparo_alerta",
+            "canal_notificacion",
+            "notificacion_enviada",
+            "notificacion_detalle",
             "estado",
+            "tipos_ia",
+            "descripcion_ia",
+            "ia_analizado_en",
+            "ia_error",
         ]
         read_only_fields = [
             "id",
@@ -119,6 +223,19 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
             "punto_x",
             "punto_y",
             "disparo_alerta",
+            "canal_notificacion",
+            "notificacion_enviada",
+            "notificacion_detalle",
+            "tipos_ia",
+            "descripcion_ia",
+            "ia_analizado_en",
+            "ia_error",
+        ]
+
+    def get_tipos_ia(self, evento):
+        return [
+            {"id": t.id, "nombre": t.nombre, "severidad": t.severidad}
+            for t in evento.tipos_ia.all()
         ]
 
 
@@ -133,6 +250,7 @@ class UltimoEventoSerializer(serializers.ModelSerializer):
 class CamaraDashboardSerializer(serializers.ModelSerializer):
     zonas = ZonaDashboardSerializer(many=True, read_only=True)
     ultimo_evento = serializers.SerializerMethodField()
+    px_por_metro = serializers.FloatField(read_only=True, allow_null=True)
 
     class Meta:
         model = Camara
@@ -140,9 +258,14 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
             "id",
             "nombre",
             "ip",
+            "puerto_onvif",
+            "usuario_onvif",
+            "password_onvif",
+            "rtsp_url",
             "ubicacion",
             "activa",
             "snapshot_referencia",
+            "px_por_metro",
             "zonas",
             "ultimo_evento",
         ]
@@ -152,3 +275,130 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
         if not evento:
             return None
         return UltimoEventoSerializer(evento, context=self.context).data
+
+
+class CamaraCrearSerializer(serializers.ModelSerializer):
+    """Alta de una cámara desde el dashboard. La empresa se asigna sola —
+    este panel todavía no tiene gestión de empresas propia; si hace falta
+    una distinta, se ajusta desde el admin de Django (app core)."""
+
+    class Meta:
+        model = Camara
+        fields = [
+            "id",
+            "nombre",
+            "ip",
+            "puerto_onvif",
+            "usuario_onvif",
+            "password_onvif",
+            "rtsp_url",
+            "ubicacion",
+            "activa",
+        ]
+        read_only_fields = ["id"]
+
+    def create(self, validated_data):
+        empresa = Empresa.objects.first()
+        if empresa is None:
+            empresa = Empresa.objects.create(nombre="Empresa")
+        return Camara.objects.create(empresa=empresa, **validated_data)
+
+
+# --- Sección Sistema: credenciales Brevo + gestión de equipos locales ---
+
+
+class ConfiguracionNotificacionesSerializer(serializers.ModelSerializer):
+    """La API key nunca se devuelve en la respuesta (write-only) — solo se
+    informa si hay una configurada (en la BD o por variable de entorno) para
+    que el formulario del dashboard pueda mostrar el estado sin exponer el
+    secreto de vuelta al navegador en cada GET."""
+
+    brevo_api_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    brevo_api_key_configurada = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConfiguracionNotificaciones
+        fields = [
+            "brevo_api_key",
+            "brevo_api_key_configurada",
+            "brevo_remitente_email",
+            "brevo_remitente_nombre",
+            "actualizada_en",
+        ]
+        read_only_fields = ["actualizada_en"]
+
+    def get_brevo_api_key_configurada(self, obj):
+        return bool(obj.brevo_api_key or settings.BREVO_API_KEY)
+
+
+class ConfiguracionIASerializer(serializers.ModelSerializer):
+    """La API key nunca se devuelve en la respuesta (write-only) — solo se
+    informa si hay una configurada (en la BD o por variable de entorno),
+    igual que ConfiguracionNotificacionesSerializer con Brevo."""
+
+    api_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    api_key_configurada = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConfiguracionIA
+        fields = ["proveedor", "api_key", "api_key_configurada", "modelo", "actualizada_en"]
+        read_only_fields = ["actualizada_en"]
+
+    def get_api_key_configurada(self, obj):
+        from .ia_deteccion import _api_key_por_defecto
+
+        return bool(obj.api_key or _api_key_por_defecto(obj.proveedor))
+
+
+class TipoEventoIASerializer(serializers.ModelSerializer):
+    """CRUD del catálogo de eventos que la IA busca en cada snapshot."""
+
+    class Meta:
+        model = TipoEventoIA
+        fields = ["id", "nombre", "descripcion", "severidad", "activo", "creado_en"]
+        read_only_fields = ["id", "creado_en"]
+
+
+class EquipoLocalSerializer(serializers.ModelSerializer):
+    """CRUD de equipos locales (mini-PC en sitio) desde el dashboard —
+    antes solo se podían crear desde el admin de Django. api_key se genera
+    sola al crear el registro (ver models.generar_api_key) y se muestra acá
+    para que el administrador la copie al .env del equipo local."""
+
+    conectado = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EquipoLocal
+        fields = ["id", "nombre", "api_key", "activo", "ultima_conexion", "conectado", "creado_en"]
+        read_only_fields = ["id", "api_key", "ultima_conexion", "creado_en"]
+
+    def get_conectado(self, equipo):
+        if not equipo.ultima_conexion:
+            return False
+        return (timezone.now() - equipo.ultima_conexion) < timedelta(minutes=5)
+
+
+class InstruccionSeguridadSerializer(serializers.ModelSerializer):
+    """Bitácora de restricciones de seguridad escritas en texto simple —
+    ver InstruccionSeguridad. `camara`/`zona` son opcionales: se puede
+    anotar la instrucción antes de saber a qué cámara aplica o si ya se
+    convirtió en una zona real."""
+
+    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True, default=None)
+    zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
+
+    class Meta:
+        model = InstruccionSeguridad
+        fields = [
+            "id",
+            "camara",
+            "camara_nombre",
+            "texto",
+            "estado",
+            "zona",
+            "zona_nombre",
+            "notas",
+            "creada_en",
+            "actualizada_en",
+        ]
+        read_only_fields = ["creada_en", "actualizada_en"]

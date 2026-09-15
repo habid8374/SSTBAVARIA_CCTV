@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 1.4cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #1a1a1a; }
+  table.encabezado { width: 100%; border-collapse: collapse; margin-bottom: 6pt; }
+  table.encabezado td { border: 0.5pt solid #1a1a1a; padding: 3pt 6pt; vertical-align: middle; }
+  .codigos { width: 22%; font-size: 7.5pt; line-height: 1.5; }
+  .titulo { text-align: center; font-size: 12pt; font-weight: bold; color: #0b1f3a; }
+  h2 { font-size: 10pt; margin: 10pt 0 4pt 0; color: #0b1f3a; background-color: #f1f5f9; padding: 3pt 6pt; border: 0.5pt solid #d4d4d4; }
+  table.datos { width: 100%; border-collapse: collapse; margin-bottom: 4pt; }
+  table.datos td { padding: 3pt 6pt; vertical-align: top; border: 0.5pt solid #d4d4d4; }
+  table.datos td.etiqueta { font-weight: bold; background-color: #f1f5f9; white-space: nowrap; }
+  table.trabajadores { width: 100%; border-collapse: collapse; margin-bottom: 3pt; }
+  table.trabajadores th { background-color: #f1f5f9; text-align: left; padding: 2pt 4pt; border: 0.5pt solid #d4d4d4; font-size: 7.5pt; }
+  table.trabajadores td { padding: 2pt 4pt; border: 0.5pt solid #d4d4d4; font-size: 8pt; }
+  table.trabajadores td.centro { text-align: center; }
+  p.nota { font-size: 7pt; color: #444; margin: 3pt 0 8pt 0; }
+  table.firmas { width: 100%; border-collapse: collapse; margin-top: 26pt; }
+  table.firmas td { width: 50%; text-align: center; padding-top: 4pt; border-top: 0.5pt solid #1a1a1a; font-size: 8pt; }
+  td.motivo { color: #b91c1c; }
+</style>
+</head>
+<body>
+  <table class="encabezado">
+    <tr>
+      <td class="codigos">
+        Código: 06-005115<br>
+        Actualización: 002<br>
+        Fecha Rev: 27-Ago-2019<br>
+        Página 1 de 1
+      </td>
+      <td class="titulo">AUTORIZACIÓN DE INGRESO PERSONAL CONTRATISTA<br>INCLUSIONES / EXCLUSIONES</td>
+    </tr>
+  </table>
+
+  <table class="datos">
+    <tr>
+      <td class="etiqueta">Nombre de la planta / área</td><td>{{ autorizacion.area_trabajo|default:"—" }}</td>
+      <td class="etiqueta">Fecha diligenciamiento</td><td>{{ autorizacion.creada_en|date:"d/m/Y" }}</td>
+    </tr>
+    <tr>
+      <td class="etiqueta">Nombre empresa contratista</td><td>{{ autorizacion.contratista.nombre }}</td>
+      <td class="etiqueta">NIT</td><td>{{ autorizacion.contratista.nit|default:"—" }}</td>
+    </tr>
+    <tr>
+      <td class="etiqueta">No. contrato o pedido</td><td>{{ autorizacion.declaracion.numero_pedido|default:"—" }}</td>
+      <td class="etiqueta">Declaración de método / plan de seguridad</td>
+      <td>{% if autorizacion.declaracion %}SÍ — {{ autorizacion.declaracion.descripcion_trabajo|truncatechars:40 }}{% else %}NO{% endif %}</td>
+    </tr>
+  </table>
+
+  <h2>Inclusión de trabajadores</h2>
+  <table class="trabajadores">
+    <tr>
+      <th>No</th><th>Apellidos</th><th>Nombres</th><th>No identificación</th>
+      <th>EPS</th><th>ARL</th><th>AFP</th><th>Fecha inicio contrato</th>
+    </tr>
+    {% for linea in incluidos %}
+    <tr>
+      <td class="centro">{{ forloop.counter }}</td>
+      <td>{{ linea.trabajador.apellidos }}</td>
+      <td>{{ linea.trabajador.nombres }}</td>
+      <td>{{ linea.trabajador.documento }}</td>
+      <td>{{ linea.trabajador.eps|default:"—" }}</td>
+      <td>{{ linea.trabajador.arl|default:"—" }}</td>
+      <td>{{ linea.trabajador.afp|default:"—" }}</td>
+      <td>{{ linea.trabajador.fecha_inicio_contrato|date:"d/m/Y"|default:"—" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="8">Sin trabajadores incluidos.</td></tr>
+    {% endfor %}
+  </table>
+  <p class="nota">
+    * Se declara que las personas relacionadas se encuentran con contrato de trabajo vigente; ninguna
+    persona podrá radicar documentación si no se encuentra legalmente contratada. Cada trabajador debe
+    estar incluido en la relación con los respectivos soportes de pago (EPS, ARL, AFP).
+  </p>
+
+  <table class="datos">
+    <tr>
+      <td class="etiqueta">Vigencia autorización de ingreso</td>
+      <td>{{ autorizacion.fecha_inicio|date:"d/m/Y" }} al {{ autorizacion.fecha_fin|date:"d/m/Y" }}</td>
+      <td class="etiqueta">Horario autorizado de ingreso</td>
+      <td>
+        {% if autorizacion.hora_inicio and autorizacion.hora_fin %}
+          {{ autorizacion.hora_inicio|time:"h:i A" }} a {{ autorizacion.hora_fin|time:"h:i A" }}
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td class="etiqueta">Lugar o áreas de trabajo</td><td>{{ autorizacion.area_trabajo|default:"—" }}</td>
+      <td class="etiqueta">Sitio de atención en emergencia</td><td>{{ autorizacion.sitio_encuentro_emergencia|default:"—" }}</td>
+    </tr>
+  </table>
+
+  <h2>Datos responsable de Seguridad Industrial y Salud Ocupacional del grupo de trabajadores</h2>
+  <table class="datos">
+    <tr>
+      <td class="etiqueta">Nombre completo</td><td>{{ autorizacion.responsable_siso_nombre|default:"—" }}</td>
+      <td class="etiqueta">Cargo que desempeña</td><td>{{ autorizacion.responsable_siso_cargo|default:"—" }}</td>
+    </tr>
+    <tr>
+      <td class="etiqueta">Teléfono de contacto</td><td colspan="3">{{ autorizacion.responsable_siso_telefono|default:"—" }}</td>
+    </tr>
+  </table>
+  <p class="nota">
+    Nota: la empresa contratista entrega con este formato los soportes de cada trabajador (afiliación y
+    pago al día de EPS, ARL y AFP, fotocopia de documento de identidad, concepto de aptitud médica y,
+    para trabajadores extranjeros, copia de la tarjeta de atención médica internacional).
+  </p>
+
+  <h2>Exclusión de trabajadores</h2>
+  <table class="trabajadores">
+    <tr><th>No</th><th>Apellidos</th><th>Nombres</th><th>No identificación</th><th>Motivo de la exclusión</th></tr>
+    {% for linea in excluidos %}
+    <tr>
+      <td class="centro">{{ forloop.counter }}</td>
+      <td>{{ linea.trabajador.apellidos }}</td>
+      <td>{{ linea.trabajador.nombres }}</td>
+      <td>{{ linea.trabajador.documento }}</td>
+      <td class="motivo">{{ linea.motivo_exclusion }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5">Sin trabajadores excluidos.</td></tr>
+    {% endfor %}
+  </table>
+
+  {% if autorizacion.observaciones %}
+  <p class="nota"><strong>Observaciones:</strong> {{ autorizacion.observaciones }}</p>
+  {% endif %}
+
+  <table class="firmas">
+    <tr>
+      <td>Nombre, firma y sello de la Empresa Contratista</td>
+      <td>Nombre, firma y sello del Interventor del Contrato</td>
+    </tr>
+  </table>
+</body>
+</html>

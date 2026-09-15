@@ -8,19 +8,61 @@ urlpatterns = [
     # Equipo local (autenticado por API key)
     path("eventos/", views.recibir_evento_camara, name="recibir_evento_camara"),
     path("reglas-activas/", views.obtener_reglas_activas, name="obtener_reglas_activas"),
+    path(
+        "equipo-local/sincronizar-zonas/",
+        views.sincronizar_zonas_equipo_local,
+        name="sincronizar_zonas_equipo_local",
+    ),
+    path(
+        "equipo-local/sincronizar-reglas/",
+        views.sincronizar_reglas_equipo_local,
+        name="sincronizar_reglas_equipo_local",
+    ),
     # Dashboard (autenticado por usuario/token)
     path("dashboard/indicadores/", views.indicadores_dashboard, name="indicadores_dashboard"),
     path("dashboard/eventos-por-zona/", views.eventos_por_zona, name="eventos_por_zona"),
     path("dashboard/eventos/", views.EventoListaDashboard.as_view(), name="eventos_lista"),
     path("dashboard/eventos/<int:pk>/", views.EventoDetalleDashboard.as_view(), name="eventos_detalle"),
     path("dashboard/camaras/", views.CamaraListaDashboard.as_view(), name="camaras_lista"),
+    path("dashboard/camaras/<int:pk>/", views.CamaraDetalleDashboard.as_view(), name="camaras_detalle"),
     path(
         "dashboard/camaras/<int:pk>/snapshot-referencia/",
         views.subir_snapshot_referencia,
         name="subir_snapshot_referencia",
     ),
+    path("dashboard/camaras/<int:pk>/calibrar/", views.calibrar_camara, name="calibrar_camara"),
     path("dashboard/zonas/", views.ZonaListaCrear.as_view(), name="zonas_lista"),
     path("dashboard/zonas/<int:pk>/", views.ZonaDetalle.as_view(), name="zonas_detalle"),
     path("dashboard/reglas/", views.ReglaListaCrear.as_view(), name="reglas_lista"),
     path("dashboard/reglas/<int:pk>/", views.ReglaDetalle.as_view(), name="reglas_detalle"),
+    path(
+        "dashboard/instrucciones-seguridad/",
+        views.InstruccionSeguridadListaCrear.as_view(),
+        name="instrucciones_seguridad_lista",
+    ),
+    path(
+        "dashboard/instrucciones-seguridad/<int:pk>/",
+        views.InstruccionSeguridadDetalle.as_view(),
+        name="instrucciones_seguridad_detalle",
+    ),
+    # Sistema: credenciales Brevo + gestión de equipos locales
+    path(
+        "dashboard/configuracion-notificaciones/",
+        views.ConfiguracionNotificacionesDetalle.as_view(),
+        name="configuracion_notificaciones",
+    ),
+    path(
+        "dashboard/configuracion-ia/",
+        views.ConfiguracionIADetalle.as_view(),
+        name="configuracion_ia",
+    ),
+    path("dashboard/tipos-evento-ia/", views.TipoEventoIAListaCrear.as_view(), name="tipos_evento_ia_lista"),
+    path("dashboard/tipos-evento-ia/<int:pk>/", views.TipoEventoIADetalle.as_view(), name="tipos_evento_ia_detalle"),
+    path("dashboard/equipos-locales/", views.EquipoLocalListaCrear.as_view(), name="equipos_locales_lista"),
+    path("dashboard/equipos-locales/<int:pk>/", views.EquipoLocalDetalle.as_view(), name="equipos_locales_detalle"),
+    path(
+        "dashboard/equipos-locales/descargar-zip/",
+        views.descargar_equipo_local_zip,
+        name="equipos_locales_descargar_zip",
+    ),
 ]
