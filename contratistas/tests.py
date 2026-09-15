@@ -22,6 +22,7 @@ from .models import (
     RegistroAuditoria,
     RegistroCapacitacion,
     Trabajador,
+    _sumar_meses,
     nivel_riesgo,
 )
 
@@ -274,6 +275,15 @@ class IndicadoresTests(ApiTestsBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["certificaciones_especiales_vencidas"], 1)
 
+    def test_cuenta_cursos_vencidos(self):
+        vencido = (timezone.localdate() - datetime.timedelta(days=1)).isoformat()
+        vigente = (timezone.localdate() + datetime.timedelta(days=30)).isoformat()
+        self.trabajador.cursos_safety_academy = {"induccion_sst": vencido, "epp": vigente}
+        self.trabajador.save(update_fields=["cursos_safety_academy"])
+        response = self.client.get(reverse("contratistas:indicadores"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["cursos_vencidos"], 1)
+
 
 class IndicadoresDashboardTests(ApiTestsBase):
     def test_requiere_autenticacion(self):
@@ -287,6 +297,26 @@ class IndicadoresDashboardTests(ApiTestsBase):
         # self.trabajador (de ApiTestsBase) no tiene ningún curso completado.
         response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
         self.assertEqual(response.data["trabajadores_con_cursos_pendientes"], 1)
+
+    def test_cuenta_como_pendiente_el_curso_obligatorio_ya_vencido(self):
+        from .models import CursoSafetyAcademy
+
+        CursoSafetyAcademy.objects.filter(clave="induccion_sst").update(obligatorio=True)
+        vencido = (timezone.localdate() - datetime.timedelta(days=1)).isoformat()
+        self.trabajador.cursos_safety_academy = {"induccion_sst": vencido}
+        self.trabajador.save(update_fields=["cursos_safety_academy"])
+        response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
+        self.assertEqual(response.data["trabajadores_con_cursos_pendientes"], 1)
+
+    def test_no_cuenta_como_pendiente_el_curso_obligatorio_aun_vigente(self):
+        from .models import CursoSafetyAcademy
+
+        CursoSafetyAcademy.objects.filter(clave="induccion_sst").update(obligatorio=True)
+        vigente = (timezone.localdate() + datetime.timedelta(days=30)).isoformat()
+        self.trabajador.cursos_safety_academy = {"induccion_sst": vigente}
+        self.trabajador.save(update_fields=["cursos_safety_academy"])
+        response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
+        self.assertEqual(response.data["trabajadores_con_cursos_pendientes"], 0)
 
     def test_estructura_basica_sin_datos(self):
         response = self.client.get(reverse("contratistas:indicadores_dashboard"), **self._auth(self.operador))
@@ -367,6 +397,29 @@ class ReglasConfigurablesTests(ApiTestsBase):
             **self._auth(self.operador),
         )
         self.assertEqual(response.status_code, 201, response.data)
+
+    def test_meses_vigencia_expuesto_en_catalogos(self):
+        from .models import CertificacionEspecial
+
+        certificacion = CertificacionEspecial.objects.filter(clave="espacios_confinados").first()
+        self.assertIsNotNone(certificacion)
+        response = self.client.get(reverse("contratistas:catalogos"), **self._auth(self.operador))
+        por_clave = {c["clave"]: c for c in response.data["certificaciones_especiales"]}
+        self.assertEqual(por_clave["espacios_confinados"]["meses_vigencia"], 36)
+
+    def test_actualizar_meses_vigencia_de_un_curso(self):
+        from .models import CursoSafetyAcademy
+
+        curso = CursoSafetyAcademy.objects.create(clave="alturas_curso", etiqueta="Trabajo en alturas")
+        response = self.client.patch(
+            reverse("contratistas:cursos_detalle", args=[curso.pk]),
+            {"meses_vigencia": 18},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        curso.refresh_from_db()
+        self.assertEqual(curso.meses_vigencia, 18)
 
     def test_operador_no_puede_eliminar_curso(self):
         from .models import CursoSafetyAcademy
@@ -932,7 +985,8 @@ class TrabajadorTests(ApiTestsBase):
         from .models import CursoSafetyAcademy
 
         CursoSafetyAcademy.objects.filter(clave__in=["induccion_sst", "epp"]).update(obligatorio=True)
-        self.trabajador.cursos_safety_academy = {"induccion_sst": "2026-01-01", "epp": None}
+        vigente = (timezone.localdate() + datetime.timedelta(days=60)).isoformat()
+        self.trabajador.cursos_safety_academy = {"induccion_sst": vigente, "epp": None}
         self.trabajador.save()
 
         response = self.client.get(
@@ -994,6 +1048,38 @@ class TrabajadorTests(ApiTestsBase):
             reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
         )
         self.assertEqual(response.data["certificaciones_especiales_vencidas"], [])
+
+    def test_cursos_vencidos_expuesta_en_el_detalle(self):
+        vencido = (timezone.localdate() - datetime.timedelta(days=1)).isoformat()
+        vigente = (timezone.localdate() + datetime.timedelta(days=30)).isoformat()
+        self.trabajador.cursos_safety_academy = {"induccion_sst": vencido, "epp": vigente, "grua": None}
+        self.trabajador.save(update_fields=["cursos_safety_academy"])
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        vencidos = response.data["cursos_vencidos"]
+        self.assertEqual([v["clave"] for v in vencidos], ["induccion_sst"])
+        self.assertEqual(vencidos[0]["fecha_vencimiento"], vencido)
+
+    def test_cursos_sin_registrar_no_aparecen_como_vencidos(self):
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.data["cursos_vencidos"], [])
+
+    def test_curso_vencido_cuenta_como_pendiente(self):
+        from .models import CursoSafetyAcademy
+
+        CursoSafetyAcademy.objects.filter(clave="induccion_sst").update(obligatorio=True)
+        vencido = (timezone.localdate() - datetime.timedelta(days=1)).isoformat()
+        self.trabajador.cursos_safety_academy = {"induccion_sst": vencido}
+        self.trabajador.save(update_fields=["cursos_safety_academy"])
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        claves = [c["clave"] for c in response.data["cursos_pendientes"]]
+        self.assertEqual(claves, ["induccion_sst"])
 
     def test_crear_trabajador(self):
         response = self.client.post(
@@ -3261,6 +3347,33 @@ class CapacitacionTests(ApiTestsBase):
         self.trabajador.refresh_from_db()
         self.assertNotIn("induccion_sst", self.trabajador.cursos_safety_academy)
 
+    def test_aprobar_usa_meses_vigencia_del_curso_para_la_fecha_de_vencimiento(self):
+        from .models import CursoSafetyAcademy
+
+        CursoSafetyAcademy.objects.filter(clave="induccion_sst").update(meses_vigencia=12)
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": self.trabajador.nombres, "documento": self.trabajador.documento},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        registro_id = inicio.data["id"]
+
+        respuesta = self.client.post(
+            reverse("contratistas:capacitacion_calificar", args=[registro_id]),
+            {"respuestas": self._respuestas_correctas()},
+            content_type="application/json",
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+
+        self.trabajador.refresh_from_db()
+        esperado = _sumar_meses(timezone.localdate(), 12).isoformat()
+        self.assertEqual(self.trabajador.cursos_safety_academy["induccion_sst"], esperado)
+
     def test_no_se_puede_calificar_dos_veces(self):
         self.contratista.capacitacion_habilitada_manual = True
         self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
@@ -3496,6 +3609,24 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         }
         self.assertIn(self.contratista.nombre, nombres_lista)
         self.assertIn(self.otro_contratista.nombre, nombres_lista)
+
+    def test_plantilla_excel_protege_las_hojas_contra_edicion(self):
+        from io import BytesIO
+
+        import openpyxl
+
+        response = self.client.get(reverse("contratistas:trabajadores_plantilla_excel"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        hoja = libro["Trabajadores"]
+        hoja_listas = libro["Listas (no borrar)"]
+        self.assertTrue(hoja.protection.sheet)
+        self.assertTrue(hoja_listas.protection.sheet)
+        self.assertTrue(libro.security.lockStructure)
+        # Las celdas de datos siguen editables; solo el encabezado y las
+        # fórmulas/listas quedan bloqueadas al activar la protección.
+        self.assertFalse(hoja["A2"].protection.locked)
+        self.assertTrue(hoja["A1"].protection.locked)
 
     def test_plantilla_excel_requiere_personal_interno(self):
         response = self.client.get(

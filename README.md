@@ -194,8 +194,8 @@ frontend en Vercel — pero viven en el mismo repositorio.
     marcar `obligatorio` (misma pestaña). El campo calculado
     `Trabajador.cursos_pendientes` avisa (⚠ en la lista de trabajadores y
     un KPI en amarillo en Indicadores) cuando un trabajador activo no
-    tiene completado algún curso obligatorio — es un aviso, no bloquea el
-    registro ni la radicación.
+    tiene un curso obligatorio diligenciado o lo tiene **vencido** — es un
+    aviso, no bloquea el registro ni la radicación.
   - **Certificaciones especiales de trabajo** (`Trabajador.certificaciones_especiales`,
     un `JSONField` `{clave: fecha ISO o null}` con el mismo patrón que
     `cursos_safety_academy`): espacios confinados, conducción de
@@ -209,6 +209,27 @@ frontend en Vercel — pero viven en el mismo repositorio.
     de trabajadores, junto al examen médico/alturas, y un KPI
     `certificaciones_especiales_vencidas` en `/api/contratistas/indicadores/`)
     por cada una vencida.
+  - **Fechas de vencimiento (no de realización) + vigencia por colores**:
+    tanto `cursos_safety_academy` como `certificaciones_especiales` guardan
+    la fecha de **vencimiento** real de cada curso/certificación (igual
+    convención que `Trabajador.fecha_vencimiento_examen_medico`/
+    `fecha_vencimiento_certificacion_alturas`), no la fecha en que se
+    completó — editable libremente desde el formulario o el importador
+    Excel. `CursoSafetyAcademy.meses_vigencia`/`CertificacionEspecial.meses_vigencia`
+    (enteros opcionales, ej. 18 para alturas, 36 para espacios confinados —
+    sembrado en `0030_sembrar_meses_vigencia_espacios_confinados`) es
+    **solo** una ayuda de UX: al marcar un curso/certificación como
+    completado en el formulario, sugiere hoy + esos meses como vencimiento
+    (vía el helper `_sumar_meses` en `contratistas/models.py`, calendario
+    real — ajusta el día si el mes destino es más corto). No condiciona el
+    cálculo de vigencia: la fecha guardada siempre se trata como
+    vencimiento real, con badge de color en el formulario (verde
+    vigente/ámbar por vencer a 15 días o menos/rojo vencido, igual umbral
+    que `VencimientoBadge`). El nuevo campo calculado
+    `Trabajador.cursos_vencidos` (mismo patrón que
+    `certificaciones_especiales_vencidas`) alimenta el aviso ⚠ en la lista
+    de trabajadores y el KPI `cursos_vencidos` en
+    `/api/contratistas/indicadores/`.
   - **Aviso de pendiente por revisar** (dos canales independientes, ambos
     disparados desde `contratistas/notificaciones.py`): al radicar
     seguridad social (`RadicacionListaDashboard.perform_create`) y al pasar
@@ -357,8 +378,9 @@ frontend en Vercel — pero viven en el mismo repositorio.
   por contratista, autorización de datos obligatoria (columna "SI/NO",
   también desplegable) — así que una fila que no pasaría el formulario
   tampoco se crea acá: queda reportada `{fila, mensaje}` sin tumbar el
-  resto del archivo. La plantilla también trae una columna de fecha por
-  cada curso Safety Academy y cada certificación especial — leídas de los
+  resto del archivo. La plantilla también trae una columna de fecha de
+  **vencimiento** por cada curso Safety Academy y cada certificación
+  especial (encabezado "... — vencimiento (AAAA-MM-DD)") — leídas de los
   catálogos editables `CursoSafetyAcademy`/`CertificacionEspecial` en el
   momento de generar/leer el archivo (`_encabezados_y_catalogos()`), no
   de una lista fija en código, así que reflejan lo que un Administrador
@@ -367,7 +389,15 @@ frontend en Vercel — pero viven en el mismo repositorio.
   cada trabajador al importar en vez de marcarlo uno por uno después.
   Nunca crea `RadicacionSeguridadSocial` — cada trabajador importado
   queda igual que si se hubiera registrado a
-  mano, pendiente de esa radicación.
+  mano, pendiente de esa radicación. La plantilla generada queda
+  **protegida** (`hoja.protection`/`libro.security`, contraseña
+  `CONTRASENA_PLANTILLA` en `importar_trabajadores_excel.py`): las celdas
+  de datos quedan libres para escribir, pero las fórmulas de los
+  `DataValidation` y la hoja oculta "Listas (no borrar)" no se pueden
+  editar/desocultar sin la contraseña — no es una medida de seguridad
+  fuerte (se revierte con herramientas de terceros), solo evita que se
+  rompa un desplegable o se borre la hoja de listas al llenar el archivo
+  a mano.
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.
 

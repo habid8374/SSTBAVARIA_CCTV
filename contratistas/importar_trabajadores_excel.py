@@ -32,7 +32,9 @@ import datetime
 import unicodedata
 
 import openpyxl
+from openpyxl.styles import Protection
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.protection import WorkbookProtection
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from .models import CertificacionEspecial, CursoSafetyAcademy, EmpresaContratista, Trabajador
@@ -44,6 +46,12 @@ class ErrorImportacionExcel(Exception):
 
 HOJA_TRABAJADORES = "Trabajadores"
 HOJA_LISTAS = "Listas (no borrar)"
+
+# Protege la hoja/libro contra ediciones accidentales de las fórmulas de
+# validación y contra desocultar "Listas (no borrar)" — no es una medida de
+# seguridad real (la protección de Excel se quita sin la contraseña con
+# herramientas de terceros), solo evita que alguien la rompa sin querer.
+CONTRASENA_PLANTILLA = "SSTBavaria2026"
 
 ENCABEZADOS_BASE = [
     "Contratista",
@@ -119,8 +127,10 @@ def _encabezados_y_catalogos():
     son editables desde el dashboard."""
     cursos = _catalogo_cursos()
     certificaciones = _catalogo_certificaciones()
-    encabezados_cursos = [f"Curso: {c.etiqueta} (AAAA-MM-DD)" for c in cursos]
-    encabezados_certificaciones = [f"Certificación: {c.etiqueta} (AAAA-MM-DD)" for c in certificaciones]
+    encabezados_cursos = [f"Curso: {c.etiqueta} — vencimiento (AAAA-MM-DD)" for c in cursos]
+    encabezados_certificaciones = [
+        f"Certificación: {c.etiqueta} — vencimiento (AAAA-MM-DD)" for c in certificaciones
+    ]
     encabezados = ENCABEZADOS_BASE + encabezados_cursos + encabezados_certificaciones
     claves_cursos = [c.clave for c in cursos]
     claves_certificaciones = [c.clave for c in certificaciones]
@@ -173,6 +183,26 @@ def generar_plantilla_trabajadores_excel():
     anchos = anchos_base + [30] * (len(claves_cursos) + len(claves_certificaciones))
     for indice, ancho in enumerate(anchos, start=1):
         hoja.column_dimensions[get_column_letter(indice)].width = ancho
+
+    # Deja libres para escribir solo las celdas de datos (encabezado incluido
+    # como referencia, pero bloqueado); todo lo demás de la hoja —fórmulas de
+    # validación, formato— queda protegido una vez se activa hoja.protection.
+    celda_desbloqueada = Protection(locked=False)
+    ultima_columna = len(encabezados)
+    for fila in hoja.iter_rows(min_row=2, max_row=FILAS_PLANTILLA + 1, min_col=1, max_col=ultima_columna):
+        for celda in fila:
+            celda.protection = celda_desbloqueada
+
+    hoja.protection.sheet = True
+    hoja.protection.password = CONTRASENA_PLANTILLA
+    hoja.protection.formatColumns = False
+    hoja.protection.formatRows = False
+
+    hoja_listas.protection.sheet = True
+    hoja_listas.protection.password = CONTRASENA_PLANTILLA
+
+    libro.security = WorkbookProtection(lockStructure=True)
+    libro.security.set_workbook_password(CONTRASENA_PLANTILLA)
 
     return libro
 
