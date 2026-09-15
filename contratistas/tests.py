@@ -3392,3 +3392,297 @@ class CapacitacionTests(ApiTestsBase):
             reverse("contratistas:capacitacion_registro_detalle", args=[registro.pk])
         )
         self.assertEqual(response.status_code, 401)
+
+
+def _construir_excel_trabajadores(filas):
+    """`filas` es una lista de tuplas en el mismo orden que ENCABEZADOS."""
+    from io import BytesIO
+
+    import openpyxl
+
+    from .importar_trabajadores_excel import ENCABEZADOS
+
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.title = "Trabajadores"
+    hoja.append(ENCABEZADOS)
+    for fila in filas:
+        hoja.append(fila)
+    buffer = BytesIO()
+    libro.save(buffer)
+    return buffer.getvalue()
+
+
+class ImportarTrabajadoresExcelTests(ApiTestsBase):
+    """Carga masiva de trabajadores desde el Excel del cliente — columna
+    Contratista (desplegable) para poder mezclar varias empresas en un
+    mismo archivo; cada fila válida se crea con las mismas reglas que el
+    formulario manual, las demás quedan reportadas sin tumbar el resto."""
+
+    def setUp(self):
+        super().setUp()
+        self.contratista.contacto_correo = "contacto@scepsa.com"
+        self.contratista.save(update_fields=["contacto_correo"])
+        self.otro_contratista = EmpresaContratista.objects.create(
+            empresa=self.empresa, nombre="OTRA CONTRATISTA SAS", contacto_correo="contacto@otra.com"
+        )
+        self.portal_user = Usuario.objects.create_user("portal_scepsa", "portal@scepsa.com", "clave12345")
+        self.portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        self.portal_user.perfil.contratista = self.contratista
+        self.portal_user.perfil.save(update_fields=["rol", "contratista"])
+
+    def test_plantilla_excel_incluye_las_contratistas_activas(self):
+        from io import BytesIO
+
+        import openpyxl
+
+        response = self.client.get(reverse("contratistas:trabajadores_plantilla_excel"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        self.assertIn("Trabajadores", libro.sheetnames)
+        hoja = libro["Trabajadores"]
+        self.assertEqual(hoja.cell(row=1, column=1).value, "Contratista")
+        nombres_lista = {
+            hoja_listas_celda.value for hoja_listas_celda in libro["Listas (no borrar)"]["A"]
+        }
+        self.assertIn(self.contratista.nombre, nombres_lista)
+        self.assertIn(self.otro_contratista.nombre, nombres_lista)
+
+    def test_plantilla_excel_requiere_personal_interno(self):
+        response = self.client.get(
+            reverse("contratistas:trabajadores_plantilla_excel"), **self._auth(self.portal_user)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_importar_excel_crea_trabajadores_de_varias_contratistas(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        contenido = _construir_excel_trabajadores(
+            [
+                (
+                    self.contratista.nombre,
+                    "Ana María",
+                    "Rodríguez Pérez",
+                    "1000111222",
+                    "SI",
+                    "Sura EPS",
+                    "Positiva",
+                    "Colpensiones",
+                    "Fijo",
+                    None,
+                    None,
+                    None,
+                ),
+                (
+                    self.otro_contratista.nombre,
+                    "Carlos",
+                    "Gómez",
+                    "1000333444",
+                    "SI",
+                    "",
+                    "",
+                    "",
+                    "Temporal",
+                    None,
+                    None,
+                    None,
+                ),
+            ]
+        )
+        archivo = SimpleUploadedFile(
+            "trabajadores.xlsx", contenido, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 2)
+        self.assertEqual(response.data["errores"], [])
+        ana = Trabajador.objects.get(documento="1000111222")
+        self.assertEqual(ana.contratista_id, self.contratista.id)
+        self.assertTrue(ana.autorizacion_datos)
+        self.assertIsNotNone(ana.autorizacion_datos_en)
+        carlos = Trabajador.objects.get(documento="1000333444")
+        self.assertEqual(carlos.contratista_id, self.otro_contratista.id)
+        self.assertEqual(carlos.tipo_vinculacion, "temporal")
+
+    def test_importar_excel_fila_sin_autorizacion_no_se_crea_y_queda_reportada(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        contenido = _construir_excel_trabajadores(
+            [
+                (
+                    self.contratista.nombre,
+                    "Sin Autorizar",
+                    "Prueba",
+                    "1000555666",
+                    "NO",
+                    "", "", "", "Fijo", None, None, None,
+                ),
+            ]
+        )
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 0)
+        self.assertEqual(len(response.data["errores"]), 1)
+        self.assertEqual(response.data["errores"][0]["fila"], 2)
+        self.assertIn("autorizacion_datos", response.data["errores"][0]["mensaje"])
+        self.assertFalse(Trabajador.objects.filter(documento="1000555666").exists())
+
+    def test_importar_excel_contratista_no_encontrado_queda_reportado(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        contenido = _construir_excel_trabajadores(
+            [
+                (
+                    "EMPRESA QUE NO EXISTE SAS",
+                    "Nombre",
+                    "Apellido",
+                    "1000777888",
+                    "SI",
+                    "", "", "", "Fijo", None, None, None,
+                ),
+            ]
+        )
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 0)
+        self.assertEqual(len(response.data["errores"]), 1)
+        self.assertIn("EMPRESA QUE NO EXISTE SAS", response.data["errores"][0]["mensaje"])
+
+    def test_importar_excel_documento_duplicado_en_la_misma_contratista_queda_reportado(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        # self.trabajador (de ApiTestsBase) ya existe con documento "80432071" en self.contratista.
+        contenido = _construir_excel_trabajadores(
+            [
+                (
+                    self.contratista.nombre,
+                    "Gerald Marcelo",
+                    "Garzón Beltrán",
+                    "80432071",
+                    "SI",
+                    "", "", "", "Fijo", None, None, None,
+                ),
+            ]
+        )
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 0)
+        self.assertEqual(len(response.data["errores"]), 1)
+        self.assertEqual(Trabajador.objects.filter(documento="80432071").count(), 1)
+
+    def test_importar_excel_ignora_filas_vacias(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        contenido = _construir_excel_trabajadores(
+            [
+                (None, None, None, None, None, None, None, None, None, None, None, None),
+                (
+                    self.contratista.nombre,
+                    "Válido",
+                    "Prueba",
+                    "1000999000",
+                    "SI",
+                    "", "", "", "Fijo", None, None, None,
+                ),
+            ]
+        )
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        self.assertEqual(response.data["errores"], [])
+
+    def test_importar_excel_requiere_personal_interno(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("trabajadores.xlsx", _construir_excel_trabajadores([]))
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.portal_user),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_importar_excel_rechaza_archivo_no_xlsx(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("trabajadores.csv", b"contratista,nombres\n", content_type="text/csv")
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_importar_excel_incluye_fechas_de_cursos_safety_academy(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        fila = [
+            self.contratista.nombre,
+            "Con Cursos",
+            "Prueba",
+            "1000123456",
+            "SI",
+            "",
+            "",
+            "",
+            "Fijo",
+            None,
+            None,
+            None,
+            "2026-01-15",  # induccion_sst
+            None,  # riesgo_quimico
+            None,  # sam_jog_lototo
+            None,  # pasos_seguros
+            None,  # comportamientos_condiciones
+            None,  # identificacion_peligros
+            "2026-02-01",  # epp
+        ]
+        contenido = _construir_excel_trabajadores([tuple(fila)])
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        trabajador = Trabajador.objects.get(documento="1000123456")
+        self.assertEqual(
+            trabajador.cursos_safety_academy,
+            {"induccion_sst": "2026-01-15", "epp": "2026-02-01"},
+        )
+
+    def test_importar_excel_sin_filas_devuelve_400(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("trabajadores.xlsx", _construir_excel_trabajadores([]))
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 400)

@@ -1123,6 +1123,25 @@ export function eliminarTrabajador(token: string, id: number): Promise<void> {
   });
 }
 
+export type ResultadoImportacionTrabajadores = {
+  creados: number;
+  errores: { fila: number; mensaje: string }[];
+};
+
+export function descargarPlantillaTrabajadoresExcel(token: string): Promise<void> {
+  return descargarArchivo(token, "/api/contratistas/trabajadores/plantilla-excel/", "plantilla_trabajadores.xlsx");
+}
+
+export function importarTrabajadoresExcel(token: string, archivo: File): Promise<ResultadoImportacionTrabajadores> {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  return request<ResultadoImportacionTrabajadores>("/api/contratistas/trabajadores/importar-excel/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: formData,
+  });
+}
+
 export type EstadoRadicacion = "pendiente" | "aprobada" | "rechazada";
 
 export type RadicacionSeguridadSocial = {

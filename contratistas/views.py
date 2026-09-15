@@ -457,6 +457,86 @@ class TrabajadorDetalle(AuditoriaMixin, generics.RetrieveUpdateDestroyAPIView):
         super().perform_destroy(instance)
 
 
+@api_view(["GET"])
+@permission_classes([EsPersonalInterno])
+def trabajadores_plantilla_excel(request):
+    """Plantilla .xlsx en blanco para cargar trabajadores en bloque, con
+    el desplegable de Contratista (empresas activas) ya aplicado."""
+    from django.http import HttpResponse
+
+    from .importar_trabajadores_excel import generar_plantilla_trabajadores_excel
+
+    libro = generar_plantilla_trabajadores_excel()
+    respuesta = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    respuesta["Content-Disposition"] = 'attachment; filename="plantilla_trabajadores.xlsx"'
+    libro.save(respuesta)
+    return respuesta
+
+
+def _resumen_errores_serializer(errores):
+    partes = []
+    for campo, mensajes in errores.items():
+        texto = "; ".join(str(m) for m in mensajes) if isinstance(mensajes, list) else str(mensajes)
+        partes.append(f"{campo}: {texto}")
+    return " | ".join(partes)
+
+
+@api_view(["POST"])
+@permission_classes([EsPersonalInterno])
+def trabajadores_importar_excel(request):
+    """Carga masiva de trabajadores desde la plantilla .xlsx — cada fila
+    válida se crea con las mismas reglas que el formulario manual
+    (TrabajadorSerializer, incluida la autorización de datos
+    obligatoria); las filas que no pasan quedan reportadas sin tumbar el
+    resto del archivo. Nunca crea radicaciones — cada trabajador queda
+    pendiente de esa radicación, igual que si se hubiera registrado a
+    mano."""
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    from core.validators import validar_tamano_archivo
+
+    from .importar_trabajadores_excel import ErrorImportacionExcel, procesar_trabajadores_excel
+
+    archivo = request.FILES.get("archivo")
+    if not archivo:
+        return Response({"detail": "Hace falta adjuntar un archivo."}, status=status.HTTP_400_BAD_REQUEST)
+    if not archivo.name.lower().endswith(".xlsx"):
+        return Response({"detail": "El archivo debe ser un .xlsx."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        validar_tamano_archivo(archivo)
+    except DjangoValidationError as exc:
+        return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        filas, errores = procesar_trabajadores_excel(archivo)
+    except ErrorImportacionExcel as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not filas and not errores:
+        return Response(
+            {"detail": "El archivo no tiene filas con datos — usa la plantilla y no borres los encabezados."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    creados = 0
+    for fila in filas:
+        numero_fila = fila.pop("_fila_excel")
+        serializer = TrabajadorSerializer(data=fila)
+        if not serializer.is_valid():
+            errores.append({"fila": numero_fila, "mensaje": _resumen_errores_serializer(serializer.errors)})
+            continue
+        try:
+            trabajador = serializer.save()
+        except Exception as exc:  # fila individual no debe tumbar el resto del archivo
+            errores.append({"fila": numero_fila, "mensaje": f"No se pudo crear: {exc}"})
+            continue
+        registrar_auditoria(request.user, trabajador, RegistroAuditoria.Accion.CREADO)
+        creados += 1
+
+    errores.sort(key=lambda e: e["fila"])
+    return Response({"creados": creados, "errores": errores})
+
+
 # --- Radicaciones de seguridad social ---
 
 
