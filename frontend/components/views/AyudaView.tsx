@@ -371,24 +371,47 @@ const TEMAS: Tema[] = [
         <P>
           Las columnas iniciales incluyen <strong>&quot;Fecha de revisión y validación&quot;</strong>{" "}
           (prellenada con la fecha en que se descarga la plantilla — cuándo SST revisó/validó esa fila,
-          editable si la revisión real fue otro día), <strong>&quot;Validación&quot;</strong> (desplegable
-          Ingreso/Renovación) y <strong>&quot;Número de pedido o CM&quot;</strong> (texto libre, sin
-          validación — informativo). Ninguna de las tres afecta cómo se calcula la vigencia de nada; son
-          solo datos que el cliente pidió llevar junto a cada trabajador.
+          editable si la revisión real fue otro día) y <strong>&quot;Validación&quot;</strong> (desplegable
+          Ingreso/Renovación). Después vienen varios campos de control que replican al detalle la hoja del
+          cliente y son puramente informativos (no afectan cursos, certificaciones ni ningún cálculo de
+          vigencia): <strong>Número de pedido o CM</strong>, <strong>¿Casco rojo?</strong>,{" "}
+          <strong>Clase de riesgo</strong> (I a V), <strong>Área de trabajo</strong> (Proyecto/Envase/
+          Elaboración/Ingeniería y Serv/Calidad/People), <strong>Formato de inclusión firmado</strong>,{" "}
+          <strong>Registros de EPP entregados</strong>, <strong>Pago de seguridad social cumple</strong>,{" "}
+          <strong>Inducción del empleador registrada</strong>, <strong>Responsable de SST en planta</strong>{" "}
+          (nombre y teléfono), <strong>Radicación OK</strong>, <strong>Radicado por</strong>,{" "}
+          <strong>Validador</strong> y <strong>Requisitos OK verificados</strong>. Todos quedan también en
+          el formulario manual del trabajador, dentro de &quot;Campos de control (replican el Excel del
+          cliente)&quot;.
+        </P>
+        <P>
+          <strong>Tipo de contratista</strong> y <strong>contrato marco</strong> — que en el Excel del
+          cliente se repiten en cada fila de una misma empresa — se editan una sola vez en la ficha de la
+          empresa contratista (Contratistas → Editar), no por trabajador, para no tener que escribir lo
+          mismo en cada fila. La planilla de seguridad social (número, fecha de reporte, fecha de
+          vencimiento, ARL vigente) tampoco se repite acá: sigue viviendo en su propio panel de
+          radicaciones, como siempre — la carga masiva de trabajadores nunca crea radicaciones.
         </P>
         <P>
           La plantilla también trae una columna de fecha de <strong>vencimiento</strong> para el{" "}
-          <strong>examen médico</strong>, la <strong>certificación de trabajo en alturas</strong>, cada uno
-          de los <strong>cursos de Safety Academy</strong> y cada <strong>certificación especial</strong>{" "}
-          (espacios confinados, conducción, manlift, grúa, soldador, rescatista, licencia SST) — el
-          encabezado de cada columna lo aclara (&quot;... — vencimiento (AAAA-MM-DD o N/A)&quot;);
-          diligenciar una fecha ahí equivale a marcarla completada con ese vencimiento (igual que hacerlo
-          uno por uno en el formulario). Dejar la celda <strong>vacía o escribir &quot;N/A&quot;</strong>{" "}
-          significan lo mismo: ese curso o certificación no aplica o no se ha hecho todavía — ninguna de las
-          dos formas tumba la fila. Estas columnas se arman con lo que esté activo en Sistema → Reglas de
-          contratistas en ese momento, así que si se agrega o desactiva un curso o certificación, la próxima
-          plantilla descargada ya lo refleja. Ningún trabajador importado queda con radicación de seguridad
-          social — esa parte sigue pendiente, igual que si se hubiera cargado a mano.
+          <strong>examen médico</strong>, la <strong>certificación de trabajo en alturas</strong> y cada{" "}
+          <strong>certificación especial</strong> (espacios confinados, conducción, manlift, grúa, soldador,
+          rescatista, licencia SST) — y, <strong>justo antes de cada una</strong>, una columna de estado{" "}
+          <strong>&quot;Certificado validado (OutSafety/Drive/NA/No validado)&quot;</strong>, igual que en
+          el Excel real del cliente. Ahí es de donde sale el <strong>N/A</strong>: si el estado dice{" "}
+          <strong>NA</strong>, esa certificación no aplica a ese trabajador y la fecha se ignora aunque haya
+          algo escrito — no hace falta (ni sirve) escribir &quot;N/A&quot; en la celda de fecha misma. El
+          estado (OutSafety/Drive/No validado) es solo informativo dentro del Excel — el sistema no lo
+          guarda, porque nada depende de <em>dónde</em> se validó un certificado, solo de si aplica y
+          cuándo vence. Los <strong>cursos de Safety Academy</strong> son la excepción: como en el Excel del
+          cliente van agrupados en un solo paquete de inducciones (sin ese detalle de estado), acá cada uno
+          tiene solo su columna de fecha — dejarla vacía o escribir &quot;N/A&quot; ahí sí significan lo
+          mismo (no diligenciado). Diligenciar una fecha equivale a marcarla completada con ese vencimiento
+          (igual que hacerlo uno por uno en el formulario). Estas columnas se arman con lo que esté activo
+          en Sistema → Reglas de contratistas en ese momento, así que si se agrega o desactiva un curso o
+          certificación, la próxima plantilla descargada ya lo refleja. Ningún trabajador importado queda
+          con radicación de seguridad social — esa parte sigue pendiente, igual que si se hubiera cargado a
+          mano.
         </P>
         <P>
           <strong>Todas</strong> las columnas de fecha (revisión, inicio de contrato, examen médico,

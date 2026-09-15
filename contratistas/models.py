@@ -18,6 +18,10 @@ class EmpresaContratista(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="contratistas")
     nombre = models.CharField(max_length=200)
     nit = models.CharField("NIT", max_length=30, blank=True)
+    tipo_contratista = models.CharField(
+        "tipo de contratista", max_length=100, blank=True, help_text="Texto libre del cliente — sin lista fija."
+    )
+    contrato_marco = models.CharField("contrato marco", max_length=150, blank=True)
     contacto_nombre = models.CharField("nombre de contacto", max_length=150, blank=True)
     contacto_telefono = models.CharField("teléfono de contacto", max_length=30, blank=True)
     contacto_correo = models.EmailField("correo de contacto", blank=True)
@@ -103,6 +107,21 @@ class Trabajador(models.Model):
         FIJO = "fijo", "Fijo"
         TEMPORAL = "temporal", "Temporal"
 
+    class ClaseRiesgo(models.TextChoices):
+        I = "I", "I"
+        II = "II", "II"
+        III = "III", "III"
+        IV = "IV", "IV"
+        V = "V", "V"
+
+    class AreaTrabajo(models.TextChoices):
+        PROYECTO = "proyecto", "Proyecto"
+        ENVASE = "envase", "Envase"
+        ELABORACION = "elaboracion", "Elaboración"
+        INGENIERIA_SERV = "ingenieria_serv", "Ingeniería y Serv"
+        CALIDAD = "calidad", "Calidad"
+        PEOPLE = "people", "People"
+
     contratista = models.ForeignKey(EmpresaContratista, on_delete=models.CASCADE, related_name="trabajadores")
     nombres = models.CharField(max_length=150)
     apellidos = models.CharField(max_length=150)
@@ -166,6 +185,50 @@ class Trabajador(models.Model):
     numero_pedido_cm = models.CharField(
         "número de pedido o CM", max_length=100, blank=True, help_text="Campo libre del cliente — sin validación."
     )
+
+    # Campos de control replicando el formato de la hoja "TABLA INGRESOS" del
+    # cliente — todos informativos/de verificación manual, ninguno afecta el
+    # cálculo de vigencia de cursos/certificaciones ni de la radicación de
+    # seguridad social (que sigue siendo su propio modelo/flujo aparte).
+    casco_rojo = models.BooleanField(
+        "¿actualmente es casco rojo?",
+        default=False,
+        help_text="Personal con casco rojo (nuevo ingreso/en inducción) según la convención del cliente.",
+    )
+    clase_riesgo = models.CharField(
+        "clase de riesgo", max_length=5, choices=ClaseRiesgo.choices, blank=True, help_text="Clase de riesgo ARL (I a V)."
+    )
+    area_trabajo = models.CharField(
+        "área donde realiza la mayor parte de sus actividades",
+        max_length=30,
+        choices=AreaTrabajo.choices,
+        blank=True,
+    )
+    formato_inclusion_firmado = models.BooleanField(
+        "formato de inclusión firmado por todos los responsables", default=False
+    )
+    registros_epp_entregados = models.BooleanField("registros de entrega de EPP y dotación", default=False)
+    pago_seguridad_cumple = models.BooleanField(
+        "pago de seguridad social cumple",
+        default=False,
+        help_text="Verificación manual de que la radicación cumple con la fecha y la clase de riesgo de la actividad.",
+    )
+    induccion_empleador_registrada = models.BooleanField(
+        "inducción del empleador registrada",
+        default=False,
+        help_text="El registro de la inducción del empleador existe en el Drive/repositorio correspondiente.",
+    )
+    responsable_sst_planta_nombre = models.CharField(
+        "responsable de SST en planta", max_length=150, blank=True, help_text="Persona del cliente que hizo seguimiento a este registro."
+    )
+    responsable_sst_planta_telefono = models.CharField("teléfono del responsable de SST en planta", max_length=30, blank=True)
+    radicacion_ok = models.BooleanField("radicación OK", default=False)
+    radicado_por = models.CharField("radicado por", max_length=150, blank=True)
+    validador = models.CharField(
+        "validador", max_length=150, blank=True, help_text="Quién validó este registro — texto libre."
+    )
+    requisitos_ok_verificados = models.BooleanField("requisitos OK verificados", default=False)
+
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     autorizacion_datos = models.BooleanField(
