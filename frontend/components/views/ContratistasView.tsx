@@ -1144,7 +1144,7 @@ function FormularioTrabajador({
           </div>
           <p className="-mt-2 text-xs text-corp-muted">
             Solo si el trabajador hace trabajo en altura — el SOP del cliente exige examen médico vigente
-            hace menos de 1 año y recertificación de alturas cada 2 años.
+            hace menos de 1 año y recertificación de alturas cada 18 meses.
           </p>
 
           <div>
