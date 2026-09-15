@@ -2,7 +2,10 @@
 masivo" que ya maneja el cliente: cada fila es un trabajador y una
 columna "Contratista" (desplegable) indica a qué EmpresaContratista
 pertenece esa fila, para poder mezclar personal de varias empresas
-contratistas en un mismo archivo.
+contratistas en un mismo archivo. El orden y los encabezados de columna
+replican, en lo posible, la hoja "TABLA INGRESOS" del Excel real del
+cliente (FECHA DE REVISIÓN Y VALIDACIÓN, VALIDACIÓN, EMPRESA, NUMERO DE
+PEDIDO O CM, ...).
 
 A diferencia del importador de Declaración de Método (que solo
 precarga un formulario), este SÍ crea registros en la base — una fila
@@ -13,15 +16,23 @@ que no pasaría el formulario normal tampoco se crea acá, queda
 reportada como error de esa fila sin tumbar el resto del archivo.
 
 La plantilla trae, además de los datos básicos, una columna de fecha
-por cada curso del catálogo Safety Academy y por cada certificación
-especial (espacios confinados, conducción, manlift, grúa, soldador,
-rescatista, licencia SST, ...) — para poder verificar de una vez la
+de vencimiento por cada curso del catálogo Safety Academy y por cada
+certificación especial (espacios confinados, conducción, manlift, grúa,
+soldador, rescatista, licencia SST, ...) — para poder verificar de una vez la
 vigencia de cada una al importar, igual que si se marcaran uno por uno
-en el formulario manual. Ambos catálogos se leen de la base en el
-momento de generar/leer el Excel (no de una lista fija en código), así
-que si un Administrador agrega o desactiva un curso/certificación
-desde Sistema → Reglas de contratistas, la plantilla lo refleja sin
-tocar código.
+en el formulario manual. Dejar una de estas celdas vacía o con "N/A"
+significa lo mismo: ese curso/certificación no quedó diligenciado para
+ese trabajador (no aplica o no se ha hecho todavía) — ninguna de las dos
+formas tumba la fila ni el resto del archivo. Ambos catálogos se leen de
+la base en el momento de generar/leer el Excel (no de una lista fija en
+código), así que si un Administrador agrega o desactiva un
+curso/certificación desde Sistema → Reglas de contratistas, la plantilla
+lo refleja sin tocar código.
+
+Todas las columnas de fecha llevan validación de tipo fecha (el pequeño
+calendario junto a la celda, en vez de tener que escribir el texto a
+mano) — evita el error más común al llenar el Excel: la fecha en el
+formato equivocado.
 
 La radicación de seguridad social nunca se crea desde acá — cada
 trabajador importado queda igual que si se hubiera registrado a mano:
@@ -32,7 +43,8 @@ import datetime
 import unicodedata
 
 import openpyxl
-from openpyxl.styles import Protection
+from openpyxl.formatting.rule import FormulaRule
+from openpyxl.styles import PatternFill, Protection
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.protection import WorkbookProtection
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -53,8 +65,14 @@ HOJA_LISTAS = "Listas (no borrar)"
 # herramientas de terceros), solo evita que alguien la rompa sin querer.
 CONTRASENA_PLANTILLA = "SSTBavaria2026"
 
+# Mismo orden que la hoja "TABLA INGRESOS" del Excel real del cliente para
+# las columnas iniciales (FECHA DE REVISIÓN Y VALIDACIÓN, VALIDACIÓN,
+# EMPRESA, ..., NUMERO DE PEDIDO O CM) — las columnas de curso/certificación
+# se agregan después, dinámicamente, según el catálogo vigente.
 ENCABEZADOS_BASE = [
-    "Contratista",
+    "Fecha de revisión y validación (AAAA-MM-DD)",
+    "Validación (Ingreso/Renovación)",
+    "Contratista (empresa)",
     "Nombres",
     "Apellidos",
     "Documento",
@@ -64,9 +82,20 @@ ENCABEZADOS_BASE = [
     "AFP",
     "Tipo de vinculación (Fijo/Temporal)",
     "Fecha inicio contrato (AAAA-MM-DD)",
+    "Número de pedido o CM",
     "Vencimiento examen médico alturas (AAAA-MM-DD)",
     "Vencimiento certificación alturas (AAAA-MM-DD)",
 ]
+
+# Posiciones 1-indexadas (columna Excel) dentro de ENCABEZADOS_BASE.
+COL_FECHA_REVISION = 1
+COL_VALIDACION = 2
+COL_CONTRATISTA = 3
+COL_AUTORIZACION = 7
+COL_VINCULACION = 11
+COL_FECHA_INICIO = 12
+COL_FECHA_EXAMEN = 14
+COL_FECHA_ALTURAS = 15
 
 # Filas con el desplegable ya aplicado en la plantilla descargable, para
 # poder pegar/escribir varias de una vez sin tener que repetir la validación.
@@ -76,7 +105,16 @@ _ETIQUETA_A_TIPO_VINCULACION = {
     "fijo": Trabajador.TipoVinculacion.FIJO,
     "temporal": Trabajador.TipoVinculacion.TEMPORAL,
 }
+_ETIQUETA_A_TIPO_VALIDACION = {
+    "ingreso": Trabajador.TipoValidacion.INGRESO,
+    "renovacion": Trabajador.TipoValidacion.RENOVACION,
+}
 _VALORES_SI = {"si", "s", "x", "yes", "true", "1"}
+_VALORES_NO_APLICA = {"na", "n/a", "n.a.", "n.a", "no aplica"}
+
+FILL_VENCIDO = PatternFill(start_color="FFFF0000", end_color="FFFF0000", fill_type="solid")
+FILL_POR_VENCER = PatternFill(start_color="FFFFC000", end_color="FFFFC000", fill_type="solid")
+FILL_VIGENTE = PatternFill(start_color="FF00B050", end_color="FF00B050", fill_type="solid")
 
 
 def _sin_acentos(texto):
@@ -93,9 +131,11 @@ def _texto_celda(valor):
 
 
 def _valor_fecha(celda):
-    """Acepta tanto una fecha real de Excel (la plantilla no fuerza
-    formato de celda) como texto AAAA-MM-DD o DD/MM/AAAA. Una fecha
-    ilegible se ignora en vez de tumbar la fila — el campo es opcional."""
+    """Acepta una fecha real de Excel (elegida con el calendario), texto
+    AAAA-MM-DD o DD/MM/AAAA, o "N/A" (y variantes) para "no aplica" — en
+    los tres casos que no sean una fecha reconocible el resultado es
+    simplemente None: el campo es opcional y una celda con N/A o vacía
+    significan lo mismo (no diligenciado), así que ninguna tumba la fila."""
     if celda in (None, ""):
         return None
     if isinstance(celda, datetime.datetime):
@@ -103,7 +143,7 @@ def _valor_fecha(celda):
     if isinstance(celda, datetime.date):
         return celda
     texto = str(celda).strip()
-    if not texto:
+    if not texto or _sin_acentos(texto) in _VALORES_NO_APLICA:
         return None
     for formato in ("%Y-%m-%d", "%d/%m/%Y"):
         try:
@@ -127,9 +167,9 @@ def _encabezados_y_catalogos():
     son editables desde el dashboard."""
     cursos = _catalogo_cursos()
     certificaciones = _catalogo_certificaciones()
-    encabezados_cursos = [f"Curso: {c.etiqueta} — vencimiento (AAAA-MM-DD)" for c in cursos]
+    encabezados_cursos = [f"Curso: {c.etiqueta} — vencimiento (AAAA-MM-DD o N/A)" for c in cursos]
     encabezados_certificaciones = [
-        f"Certificación: {c.etiqueta} — vencimiento (AAAA-MM-DD)" for c in certificaciones
+        f"Certificación: {c.etiqueta} — vencimiento (AAAA-MM-DD o N/A)" for c in certificaciones
     ]
     encabezados = ENCABEZADOS_BASE + encabezados_cursos + encabezados_certificaciones
     claves_cursos = [c.clave for c in cursos]
@@ -137,15 +177,65 @@ def _encabezados_y_catalogos():
     return encabezados, claves_cursos, claves_certificaciones
 
 
+def _agregar_validacion_fecha(hoja, columna, primera_fila, ultima_fila):
+    """Restringe la columna a fechas — Excel muestra el ícono de calendario
+    junto a la celda para elegirla sin escribir nada. `errorStyle="warning"`
+    (no "stop") para no bloquear a quien escribe N/A cuando el curso o la
+    certificación no aplica: avisa que el valor no es una fecha, pero deja
+    seguir."""
+    letra = get_column_letter(columna)
+    dv = DataValidation(
+        type="date",
+        operator="between",
+        formula1="DATE(2000,1,1)",
+        formula2="DATE(2099,12,31)",
+        allow_blank=True,
+        showErrorMessage=True,
+        errorStyle="warning",
+        errorTitle="¿Es una fecha?",
+        error="Usa el calendario junto a la celda para elegir la fecha, o escribe N/A si no aplica.",
+    )
+    hoja.add_data_validation(dv)
+    dv.add(f"{letra}{primera_fila}:{letra}{ultima_fila}")
+
+
+def _agregar_colores_vigencia(hoja, columna, primera_fila, ultima_fila):
+    """3 colores sobre la fecha de vencimiento misma (no una columna de
+    estado aparte, para no duplicar columnas): rojo vencida, ámbar si vence
+    en 15 días o menos, verde si todavía falta más — mismo umbral que usa
+    el resto de la app. Una celda vacía o con N/A no cae en ninguna regla,
+    así que queda sin colorear."""
+    letra = get_column_letter(columna)
+    rango = f"{letra}{primera_fila}:{letra}{ultima_fila}"
+    ref = f"{letra}{primera_fila}"
+    hoja.conditional_formatting.add(
+        rango, FormulaRule(formula=[f"AND(ISNUMBER({ref}),{ref}<TODAY())"], fill=FILL_VENCIDO)
+    )
+    hoja.conditional_formatting.add(
+        rango,
+        FormulaRule(formula=[f"AND(ISNUMBER({ref}),{ref}>=TODAY(),{ref}<=TODAY()+15)"], fill=FILL_POR_VENCER),
+    )
+    hoja.conditional_formatting.add(
+        rango, FormulaRule(formula=[f"AND(ISNUMBER({ref}),{ref}>TODAY()+15)"], fill=FILL_VIGENTE)
+    )
+
+
 def generar_plantilla_trabajadores_excel():
     """Libro .xlsx en blanco con los encabezados y los desplegables
-    (Contratista, autorización de datos, tipo de vinculación — solo
-    empresas activas) ya aplicados a las primeras FILAS_PLANTILLA filas —
-    lista para llenar y volver a subir."""
+    (Contratista, autorización de datos, tipo de vinculación, validación —
+    solo empresas activas) ya aplicados a las primeras FILAS_PLANTILLA
+    filas — lista para llenar y volver a subir. Las columnas de fecha
+    quedan con selector de calendario, y las de vencimiento (examen médico,
+    alturas, cursos, certificaciones) con los mismos 3 colores de vigencia
+    que usa el resto del sistema. "Fecha de revisión y validación" viene
+    prellenada con la fecha de hoy (cuando se descarga la plantilla),
+    editable si la revisión real fue otro día."""
     contratistas = list(
         EmpresaContratista.objects.filter(activa=True).order_by("nombre").values_list("nombre", flat=True)
     )
     encabezados, claves_cursos, claves_certificaciones = _encabezados_y_catalogos()
+    ultima_columna = len(encabezados)
+    ultima_fila = FILAS_PLANTILLA + 1
 
     libro = openpyxl.Workbook()
     hoja = libro.active
@@ -154,12 +244,18 @@ def generar_plantilla_trabajadores_excel():
     for celda in hoja[1]:
         celda.font = celda.font.copy(bold=True)
 
+    hoy = datetime.date.today()
+    for fila in range(2, ultima_fila + 1):
+        celda = hoja.cell(row=fila, column=COL_FECHA_REVISION, value=hoy)
+        celda.number_format = "YYYY-MM-DD"
+
     hoja_listas = libro.create_sheet(HOJA_LISTAS)
     for fila, nombre in enumerate(contratistas, start=1):
         hoja_listas.cell(row=fila, column=1, value=nombre)
     hoja_listas.sheet_state = "hidden"
 
     ultima_fila_listas = max(len(contratistas), 1)
+    letra_contratista = get_column_letter(COL_CONTRATISTA)
     dv_contratista = DataValidation(
         type="list",
         formula1=f"'{HOJA_LISTAS}'!$A$1:$A${ultima_fila_listas}",
@@ -169,18 +265,40 @@ def generar_plantilla_trabajadores_excel():
         error="Elige una empresa contratista de la lista desplegable.",
     )
     hoja.add_data_validation(dv_contratista)
-    dv_contratista.add(f"A2:A{FILAS_PLANTILLA + 1}")
+    dv_contratista.add(f"{letra_contratista}2:{letra_contratista}{ultima_fila}")
 
+    letra_validacion = get_column_letter(COL_VALIDACION)
+    dv_validacion = DataValidation(type="list", formula1='"Ingreso,Renovación"', allow_blank=True)
+    hoja.add_data_validation(dv_validacion)
+    dv_validacion.add(f"{letra_validacion}2:{letra_validacion}{ultima_fila}")
+
+    letra_autorizacion = get_column_letter(COL_AUTORIZACION)
     dv_autorizacion = DataValidation(type="list", formula1='"SI,NO"', allow_blank=True)
     hoja.add_data_validation(dv_autorizacion)
-    dv_autorizacion.add(f"E2:E{FILAS_PLANTILLA + 1}")
+    dv_autorizacion.add(f"{letra_autorizacion}2:{letra_autorizacion}{ultima_fila}")
 
+    letra_vinculacion = get_column_letter(COL_VINCULACION)
     dv_vinculacion = DataValidation(type="list", formula1='"Fijo,Temporal"', allow_blank=True)
     hoja.add_data_validation(dv_vinculacion)
-    dv_vinculacion.add(f"I2:I{FILAS_PLANTILLA + 1}")
+    dv_vinculacion.add(f"{letra_vinculacion}2:{letra_vinculacion}{ultima_fila}")
 
-    anchos_base = [30, 20, 20, 16, 24, 14, 14, 14, 26, 24, 30, 28]
-    anchos = anchos_base + [30] * (len(claves_cursos) + len(claves_certificaciones))
+    # Columnas de vencimiento (con color de vigencia) vs. columnas de fecha
+    # "simples" (solo calendario, sin color — revisión y fecha de inicio de
+    # contrato no tienen un estado vigente/vencido que tenga sentido).
+    columnas_vencimiento = [COL_FECHA_EXAMEN, COL_FECHA_ALTURAS]
+    primera_columna_cursos = len(ENCABEZADOS_BASE) + 1
+    columnas_vencimiento += list(
+        range(primera_columna_cursos, primera_columna_cursos + len(claves_cursos) + len(claves_certificaciones))
+    )
+    for columna in columnas_vencimiento:
+        _agregar_validacion_fecha(hoja, columna, 2, ultima_fila)
+        _agregar_colores_vigencia(hoja, columna, 2, ultima_fila)
+
+    for columna in (COL_FECHA_REVISION, COL_FECHA_INICIO):
+        _agregar_validacion_fecha(hoja, columna, 2, ultima_fila)
+
+    anchos_base = [26, 22, 26, 20, 20, 16, 24, 14, 14, 14, 26, 24, 22, 30, 28]
+    anchos = anchos_base + [32] * (len(claves_cursos) + len(claves_certificaciones))
     for indice, ancho in enumerate(anchos, start=1):
         hoja.column_dimensions[get_column_letter(indice)].width = ancho
 
@@ -188,8 +306,7 @@ def generar_plantilla_trabajadores_excel():
     # como referencia, pero bloqueado); todo lo demás de la hoja —fórmulas de
     # validación, formato— queda protegido una vez se activa hoja.protection.
     celda_desbloqueada = Protection(locked=False)
-    ultima_columna = len(encabezados)
-    for fila in hoja.iter_rows(min_row=2, max_row=FILAS_PLANTILLA + 1, min_col=1, max_col=ultima_columna):
+    for fila in hoja.iter_rows(min_row=2, max_row=ultima_fila, min_col=1, max_col=ultima_columna):
         for celda in fila:
             celda.protection = celda_desbloqueada
 
@@ -240,6 +357,8 @@ def procesar_trabajadores_excel(archivo):
         celdas = list(fila) + [None] * (len(encabezados) - len(fila))
         celdas = celdas[: len(encabezados)]
         (
+            fecha_revision_txt,
+            validacion_txt,
             contratista_txt,
             nombres,
             apellidos,
@@ -250,6 +369,7 @@ def procesar_trabajadores_excel(archivo):
             afp,
             vinculacion_txt,
             fecha_inicio,
+            numero_pedido_cm,
             fecha_examen,
             fecha_certificacion,
         ) = celdas[:indice_cursos]
@@ -276,6 +396,7 @@ def procesar_trabajadores_excel(archivo):
         vinculacion = _ETIQUETA_A_TIPO_VINCULACION.get(
             _sin_acentos(vinculacion_txt or ""), Trabajador.TipoVinculacion.FIJO
         )
+        tipo_validacion = _ETIQUETA_A_TIPO_VALIDACION.get(_sin_acentos(validacion_txt or ""), "")
 
         cursos_safety_academy = {}
         for clave, celda_curso in zip(claves_cursos, celdas_cursos):
@@ -302,6 +423,9 @@ def procesar_trabajadores_excel(archivo):
                 "afp": _texto_celda(afp),
                 "tipo_vinculacion": vinculacion,
                 "fecha_inicio_contrato": _valor_fecha(fecha_inicio),
+                "fecha_revision_validacion": _valor_fecha(fecha_revision_txt),
+                "tipo_validacion": tipo_validacion,
+                "numero_pedido_cm": _texto_celda(numero_pedido_cm),
                 "fecha_vencimiento_examen_medico": _valor_fecha(fecha_examen),
                 "fecha_vencimiento_certificacion_alturas": _valor_fecha(fecha_certificacion),
                 "cursos_safety_academy": cursos_safety_academy,

@@ -307,7 +307,11 @@ const TEMAS: Tema[] = [
             conducción, manlift, grúa, soldador, rescatista, licencia SST) — a diferencia de los cursos, se
             marcan solo para quien de verdad realiza esa actividad, con el mismo esquema de fecha de
             vencimiento y badge de color, y solo avisan &quot;vencida&quot; cuando una que el trabajador sí
-            tiene ya venció (no cuenta como pendiente si nunca la tuvo).</li>
+            tiene ya venció (no cuenta como pendiente si nunca la tuvo). También trae tres campos opcionales,
+            puramente informativos (no afectan cursos, certificaciones ni ningún cálculo de vigencia):{" "}
+            <strong>fecha de revisión y validación</strong>, <strong>validación</strong>
+            (Ingreso/Renovación) y <strong>número de pedido o CM</strong> — el mismo trío que trae la carga
+            masiva desde Excel (ver más abajo).</li>
           <li><strong>Radicación de seguridad social</strong>: por cada trabajador y mes, se sube el
             comprobante de pago (PDF o foto) con número de planilla y fecha de vencimiento.</li>
         </Ol>
@@ -352,25 +356,51 @@ const TEMAS: Tema[] = [
         <P>
           Solo para personal interno (SST/interventoría), arriba de la vista hay dos botones:{" "}
           <strong>&quot;Descargar plantilla trabajadores&quot;</strong> genera un .xlsx en blanco con una
-          columna <strong>Contratista</strong> desplegable (lista las empresas activas) para poder cargar
-          personal de varias empresas contratistas en un mismo archivo — cada fila indica a cuál pertenece.
-          Al terminar de llenarla, <strong>&quot;Importar trabajadores (Excel)&quot;</strong> la sube: cada
-          fila válida se crea con las mismas reglas que si se registrara a mano desde el formulario (documento
-          único por contratista, autorización de datos obligatoria — columna &quot;Autorización datos
-          (SI/NO)&quot;, también desplegable). Las filas marcadas <strong>NO</strong>, con un contratista que
-          no calza con el desplegable, o con un documento repetido, no se crean — quedan reportadas con su
-          número de fila para corregir y volver a intentar, sin tumbar el resto del archivo. La plantilla
-          también trae una columna de fecha de <strong>vencimiento</strong> para el{" "}
+          columna <strong>Contratista (empresa)</strong> desplegable (lista las empresas activas) para poder
+          cargar personal de varias empresas contratistas en un mismo archivo — cada fila indica a cuál
+          pertenece. El orden y los encabezados de columna replican, en lo posible, el Excel real que ya
+          maneja el cliente (&quot;Fecha de revisión y validación&quot;, &quot;Validación&quot;,
+          &quot;Empresa&quot;, ..., &quot;Número de pedido o CM&quot;, ...). Al terminar de llenarla,{" "}
+          <strong>&quot;Importar trabajadores (Excel)&quot;</strong> la sube: cada fila válida se crea con
+          las mismas reglas que si se registrara a mano desde el formulario (documento único por
+          contratista, autorización de datos obligatoria — columna &quot;Autorización datos (SI/NO)&quot;,
+          también desplegable). Las filas marcadas <strong>NO</strong>, con un contratista que no calza con
+          el desplegable, o con un documento repetido, no se crean — quedan reportadas con su número de fila
+          para corregir y volver a intentar, sin tumbar el resto del archivo.
+        </P>
+        <P>
+          Las columnas iniciales incluyen <strong>&quot;Fecha de revisión y validación&quot;</strong>{" "}
+          (prellenada con la fecha en que se descarga la plantilla — cuándo SST revisó/validó esa fila,
+          editable si la revisión real fue otro día), <strong>&quot;Validación&quot;</strong> (desplegable
+          Ingreso/Renovación) y <strong>&quot;Número de pedido o CM&quot;</strong> (texto libre, sin
+          validación — informativo). Ninguna de las tres afecta cómo se calcula la vigencia de nada; son
+          solo datos que el cliente pidió llevar junto a cada trabajador.
+        </P>
+        <P>
+          La plantilla también trae una columna de fecha de <strong>vencimiento</strong> para el{" "}
           <strong>examen médico</strong>, la <strong>certificación de trabajo en alturas</strong>, cada uno
           de los <strong>cursos de Safety Academy</strong> y cada <strong>certificación especial</strong>{" "}
           (espacios confinados, conducción, manlift, grúa, soldador, rescatista, licencia SST) — el
-          encabezado de cada columna lo aclara (&quot;... — vencimiento (AAAA-MM-DD)&quot;); diligenciar una
-          fecha ahí equivale a marcarla completada con ese vencimiento (igual que hacerlo uno por uno en el
-          formulario), y dejarla vacía la deja sin diligenciar; así se puede verificar de una vez la vigencia
-          de cada trabajador importado. Estas columnas se arman con lo que esté activo en Sistema → Reglas de
+          encabezado de cada columna lo aclara (&quot;... — vencimiento (AAAA-MM-DD o N/A)&quot;);
+          diligenciar una fecha ahí equivale a marcarla completada con ese vencimiento (igual que hacerlo
+          uno por uno en el formulario). Dejar la celda <strong>vacía o escribir &quot;N/A&quot;</strong>{" "}
+          significan lo mismo: ese curso o certificación no aplica o no se ha hecho todavía — ninguna de las
+          dos formas tumba la fila. Estas columnas se arman con lo que esté activo en Sistema → Reglas de
           contratistas en ese momento, así que si se agrega o desactiva un curso o certificación, la próxima
           plantilla descargada ya lo refleja. Ningún trabajador importado queda con radicación de seguridad
           social — esa parte sigue pendiente, igual que si se hubiera cargado a mano.
+        </P>
+        <P>
+          <strong>Todas</strong> las columnas de fecha (revisión, inicio de contrato, examen médico,
+          alturas, cada curso, cada certificación) tienen validación de tipo fecha: al hacer clic en la
+          celda aparece un pequeño <strong>calendario</strong> junto a ella para elegir el día sin tener que
+          escribir nada — la forma más segura de evitar el error más común al llenar el Excel, la fecha en
+          el formato equivocado. Las columnas de vencimiento (examen médico, alturas, cada curso y
+          certificación) además vienen con los mismos <strong>3 colores de vigencia</strong> que usa el
+          resto del sistema — se calculan solos con una fórmula al escribir la fecha, sin que nadie tenga
+          que colorear nada a mano: <strong className="text-emerald-700">verde</strong> vigente,{" "}
+          <strong className="text-amber-700">ámbar</strong> si vence en 15 días o menos y{" "}
+          <strong className="text-red-700">rojo</strong> si ya venció.
         </P>
         <P>
           La plantilla descargada viene <strong>protegida</strong>: las fórmulas de los desplegables y la

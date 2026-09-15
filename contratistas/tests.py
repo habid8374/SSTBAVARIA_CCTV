@@ -3603,7 +3603,7 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         libro = openpyxl.load_workbook(BytesIO(response.content))
         self.assertIn("Trabajadores", libro.sheetnames)
         hoja = libro["Trabajadores"]
-        self.assertEqual(hoja.cell(row=1, column=1).value, "Contratista")
+        self.assertEqual(hoja.cell(row=1, column=3).value, "Contratista (empresa)")
         nombres_lista = {
             hoja_listas_celda.value for hoja_listas_celda in libro["Listas (no borrar)"]["A"]
         }
@@ -3634,12 +3634,41 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_plantilla_excel_replica_columnas_clave_del_formato_del_cliente(self):
+        from io import BytesIO
+
+        import openpyxl
+
+        response = self.client.get(reverse("contratistas:trabajadores_plantilla_excel"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        libro = openpyxl.load_workbook(BytesIO(response.content))
+        hoja = libro["Trabajadores"]
+        encabezados = [c.value for c in hoja[1]]
+        self.assertEqual(encabezados[0], "Fecha de revisión y validación (AAAA-MM-DD)")
+        self.assertEqual(encabezados[1], "Validación (Ingreso/Renovación)")
+        self.assertEqual(encabezados[12], "Número de pedido o CM")
+        # "Fecha de revisión y validación" viene prellenada con hoy, como fecha real.
+        valor_a2 = hoja["A2"].value
+        fecha_a2 = valor_a2.date() if hasattr(valor_a2, "date") else valor_a2
+        self.assertEqual(fecha_a2, timezone.localdate())
+        # Validación tiene su propio desplegable, igual que Contratista/autorización/vinculación.
+        formulas_desplegables = {dv.formula1 for dv in hoja.data_validations.dataValidation if dv.type == "list"}
+        self.assertIn('"Ingreso,Renovación"', formulas_desplegables)
+        # Las columnas de vencimiento (examen médico, alturas, cursos, certificaciones) tienen
+        # selector de calendario y los 3 colores de vigencia.
+        tipos_desplegables_fecha = [dv for dv in hoja.data_validations.dataValidation if dv.type == "date"]
+        self.assertGreater(len(tipos_desplegables_fecha), 2)
+        columnas_con_reglas = {rango.sqref for rango in hoja.conditional_formatting}
+        self.assertGreater(len(columnas_con_reglas), 0)
+
     def test_importar_excel_crea_trabajadores_de_varias_contratistas(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         contenido = _construir_excel_trabajadores(
             [
                 (
+                    None,
+                    None,
                     self.contratista.nombre,
                     "Ana María",
                     "Rodríguez Pérez",
@@ -3652,8 +3681,11 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
                     None,
                     None,
                     None,
+                    None,
                 ),
                 (
+                    None,
+                    None,
                     self.otro_contratista.nombre,
                     "Carlos",
                     "Gómez",
@@ -3663,6 +3695,7 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
                     "",
                     "",
                     "Temporal",
+                    None,
                     None,
                     None,
                     None,
@@ -3694,12 +3727,14 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         contenido = _construir_excel_trabajadores(
             [
                 (
+                    None,
+                    None,
                     self.contratista.nombre,
                     "Sin Autorizar",
                     "Prueba",
                     "1000555666",
                     "NO",
-                    "", "", "", "Fijo", None, None, None,
+                    "", "", "", "Fijo", None, None, None, None,
                 ),
             ]
         )
@@ -3722,12 +3757,14 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         contenido = _construir_excel_trabajadores(
             [
                 (
+                    None,
+                    None,
                     "EMPRESA QUE NO EXISTE SAS",
                     "Nombre",
                     "Apellido",
                     "1000777888",
                     "SI",
-                    "", "", "", "Fijo", None, None, None,
+                    "", "", "", "Fijo", None, None, None, None,
                 ),
             ]
         )
@@ -3749,12 +3786,14 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         contenido = _construir_excel_trabajadores(
             [
                 (
+                    None,
+                    None,
                     self.contratista.nombre,
                     "Gerald Marcelo",
                     "Garzón Beltrán",
                     "80432071",
                     "SI",
-                    "", "", "", "Fijo", None, None, None,
+                    "", "", "", "Fijo", None, None, None, None,
                 ),
             ]
         )
@@ -3774,14 +3813,16 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
 
         contenido = _construir_excel_trabajadores(
             [
-                (None, None, None, None, None, None, None, None, None, None, None, None),
+                (None, None, None, None, None, None, None, None, None, None, None, None, None, None, None),
                 (
+                    None,
+                    None,
                     self.contratista.nombre,
                     "Válido",
                     "Prueba",
                     "1000999000",
                     "SI",
-                    "", "", "", "Fijo", None, None, None,
+                    "", "", "", "Fijo", None, None, None, None,
                 ),
             ]
         )
@@ -3821,6 +3862,8 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         fila = [
+            None,
+            None,
             self.contratista.nombre,
             "Con Cursos",
             "Prueba",
@@ -3830,6 +3873,7 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
             "",
             "",
             "Fijo",
+            None,
             None,
             None,
             None,
@@ -3860,12 +3904,14 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         fila = [
+            None,
+            None,
             self.contratista.nombre,
             "Con Certificaciones",
             "Prueba",
             "1000654321",
             "SI",
-            "", "", "", "Fijo", None, None, None,
+            "", "", "", "Fijo", None, None, None, None,
             None, None, None, None, None, None, None,  # 7 columnas de cursos, vacías
             None,  # espacios_confinados
             None,  # conduccion_vehiculos
@@ -3889,6 +3935,62 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
             trabajador.certificaciones_especiales,
             {"manlift": "2026-05-01", "licencia_sst": "2027-01-01"},
         )
+
+    def test_importar_excel_na_en_fecha_de_curso_no_tumba_la_fila_y_queda_sin_diligenciar(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        fila = [
+            None,
+            None,
+            self.contratista.nombre,
+            "Con NA",
+            "Prueba",
+            "1000222111",
+            "SI",
+            "", "", "", "Fijo", None, None, None, None,
+            "N/A",  # induccion_sst — no aplica
+            None, None, None, None, None,
+        ]
+        contenido = _construir_excel_trabajadores([tuple(fila)])
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        trabajador = Trabajador.objects.get(documento="1000222111")
+        self.assertEqual(trabajador.cursos_safety_academy, {})
+
+    def test_importar_excel_incluye_fecha_revision_validacion_y_numero_pedido(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        fila = [
+            "2026-09-01",
+            "Renovación",
+            self.contratista.nombre,
+            "Con Revision",
+            "Prueba",
+            "1000333222",
+            "SI",
+            "", "", "", "Fijo", None,
+            "CM-4521",
+            None, None,
+        ]
+        contenido = _construir_excel_trabajadores([tuple(fila)])
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        trabajador = Trabajador.objects.get(documento="1000333222")
+        self.assertEqual(trabajador.fecha_revision_validacion, datetime.date(2026, 9, 1))
+        self.assertEqual(trabajador.tipo_validacion, "renovacion")
+        self.assertEqual(trabajador.numero_pedido_cm, "CM-4521")
 
     def test_importar_excel_sin_filas_devuelve_400(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

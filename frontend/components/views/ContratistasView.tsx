@@ -31,6 +31,7 @@ import {
   type RadicacionSeguridadSocial,
   type ResultadoImportacionTrabajadores,
   type Rol,
+  type TipoValidacion,
   type TipoVinculacion,
   type Trabajador,
 } from "@/lib/api";
@@ -989,6 +990,11 @@ function FormularioTrabajador({
   const [afp, setAfp] = useState(trabajador?.afp ?? "");
   const [tipoVinculacion, setTipoVinculacion] = useState<TipoVinculacion>(trabajador?.tipo_vinculacion ?? "fijo");
   const [fechaInicio, setFechaInicio] = useState(trabajador?.fecha_inicio_contrato ?? "");
+  const [fechaRevisionValidacion, setFechaRevisionValidacion] = useState(
+    trabajador?.fecha_revision_validacion ?? (trabajador ? "" : new Date().toISOString().slice(0, 10))
+  );
+  const [tipoValidacion, setTipoValidacion] = useState<TipoValidacion>(trabajador?.tipo_validacion ?? "");
+  const [numeroPedidoCm, setNumeroPedidoCm] = useState(trabajador?.numero_pedido_cm ?? "");
   const [fechaVencExamenMedico, setFechaVencExamenMedico] = useState(
     trabajador?.fecha_vencimiento_examen_medico ?? ""
   );
@@ -1054,6 +1060,9 @@ function FormularioTrabajador({
       afp,
       tipo_vinculacion: tipoVinculacion,
       fecha_inicio_contrato: fechaInicio || null,
+      fecha_revision_validacion: fechaRevisionValidacion || null,
+      tipo_validacion: tipoValidacion,
+      numero_pedido_cm: numeroPedidoCm,
       fecha_vencimiento_examen_medico: fechaVencExamenMedico || null,
       fecha_vencimiento_certificacion_alturas: fechaVencCertAlturas || null,
       cursos_safety_academy: cursos,
@@ -1115,14 +1124,44 @@ function FormularioTrabajador({
               <input value={afp} onChange={(e) => setAfp(e.target.value)} className={INPUT} />
             </Campo>
           </div>
-          <Campo label="Fecha de inicio de contrato">
-            <input
-              type="date"
-              value={fechaInicio ?? ""}
-              onChange={(e) => setFechaInicio(e.target.value)}
-              className={INPUT}
-            />
-          </Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Fecha de inicio de contrato">
+              <input
+                type="date"
+                value={fechaInicio ?? ""}
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className={INPUT}
+              />
+            </Campo>
+            <Campo label="Número de pedido o CM — opcional">
+              <input
+                value={numeroPedidoCm}
+                onChange={(e) => setNumeroPedidoCm(e.target.value)}
+                className={INPUT}
+              />
+            </Campo>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Fecha de revisión y validación — opcional">
+              <input
+                type="date"
+                value={fechaRevisionValidacion ?? ""}
+                onChange={(e) => setFechaRevisionValidacion(e.target.value)}
+                className={INPUT}
+              />
+            </Campo>
+            <Campo label="Validación — opcional">
+              <select
+                value={tipoValidacion}
+                onChange={(e) => setTipoValidacion(e.target.value as TipoValidacion)}
+                className={INPUT}
+              >
+                <option value="">— sin especificar —</option>
+                <option value="ingreso">Ingreso</option>
+                <option value="renovacion">Renovación</option>
+              </select>
+            </Campo>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Vencimiento examen médico — opcional">
