@@ -296,7 +296,10 @@ const TEMAS: Tema[] = [
           <li><strong>Trabajadores</strong> de esa empresa: documento, EPS/ARL/AFP, tipo de vinculación,
             cursos de Safety Academy — los cursos marcados con <span className="text-amber-700">*</span>{" "}
             son obligatorios (se configuran en Sistema → Reglas de contratistas); si a un trabajador activo
-            le falta alguno, aparece un aviso ⚠ junto a su nombre en la lista.</li>
+            le falta alguno, aparece un aviso ⚠ junto a su nombre en la lista. También tiene{" "}
+            <strong>certificaciones especiales</strong> (espacios confinados, conducción, manlift, grúa,
+            soldador, rescatista, licencia SST) — a diferencia de los cursos, se marcan solo para quien de
+            verdad realiza esa actividad, y solo avisan cuando una que el trabajador sí tiene ya venció.</li>
           <li><strong>Radicación de seguridad social</strong>: por cada trabajador y mes, se sube el
             comprobante de pago (PDF o foto) con número de planilla y fecha de vencimiento.</li>
         </Ol>
@@ -350,12 +353,16 @@ const TEMAS: Tema[] = [
           no calza con el desplegable, o con un documento repetido, no se crean — quedan reportadas con su
           número de fila para corregir y volver a intentar, sin tumbar el resto del archivo. La plantilla
           también trae una columna de fecha para el <strong>examen médico</strong>, la{" "}
-          <strong>certificación de trabajo en alturas</strong> y cada uno de los{" "}
-          <strong>cursos de Safety Academy</strong> — diligenciar una fecha ahí equivale a marcar ese curso
-          como completado en esa fecha (igual que hacerlo uno por uno en el formulario), y dejarla vacía lo
-          deja pendiente; así se puede verificar de una vez la vigencia de cada trabajador importado. Ningún
-          trabajador importado queda con radicación de seguridad social — esa parte sigue pendiente, igual
-          que si se hubiera cargado a mano.
+          <strong>certificación de trabajo en alturas</strong>, cada uno de los{" "}
+          <strong>cursos de Safety Academy</strong> y cada <strong>certificación especial</strong>{" "}
+          (espacios confinados, conducción, manlift, grúa, soldador, rescatista, licencia SST) —
+          diligenciar una fecha ahí equivale a marcarla como completada/vigente desde esa fecha (igual que
+          hacerlo uno por uno en el formulario), y dejarla vacía la deja sin diligenciar; así se puede
+          verificar de una vez la vigencia de cada trabajador importado. Estas columnas se arman con lo que
+          esté activo en Sistema → Reglas de contratistas en ese momento, así que si se agrega o desactiva
+          un curso o certificación, la próxima plantilla descargada ya lo refleja. Ningún trabajador
+          importado queda con radicación de seguridad social — esa parte sigue pendiente, igual que si se
+          hubiera cargado a mano.
         </P>
         <Sub>Vencimiento de examen médico y certificación de alturas</Sub>
         <P>
@@ -365,6 +372,13 @@ const TEMAS: Tema[] = [
           vigente hace menos de 1 año y recertificación de alturas cada 2 años). Igual que con la seguridad
           social, si alguno queda vencido o vence en 15 días o menos aparece un aviso ⚠ junto al nombre del
           trabajador en la lista, y un conteo en el banner de arriba de toda la vista de Contratistas.
+        </P>
+        <P>
+          Las <strong>certificaciones especiales</strong> (más abajo en el mismo formulario) funcionan
+          parecido pero solo avisan &quot;vencida&quot; — no &quot;por vencer&quot; ni cuenta como
+          pendiente si el trabajador nunca la tuvo, porque a diferencia del examen médico/alturas no todo
+          trabajador necesita todas las certificaciones. El aviso ⚠ aparece junto al nombre del trabajador
+          listando cuáles vencieron, y el conteo total en el mismo banner de arriba.
         </P>
       </>
     ),
@@ -782,9 +796,11 @@ const TEMAS: Tema[] = [
         <Sub>Reglas de contratistas</Sub>
         <P>
           Catálogos que antes estaban fijos en el código, ahora editables acá: los <strong>cursos Safety
-          Academy</strong> que aparecen al registrar un trabajador, los <strong>certificados de apoyo
-          requeridos</strong> y el <strong>equipo de protección personal (EPP)</strong> que
-          aparecen en las actividades de una declaración de método, y
+          Academy</strong> y las <strong>certificaciones especiales</strong> (espacios confinados,
+          conducción, manlift, grúa, soldador, rescatista, licencia SST — a diferencia de los cursos,
+          ninguna es obligatoria para todos) que aparecen al registrar un trabajador, los{" "}
+          <strong>certificados de apoyo requeridos</strong> y el <strong>equipo de protección personal
+          (EPP)</strong> que aparecen en las actividades de una declaración de método, y
           los <strong>días de alerta de vencimiento</strong> (a cuántos días de vencer una planilla se
           considera &quot;por vencer&quot; en el banner de Contratistas), y el <strong>correo para avisos
           de revisión pendiente</strong>. Cada ítem se puede editar (renombrar), desactivar sin borrar el

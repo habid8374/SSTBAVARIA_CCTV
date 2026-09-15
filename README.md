@@ -175,23 +175,40 @@ frontend en Vercel — pero viven en el mismo repositorio.
     al vuelo, sin tablas de resumen que se puedan desincronizar.
   - **Motor de reglas configurable** (pestaña "Reglas de contratistas" en
     Sistema, solo Administrador): los cursos Safety Academy
-    (`contratistas.CursoSafetyAcademy`), los permisos de trabajo
+    (`contratistas.CursoSafetyAcademy`), las certificaciones especiales
+    (`contratistas.CertificacionEspecial`), los permisos de trabajo
     (`contratistas.PermisoTrabajo`), el equipo de protección personal
     (`contratistas.EquipoProteccionPersonal`) y los días de alerta de
     vencimiento (`contratistas.ConfiguracionAlertas`) dejaron de ser
     constantes fijas en el código — ahora son catálogos editables
     (agregar/desactivar/eliminar) desde el dashboard. Las migraciones
-    `0008_sembrar_cursos_y_permisos` y `0016_sembrar_epp` siembran los
-    valores que antes estaban hardcodeados (el EPP tomado tal cual del
-    formato real de Declaración de Método del cliente), así los
-    trabajadores/actividades ya guardados siguen encontrando su curso,
-    permiso o EPP por la misma clave/nombre.
+    `0008_sembrar_cursos_y_permisos`, `0016_sembrar_epp` y
+    `0028_sembrar_certificaciones_especiales` siembran los valores que
+    antes estaban hardcodeados (el EPP tomado tal cual del formato real
+    de Declaración de Método del cliente; las certificaciones especiales
+    tomadas del formato real de control de ingresos del cliente, hoja
+    "TABLA INGRESOS"), así los trabajadores/actividades ya guardados
+    siguen encontrando su curso, certificación, permiso o EPP por la
+    misma clave/nombre.
   - **Validación de cursos obligatorios**: un curso Safety Academy se puede
     marcar `obligatorio` (misma pestaña). El campo calculado
     `Trabajador.cursos_pendientes` avisa (⚠ en la lista de trabajadores y
     un KPI en amarillo en Indicadores) cuando un trabajador activo no
     tiene completado algún curso obligatorio — es un aviso, no bloquea el
     registro ni la radicación.
+  - **Certificaciones especiales de trabajo** (`Trabajador.certificaciones_especiales`,
+    un `JSONField` `{clave: fecha ISO o null}` con el mismo patrón que
+    `cursos_safety_academy`): espacios confinados, conducción de
+    vehículos/montacargas, manlift, grúa, soldador, rescatista y licencia
+    SST — certificaciones que, a diferencia de los cursos, **no** son
+    obligatorias para todo trabajador (solo aplica a quien de verdad
+    realiza esa actividad puntual, así que no hay "certificaciones
+    pendientes" — solo se avisa por las que el trabajador sí tiene
+    registradas y ya vencieron). El campo calculado
+    `Trabajador.certificaciones_especiales_vencidas` avisa (⚠ en la lista
+    de trabajadores, junto al examen médico/alturas, y un KPI
+    `certificaciones_especiales_vencidas` en `/api/contratistas/indicadores/`)
+    por cada una vencida.
   - **Aviso de pendiente por revisar** (dos canales independientes, ambos
     disparados desde `contratistas/notificaciones.py`): al radicar
     seguridad social (`RadicacionListaDashboard.perform_create`) y al pasar
@@ -341,11 +358,15 @@ frontend en Vercel — pero viven en el mismo repositorio.
   también desplegable) — así que una fila que no pasaría el formulario
   tampoco se crea acá: queda reportada `{fila, mensaje}` sin tumbar el
   resto del archivo. La plantilla también trae una columna de fecha por
-  cada curso Safety Academy (`ENCABEZADOS_CURSOS`, generadas desde
-  `Trabajador.CURSOS`) más examen médico y certificación de alturas, para
-  poder verificar la vigencia de cada trabajador al importar en vez de
-  marcarlo curso por curso después. Nunca crea `RadicacionSeguridadSocial`
-  — cada trabajador importado queda igual que si se hubiera registrado a
+  cada curso Safety Academy y cada certificación especial — leídas de los
+  catálogos editables `CursoSafetyAcademy`/`CertificacionEspecial` en el
+  momento de generar/leer el archivo (`_encabezados_y_catalogos()`), no
+  de una lista fija en código, así que reflejan lo que un Administrador
+  haya agregado o desactivado desde Reglas de contratistas — más examen
+  médico y certificación de alturas, para poder verificar la vigencia de
+  cada trabajador al importar en vez de marcarlo uno por uno después.
+  Nunca crea `RadicacionSeguridadSocial` — cada trabajador importado
+  queda igual que si se hubiera registrado a
   mano, pendiente de esa radicación.
 
 Ver `CLAUDE_CAMARAS.md` para el contexto completo del proyecto.

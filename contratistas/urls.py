@@ -12,6 +12,16 @@ urlpatterns = [
     path("funcionarios/<int:pk>/", views.FuncionarioDetalle.as_view(), name="funcionarios_detalle"),
     path("cursos/", views.CursoSafetyAcademyListaDashboard.as_view(), name="cursos_lista"),
     path("cursos/<int:pk>/", views.CursoSafetyAcademyDetalle.as_view(), name="cursos_detalle"),
+    path(
+        "certificaciones-especiales/",
+        views.CertificacionEspecialListaDashboard.as_view(),
+        name="certificaciones_especiales_lista",
+    ),
+    path(
+        "certificaciones-especiales/<int:pk>/",
+        views.CertificacionEspecialDetalle.as_view(),
+        name="certificaciones_especiales_detalle",
+    ),
     path("permisos-trabajo/", views.PermisoTrabajoListaDashboard.as_view(), name="permisos_lista"),
     path("permisos-trabajo/<int:pk>/", views.PermisoTrabajoDetalle.as_view(), name="permisos_detalle"),
     path("equipos-epp/", views.EquipoProteccionPersonalListaDashboard.as_view(), name="equipos_epp_lista"),

@@ -136,6 +136,9 @@ class CatalogosTests(ApiTestsBase):
         response = self.client.get(reverse("contratistas:catalogos"), **self._auth(self.operador))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data["cursos_safety_academy"]), 7)
+        self.assertEqual(len(response.data["certificaciones_especiales"]), 7)
+        claves = [c["clave"] for c in response.data["certificaciones_especiales"]]
+        self.assertIn("espacios_confinados", claves)
         self.assertIn("Certificado de apoyo en alturas / protección contra caídas", response.data["permisos_trabajo"])
         self.assertEqual(len(response.data["roles_firma"]), 5)
 
@@ -187,6 +190,20 @@ class EditarCatalogosTests(ApiTestsBase):
         self.assertEqual(response.status_code, 200, response.data)
         curso.refresh_from_db()
         self.assertEqual(curso.etiqueta, "Curso renombrado")
+
+    def test_renombra_certificacion_especial(self):
+        from .models import CertificacionEspecial
+
+        certificacion = CertificacionEspecial.objects.first()
+        response = self.client.patch(
+            reverse("contratistas:certificaciones_especiales_detalle", args=[certificacion.pk]),
+            {"etiqueta": "Certificación renombrada"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        certificacion.refresh_from_db()
+        self.assertEqual(certificacion.etiqueta, "Certificación renombrada")
 
 
 class IndicadoresTests(ApiTestsBase):
@@ -247,6 +264,15 @@ class IndicadoresTests(ApiTestsBase):
         self.trabajador.save(update_fields=["activo", "fecha_vencimiento_examen_medico"])
         response = self.client.get(reverse("contratistas:indicadores"), **self._auth(self.operador))
         self.assertEqual(response.data["examenes_medicos_vencidos"], 0)
+
+    def test_cuenta_certificaciones_especiales_vencidas(self):
+        vencida = (timezone.localdate() - datetime.timedelta(days=1)).isoformat()
+        vigente = (timezone.localdate() + datetime.timedelta(days=30)).isoformat()
+        self.trabajador.certificaciones_especiales = {"espacios_confinados": vencida, "grua": vigente}
+        self.trabajador.save(update_fields=["certificaciones_especiales"])
+        response = self.client.get(reverse("contratistas:indicadores"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["certificaciones_especiales_vencidas"], 1)
 
 
 class IndicadoresDashboardTests(ApiTestsBase):
@@ -949,6 +975,25 @@ class TrabajadorTests(ApiTestsBase):
         )
         self.assertFalse(response.data["examen_medico_vencido"])
         self.assertIsNone(response.data["dias_para_vencer_examen_medico"])
+
+    def test_certificaciones_especiales_vencidas_expuesta_en_el_detalle(self):
+        vencida = (timezone.localdate() - datetime.timedelta(days=1)).isoformat()
+        vigente = (timezone.localdate() + datetime.timedelta(days=30)).isoformat()
+        self.trabajador.certificaciones_especiales = {"soldador": vencida, "rescatista": vigente, "grua": None}
+        self.trabajador.save(update_fields=["certificaciones_especiales"])
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        vencidas = response.data["certificaciones_especiales_vencidas"]
+        self.assertEqual([v["clave"] for v in vencidas], ["soldador"])
+        self.assertEqual(vencidas[0]["fecha_vencimiento"], vencida)
+
+    def test_certificaciones_especiales_sin_registrar_no_aparecen_como_vencidas(self):
+        response = self.client.get(
+            reverse("contratistas:trabajadores_detalle", args=[self.trabajador.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.data["certificaciones_especiales_vencidas"], [])
 
     def test_crear_trabajador(self):
         response = self.client.post(
@@ -3395,17 +3440,21 @@ class CapacitacionTests(ApiTestsBase):
 
 
 def _construir_excel_trabajadores(filas):
-    """`filas` es una lista de tuplas en el mismo orden que ENCABEZADOS."""
+    """`filas` es una lista de tuplas en el mismo orden que devuelve
+    _encabezados_y_catalogos() al momento de correr el test (los cursos y
+    certificaciones son catálogos editables, así que sus columnas
+    dependen de lo sembrado en la base de datos de prueba)."""
     from io import BytesIO
 
     import openpyxl
 
-    from .importar_trabajadores_excel import ENCABEZADOS
+    from .importar_trabajadores_excel import _encabezados_y_catalogos
 
+    encabezados, _, _ = _encabezados_y_catalogos()
     libro = openpyxl.Workbook()
     hoja = libro.active
     hoja.title = "Trabajadores"
-    hoja.append(ENCABEZADOS)
+    hoja.append(encabezados)
     for fila in filas:
         hoja.append(fila)
     buffer = BytesIO()
@@ -3674,6 +3723,40 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
         self.assertEqual(
             trabajador.cursos_safety_academy,
             {"induccion_sst": "2026-01-15", "epp": "2026-02-01"},
+        )
+
+    def test_importar_excel_incluye_fechas_de_certificaciones_especiales(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        fila = [
+            self.contratista.nombre,
+            "Con Certificaciones",
+            "Prueba",
+            "1000654321",
+            "SI",
+            "", "", "", "Fijo", None, None, None,
+            None, None, None, None, None, None, None,  # 7 columnas de cursos, vacías
+            None,  # espacios_confinados
+            None,  # conduccion_vehiculos
+            "2026-05-01",  # manlift
+            None,  # grua
+            None,  # soldador
+            None,  # rescatista
+            "2027-01-01",  # licencia_sst
+        ]
+        contenido = _construir_excel_trabajadores([tuple(fila)])
+        archivo = SimpleUploadedFile("trabajadores.xlsx", contenido)
+        response = self.client.post(
+            reverse("contratistas:trabajadores_importar_excel"),
+            {"archivo": archivo},
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["creados"], 1)
+        trabajador = Trabajador.objects.get(documento="1000654321")
+        self.assertEqual(
+            trabajador.certificaciones_especiales,
+            {"manlift": "2026-05-01", "licencia_sst": "2027-01-01"},
         )
 
     def test_importar_excel_sin_filas_devuelve_400(self):

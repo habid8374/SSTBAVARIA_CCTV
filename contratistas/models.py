@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import json
 
@@ -103,6 +104,17 @@ class Trabajador(models.Model):
         blank=True,
         help_text="Mapa {tipo_curso: fecha ISO o null} — ver Trabajador.CURSOS para las claves válidas",
     )
+    certificaciones_especiales = models.JSONField(
+        "certificaciones especiales",
+        default=dict,
+        blank=True,
+        help_text=(
+            "Mapa {clave: fecha de vencimiento ISO o null} — ver CertificacionEspecial para las claves "
+            "válidas. A diferencia de los cursos, solo se diligencia para quien realmente hace esa "
+            "actividad (espacios confinados, conducción, manlift, grúa, soldador, rescatista, licencia "
+            "SST, ...); no se avisa por las que un trabajador nunca necesitó."
+        ),
+    )
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     autorizacion_datos = models.BooleanField(
@@ -179,6 +191,24 @@ class Trabajador(models.Model):
     @property
     def dias_para_vencer_certificacion_alturas(self):
         return _dias_para_vencer(self.fecha_vencimiento_certificacion_alturas)
+
+    @property
+    def certificaciones_especiales_vencidas(self):
+        """Certificaciones especiales que este trabajador SÍ tiene
+        registradas (con fecha) pero ya vencieron — a diferencia de
+        cursos_pendientes, no avisa por las que nunca se diligenciaron
+        (esas certificaciones no aplican a todo trabajador, ver el
+        docstring de CertificacionEspecial)."""
+        registradas = self.certificaciones_especiales or {}
+        etiquetas = dict(CertificacionEspecial.objects.filter(activo=True).values_list("clave", "etiqueta"))
+        resultado = []
+        for clave, fecha_iso in registradas.items():
+            if not fecha_iso:
+                continue
+            fecha = datetime.date.fromisoformat(fecha_iso)
+            if _vencido(fecha):
+                resultado.append({"clave": clave, "etiqueta": etiquetas.get(clave, clave), "fecha_vencimiento": fecha_iso})
+        return resultado
 
 
 def soporte_pago_upload_to(instance, filename):
@@ -534,6 +564,31 @@ class CursoSafetyAcademy(models.Model):
     class Meta:
         verbose_name = "curso Safety Academy"
         verbose_name_plural = "cursos Safety Academy"
+        ordering = ["orden", "etiqueta"]
+
+    def __str__(self):
+        return self.etiqueta
+
+
+class CertificacionEspecial(models.Model):
+    """Catálogo editable de certificaciones de trabajo especializado
+    (espacios confinados, conducción de vehículos/montacargas, manlift,
+    grúa, soldador, rescatista, licencia SST, ...) — mismo patrón que
+    CursoSafetyAcademy (clave estable + etiqueta editable) pero sin
+    "obligatorio para todo trabajador": a diferencia de los cursos, estas
+    certificaciones solo aplican a quien de verdad realiza esa actividad
+    puntual, así que no tiene sentido avisar a todo trabajador activo que
+    le falta "soldador" o "rescatista". Tomado del formato real de
+    control de ingresos del cliente ("TABLA INGRESOS")."""
+
+    clave = models.SlugField(max_length=50, unique=True)
+    etiqueta = models.CharField(max_length=150)
+    activo = models.BooleanField(default=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "certificación especial"
+        verbose_name_plural = "certificaciones especiales"
         ordering = ["orden", "etiqueta"]
 
     def __str__(self):

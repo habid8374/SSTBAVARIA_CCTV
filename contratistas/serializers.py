@@ -8,6 +8,7 @@ from .portal_usuarios import crear_usuario_portal_si_hace_falta, tiene_usuario_p
 from .models import (
     ActividadMetodo,
     AutorizacionIngreso,
+    CertificacionEspecial,
     ConfiguracionAlertas,
     ConfiguracionCapacitacion,
     CursoSafetyAcademy,
@@ -124,6 +125,7 @@ class TrabajadorSerializer(serializers.ModelSerializer):
     dias_para_vencer_examen_medico = serializers.IntegerField(read_only=True, allow_null=True)
     certificacion_alturas_vencida = serializers.BooleanField(read_only=True)
     dias_para_vencer_certificacion_alturas = serializers.IntegerField(read_only=True, allow_null=True)
+    certificaciones_especiales_vencidas = serializers.ReadOnlyField()
 
     class Meta:
         model = Trabajador
@@ -141,6 +143,8 @@ class TrabajadorSerializer(serializers.ModelSerializer):
             "fecha_inicio_contrato",
             "cursos_safety_academy",
             "cursos_pendientes",
+            "certificaciones_especiales",
+            "certificaciones_especiales_vencidas",
             "fecha_vencimiento_examen_medico",
             "examen_medico_vencido",
             "dias_para_vencer_examen_medico",
@@ -408,6 +412,7 @@ class CatalogosSerializer(serializers.Serializer):
     centralizadas acá para no duplicarlas en el cliente."""
 
     cursos_safety_academy = serializers.SerializerMethodField()
+    certificaciones_especiales = serializers.SerializerMethodField()
     permisos_trabajo = serializers.SerializerMethodField()
     equipos_epp = serializers.SerializerMethodField()
     roles_firma = serializers.SerializerMethodField()
@@ -416,6 +421,11 @@ class CatalogosSerializer(serializers.Serializer):
         return [
             {"clave": c.clave, "etiqueta": c.etiqueta, "obligatorio": c.obligatorio}
             for c in CursoSafetyAcademy.objects.filter(activo=True)
+        ]
+
+    def get_certificaciones_especiales(self, obj):
+        return [
+            {"clave": c.clave, "etiqueta": c.etiqueta} for c in CertificacionEspecial.objects.filter(activo=True)
         ]
 
     def get_permisos_trabajo(self, obj):
@@ -447,6 +457,13 @@ class CursoSafetyAcademySerializer(serializers.ModelSerializer):
     class Meta:
         model = CursoSafetyAcademy
         fields = ["id", "clave", "etiqueta", "activo", "obligatorio", "orden"]
+        read_only_fields = ["id"]
+
+
+class CertificacionEspecialSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CertificacionEspecial
+        fields = ["id", "clave", "etiqueta", "activo", "orden"]
         read_only_fields = ["id"]
 
 
