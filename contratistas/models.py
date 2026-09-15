@@ -122,7 +122,7 @@ class Trabajador(models.Model):
         "vencimiento certificación de trabajo en alturas",
         null=True,
         blank=True,
-        help_text="Opcional — solo si el trabajador hace trabajo en altura (el SOP exige recertificación cada 2 años).",
+        help_text="Opcional — solo si el trabajador hace trabajo en altura (el SOP exige recertificación cada 18 meses).",
     )
     cursos_safety_academy = models.JSONField(
         "cursos Safety Academy",
