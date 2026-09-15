@@ -1080,6 +1080,7 @@ export function actualizarContratista(
 }
 
 export type TipoVinculacion = "fijo" | "temporal";
+export type TipoValidacion = "" | "ingreso" | "renovacion";
 
 export type RadicacionResumen = {
   id: number;
@@ -1103,6 +1104,9 @@ export type Trabajador = {
   afp: string;
   tipo_vinculacion: TipoVinculacion;
   fecha_inicio_contrato: string | null;
+  fecha_revision_validacion: string | null;
+  tipo_validacion: TipoValidacion;
+  numero_pedido_cm: string;
   cursos_safety_academy: Record<string, string | null>;
   cursos_pendientes: Opcion[];
   cursos_vencidos: (Opcion & { fecha_vencimiento: string })[];
@@ -1132,6 +1136,9 @@ export type NuevoTrabajador = {
   afp?: string;
   tipo_vinculacion?: TipoVinculacion;
   fecha_inicio_contrato?: string | null;
+  fecha_revision_validacion?: string | null;
+  tipo_validacion?: TipoValidacion;
+  numero_pedido_cm?: string;
   cursos_safety_academy?: Record<string, string | null>;
   certificaciones_especiales?: Record<string, string | null>;
   fecha_vencimiento_examen_medico?: string | null;

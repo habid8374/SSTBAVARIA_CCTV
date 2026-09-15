@@ -146,6 +146,26 @@ class Trabajador(models.Model):
             "SST, ...); no se avisa por las que un trabajador nunca necesitó."
         ),
     )
+    class TipoValidacion(models.TextChoices):
+        INGRESO = "ingreso", "Ingreso"
+        RENOVACION = "renovacion", "Renovación"
+
+    fecha_revision_validacion = models.DateField(
+        "fecha de revisión y validación",
+        null=True,
+        blank=True,
+        help_text="Cuándo SST revisó/validó este registro — informativa, no afecta la vigencia de nada.",
+    )
+    tipo_validacion = models.CharField(
+        "validación",
+        max_length=20,
+        choices=TipoValidacion.choices,
+        blank=True,
+        help_text="Si este registro es un ingreso nuevo o la renovación de uno existente — informativo.",
+    )
+    numero_pedido_cm = models.CharField(
+        "número de pedido o CM", max_length=100, blank=True, help_text="Campo libre del cliente — sin validación."
+    )
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     autorizacion_datos = models.BooleanField(
