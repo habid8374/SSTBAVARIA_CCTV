@@ -689,6 +689,7 @@ export type Opcion = { clave: string; etiqueta: string };
 
 export type Catalogos = {
   cursos_safety_academy: (Opcion & { obligatorio: boolean })[];
+  certificaciones_especiales: Opcion[];
   permisos_trabajo: string[];
   equipos_epp: string[];
   roles_firma: Opcion[];
@@ -741,6 +742,57 @@ export function actualizarCurso(
 
 export function eliminarCurso(token: string, id: number): Promise<void> {
   return request<void>(`/api/contratistas/cursos/${id}/`, { method: "DELETE", headers: authHeaders(token) });
+}
+
+export type CertificacionEspecial = {
+  id: number;
+  clave: string;
+  etiqueta: string;
+  activo: boolean;
+  orden: number;
+};
+
+export type NuevaCertificacionEspecial = {
+  clave: string;
+  etiqueta: string;
+  activo?: boolean;
+  orden?: number;
+};
+
+export function listarCertificacionesEspeciales(token: string): Promise<CertificacionEspecial[]> {
+  return request<CertificacionEspecial[]>("/api/contratistas/certificaciones-especiales/", {
+    headers: authHeaders(token),
+  });
+}
+
+export function crearCertificacionEspecial(
+  token: string,
+  datos: NuevaCertificacionEspecial
+): Promise<CertificacionEspecial> {
+  return request<CertificacionEspecial>("/api/contratistas/certificaciones-especiales/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarCertificacionEspecial(
+  token: string,
+  id: number,
+  cambios: Partial<NuevaCertificacionEspecial>
+): Promise<CertificacionEspecial> {
+  return request<CertificacionEspecial>(`/api/contratistas/certificaciones-especiales/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(cambios),
+  });
+}
+
+export function eliminarCertificacionEspecial(token: string, id: number): Promise<void> {
+  return request<void>(`/api/contratistas/certificaciones-especiales/${id}/`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
 }
 
 export type PermisoTrabajo = { id: number; nombre: string; activo: boolean; orden: number };
@@ -1049,6 +1101,8 @@ export type Trabajador = {
   fecha_inicio_contrato: string | null;
   cursos_safety_academy: Record<string, string | null>;
   cursos_pendientes: Opcion[];
+  certificaciones_especiales: Record<string, string | null>;
+  certificaciones_especiales_vencidas: (Opcion & { fecha_vencimiento: string })[];
   fecha_vencimiento_examen_medico: string | null;
   examen_medico_vencido: boolean;
   dias_para_vencer_examen_medico: number | null;
@@ -1074,6 +1128,7 @@ export type NuevoTrabajador = {
   tipo_vinculacion?: TipoVinculacion;
   fecha_inicio_contrato?: string | null;
   cursos_safety_academy?: Record<string, string | null>;
+  certificaciones_especiales?: Record<string, string | null>;
   fecha_vencimiento_examen_medico?: string | null;
   fecha_vencimiento_certificacion_alturas?: string | null;
   activo?: boolean;
@@ -1230,6 +1285,7 @@ export type IndicadoresContratistas = {
   examenes_medicos_por_vencer: number;
   certificaciones_alturas_vencidas: number;
   certificaciones_alturas_por_vencer: number;
+  certificaciones_especiales_vencidas: number;
 };
 
 export function obtenerIndicadoresContratistas(token: string): Promise<IndicadoresContratistas> {

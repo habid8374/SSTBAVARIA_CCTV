@@ -23,6 +23,7 @@ from .auditoria import capturar_snapshot, registrar_auditoria
 from .models import (
     ActividadMetodo,
     AutorizacionIngreso,
+    CertificacionEspecial,
     ConfiguracionAlertas,
     ConfiguracionCapacitacion,
     CursoSafetyAcademy,
@@ -53,6 +54,7 @@ from .serializers import (
     CatalogosSerializer,
     ConfiguracionAlertasSerializer,
     ConfiguracionCapacitacionSerializer,
+    CertificacionEspecialSerializer,
     CursoSafetyAcademySerializer,
     DecisionRadicacionSerializer,
     DeclaracionMetodoSerializer,
@@ -115,9 +117,13 @@ def catalogos(request):
 @permission_classes([IsAuthenticated])
 def indicadores(request):
     """Conteo de radicaciones de seguridad social y de certificaciones de
-    trabajadores (examen médico ocupacional, trabajo en alturas) vencidas o
-    por vencer — para el banner de aviso en la vista de Contratistas. Nada
-    se marca solo en la base; se calcula al vuelo contra la fecha de hoy."""
+    trabajadores (examen médico ocupacional, trabajo en alturas,
+    certificaciones especiales) vencidas o por vencer — para el banner de
+    aviso en la vista de Contratistas. Nada se marca solo en la base; se
+    calcula al vuelo contra la fecha de hoy. Las certificaciones
+    especiales solo cuentan "vencidas" (no "por vencer" — no todo
+    trabajador las tiene, así que no hay un total base contra el cual
+    proyectar próximos vencimientos como con examen médico/alturas)."""
     hoy = timezone.localdate()
     dias_alerta = ConfiguracionAlertas.obtener().dias_alerta_vencimiento
     limite_por_vencer = hoy + timedelta(days=dias_alerta)
@@ -127,6 +133,13 @@ def indicadores(request):
     if contratista_id is not None:
         radicaciones = radicaciones.filter(trabajador__contratista_id=contratista_id)
         trabajadores = trabajadores.filter(contratista_id=contratista_id)
+    hoy_iso = hoy.isoformat()
+    certificaciones_especiales_vencidas = sum(
+        1
+        for valores in trabajadores.values_list("certificaciones_especiales", flat=True)
+        for fecha in (valores or {}).values()
+        if fecha and fecha < hoy_iso
+    )
     return Response(
         {
             "radicaciones_vencidas": radicaciones.filter(fecha_vencimiento__lt=hoy).count(),
@@ -144,6 +157,7 @@ def indicadores(request):
                 fecha_vencimiento_certificacion_alturas__gte=hoy,
                 fecha_vencimiento_certificacion_alturas__lte=limite_por_vencer,
             ).count(),
+            "certificaciones_especiales_vencidas": certificaciones_especiales_vencidas,
         }
     )
 
@@ -297,6 +311,18 @@ class CursoSafetyAcademyListaDashboard(generics.ListCreateAPIView):
 class CursoSafetyAcademyDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = CursoSafetyAcademy.objects.all()
     serializer_class = CursoSafetyAcademySerializer
+    permission_classes = [EsPersonalInterno, EsAdministradorParaEliminar]
+
+
+class CertificacionEspecialListaDashboard(generics.ListCreateAPIView):
+    queryset = CertificacionEspecial.objects.all()
+    serializer_class = CertificacionEspecialSerializer
+    permission_classes = [EsPersonalInterno]
+
+
+class CertificacionEspecialDetalle(generics.RetrieveUpdateDestroyAPIView):
+    queryset = CertificacionEspecial.objects.all()
+    serializer_class = CertificacionEspecialSerializer
     permission_classes = [EsPersonalInterno, EsAdministradorParaEliminar]
 
 

@@ -5,20 +5,25 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
+  actualizarCertificacionEspecial,
   actualizarConfiguracionAlertas,
   actualizarCurso,
   actualizarEquipoEpp,
   actualizarPermisoTrabajo,
+  crearCertificacionEspecial,
   crearCurso,
   crearEquipoEpp,
   crearPermisoTrabajo,
+  eliminarCertificacionEspecial,
   eliminarCurso,
   eliminarEquipoEpp,
   eliminarPermisoTrabajo,
+  listarCertificacionesEspeciales,
   listarCursos,
   listarEquiposEpp,
   listarPermisosTrabajo,
   obtenerConfiguracionAlertas,
+  type CertificacionEspecial,
   type ConfiguracionAlertas,
   type CursoSafetyAcademy,
   type EquipoProteccionPersonal,
@@ -37,6 +42,7 @@ export default function ReglasContratistasView({ token }: { token: string }) {
       </p>
       <DiasAlerta token={token} />
       <Cursos token={token} />
+      <CertificacionesEspeciales token={token} />
       <Permisos token={token} />
       <EquiposEpp token={token} />
     </div>
@@ -266,6 +272,135 @@ function Cursos({ token }: { token: string }) {
         </label>
         <label className="flex-1 space-y-1.5">
           <span className="text-sm font-medium text-corp-navy">Nombre del curso</span>
+          <input value={etiqueta} onChange={(e) => setEtiqueta(e.target.value)} className={INPUT} />
+        </label>
+        <button
+          type="submit"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+        >
+          + Agregar
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function CertificacionesEspeciales({ token }: { token: string }) {
+  const { confirmar, pedirTexto } = useDialog();
+  const [certificaciones, setCertificaciones] = useState<CertificacionEspecial[] | null>(null);
+  const [clave, setClave] = useState("");
+  const [etiqueta, setEtiqueta] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function cargar() {
+    listarCertificacionesEspeciales(token)
+      .then(setCertificaciones)
+      .catch(() => setError("No se pudo cargar la lista de certificaciones especiales."));
+  }
+
+  useEffect(cargar, [token]);
+
+  async function agregar(event: FormEvent) {
+    event.preventDefault();
+    if (!clave.trim() || !etiqueta.trim()) return;
+    setError(null);
+    try {
+      await crearCertificacionEspecial(token, { clave: clave.trim(), etiqueta: etiqueta.trim() });
+      setClave("");
+      setEtiqueta("");
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo crear la certificación.");
+    }
+  }
+
+  async function alternarActivo(certificacion: CertificacionEspecial) {
+    try {
+      await actualizarCertificacionEspecial(token, certificacion.id, { activo: !certificacion.activo });
+      cargar();
+    } catch {
+      setError("No se pudo actualizar la certificación.");
+    }
+  }
+
+  async function editar(certificacion: CertificacionEspecial) {
+    const nuevaEtiqueta = await pedirTexto({
+      titulo: "Editar nombre de la certificación",
+      valorInicial: certificacion.etiqueta,
+      textoConfirmar: "Guardar",
+      opcional: false,
+    });
+    if (nuevaEtiqueta === null || nuevaEtiqueta.trim() === certificacion.etiqueta) return;
+    try {
+      await actualizarCertificacionEspecial(token, certificacion.id, { etiqueta: nuevaEtiqueta.trim() });
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo editar la certificación.");
+    }
+  }
+
+  async function eliminar(certificacion: CertificacionEspecial) {
+    const ok = await confirmar({
+      titulo: "Eliminar certificación especial",
+      mensaje: `¿Eliminar "${certificacion.etiqueta}"? Ya no aparecerá como opción al registrar trabajadores.`,
+      textoConfirmar: "Eliminar",
+      peligroso: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminarCertificacionEspecial(token, certificacion.id);
+      cargar();
+    } catch {
+      setError("No se pudo eliminar la certificación.");
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-corp-border bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-corp-navy">Certificaciones especiales</h3>
+      <p className="mt-1 text-sm text-corp-muted">
+        Certificaciones de trabajo especializado (espacios confinados, conducción de vehículos/montacargas,
+        manlift, grúa, soldador, rescatista, licencia SST, ...) — a diferencia de los cursos Safety Academy,
+        solo se diligencian para el trabajador que de verdad realiza esa actividad puntual, así que no tienen
+        &quot;obligatorio para todos&quot;.
+      </p>
+      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      <div className="mt-3 space-y-2">
+        {certificaciones?.map((c) => (
+          <div
+            key={c.id}
+            className="flex flex-col gap-2 rounded-lg border border-corp-border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <span className={c.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{c.etiqueta}</span>
+              <span className="ml-2 text-xs text-corp-muted">({c.clave})</span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <button type="button" onClick={() => editar(c)} className="text-corp-blue hover:underline">
+                Editar
+              </button>
+              <button type="button" onClick={() => alternarActivo(c)} className="text-corp-blue hover:underline">
+                {c.activo ? "Desactivar" : "Activar"}
+              </button>
+              <button type="button" onClick={() => eliminar(c)} className="text-red-600 hover:underline">
+                Eliminar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={agregar} className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="space-y-1.5">
+          <span className="text-sm font-medium text-corp-navy">Clave</span>
+          <input
+            value={clave}
+            onChange={(e) => setClave(e.target.value)}
+            placeholder="ej. espacios_confinados"
+            className={`${INPUT} w-44`}
+          />
+        </label>
+        <label className="flex-1 space-y-1.5">
+          <span className="text-sm font-medium text-corp-navy">Nombre de la certificación</span>
           <input value={etiqueta} onChange={(e) => setEtiqueta(e.target.value)} className={INPUT} />
         </label>
         <button

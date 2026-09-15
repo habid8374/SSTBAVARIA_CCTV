@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     ActividadMetodo,
     AutorizacionIngreso,
+    CertificacionEspecial,
     ConfiguracionAlertas,
     ConfiguracionCapacitacion,
     CursoSafetyAcademy,
@@ -107,6 +108,12 @@ class FuncionarioAdmin(admin.ModelAdmin):
 
 @admin.register(CursoSafetyAcademy)
 class CursoSafetyAcademyAdmin(admin.ModelAdmin):
+    list_display = ("etiqueta", "clave", "activo", "orden")
+    list_editable = ("activo", "orden")
+
+
+@admin.register(CertificacionEspecial)
+class CertificacionEspecialAdmin(admin.ModelAdmin):
     list_display = ("etiqueta", "clave", "activo", "orden")
     list_editable = ("activo", "orden")
 

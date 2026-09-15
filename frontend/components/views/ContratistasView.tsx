@@ -201,7 +201,8 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
           indicadores.examenes_medicos_vencidos > 0 ||
           indicadores.examenes_medicos_por_vencer > 0 ||
           indicadores.certificaciones_alturas_vencidas > 0 ||
-          indicadores.certificaciones_alturas_por_vencer > 0) && (
+          indicadores.certificaciones_alturas_por_vencer > 0 ||
+          indicadores.certificaciones_especiales_vencidas > 0) && (
           <div className="mt-4 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {indicadores.radicaciones_vencidas > 0 && (
               <p>
@@ -243,6 +244,14 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
                 <strong>{indicadores.certificaciones_alturas_por_vencer}</strong> certificación
                 {indicadores.certificaciones_alturas_por_vencer === 1 ? "" : "es"} de trabajo en alturas por vencer
                 en los próximos 15 días.
+              </p>
+            )}
+            {indicadores.certificaciones_especiales_vencidas > 0 && (
+              <p>
+                ⚠ <strong>{indicadores.certificaciones_especiales_vencidas}</strong> certificación
+                {indicadores.certificaciones_especiales_vencidas === 1 ? "" : "es"} especial (espacios confinados,
+                conducción, manlift, grúa, soldador, rescatista, licencia SST){" "}
+                <strong>vencida{indicadores.certificaciones_especiales_vencidas === 1 ? "" : "s"}</strong>.
               </p>
             )}
           </div>
@@ -532,6 +541,16 @@ function PanelContratista({
                         trabajador={t}
                         tipo="certificacion_alturas"
                       />
+                      {t.certificaciones_especiales_vencidas.length > 0 && (
+                        <p
+                          className="mt-0.5 text-xs font-normal text-red-700"
+                          title={t.certificaciones_especiales_vencidas.map((c) => c.etiqueta).join(", ")}
+                        >
+                          ⚠ Certificación{t.certificaciones_especiales_vencidas.length === 1 ? "" : "es"} vencida
+                          {t.certificaciones_especiales_vencidas.length === 1 ? "" : "s"}:{" "}
+                          {t.certificaciones_especiales_vencidas.map((c) => c.etiqueta).join(", ")}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">{t.documento}</td>
                     <td className="px-4 py-2.5 text-xs text-corp-muted">
@@ -922,6 +941,9 @@ function FormularioTrabajador({
     trabajador?.fecha_vencimiento_certificacion_alturas ?? ""
   );
   const [cursos, setCursos] = useState<Record<string, string | null>>(trabajador?.cursos_safety_academy ?? {});
+  const [certificaciones, setCertificaciones] = useState<Record<string, string | null>>(
+    trabajador?.certificaciones_especiales ?? {}
+  );
   const [autorizacionDatos, setAutorizacionDatos] = useState(trabajador?.autorizacion_datos ?? false);
   const [evidenciaAutorizacion, setEvidenciaAutorizacion] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -933,6 +955,17 @@ function FormularioTrabajador({
 
   function fecharCurso(clave: string, fecha: string) {
     setCursos((actual) => ({ ...actual, [clave]: fecha }));
+  }
+
+  function alternarCertificacion(clave: string, marcado: boolean) {
+    setCertificaciones((actual) => ({
+      ...actual,
+      [clave]: marcado ? actual[clave] || new Date().toISOString().slice(0, 10) : null,
+    }));
+  }
+
+  function fecharCertificacion(clave: string, fecha: string) {
+    setCertificaciones((actual) => ({ ...actual, [clave]: fecha }));
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -957,6 +990,7 @@ function FormularioTrabajador({
       fecha_vencimiento_examen_medico: fechaVencExamenMedico || null,
       fecha_vencimiento_certificacion_alturas: fechaVencCertAlturas || null,
       cursos_safety_academy: cursos,
+      certificaciones_especiales: certificaciones,
       autorizacion_datos: autorizacionDatos,
     };
     try {
@@ -1071,6 +1105,40 @@ function FormularioTrabajador({
                         type="date"
                         value={cursos[curso.clave] ?? ""}
                         onChange={(e) => fecharCurso(curso.clave, e.target.value)}
+                        className="rounded-lg border border-corp-border px-2 py-1 text-xs outline-none focus:border-corp-blue"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <span className="text-sm font-medium text-corp-navy">Certificaciones especiales</span>
+            <p className="mt-0.5 text-xs text-corp-muted">
+              Solo marca las que el trabajador realmente tiene — a diferencia de los cursos, ninguna es
+              obligatoria para todos.
+            </p>
+            <div className="mt-2 space-y-2 rounded-lg border border-corp-border p-3">
+              {catalogos.certificaciones_especiales.map((certificacion) => {
+                const completado = certificaciones[certificacion.clave] != null;
+                return (
+                  <div key={certificacion.clave} className="flex flex-wrap items-center gap-2">
+                    <label className="flex flex-1 items-center gap-2 text-sm text-corp-navy">
+                      <input
+                        type="checkbox"
+                        checked={completado}
+                        onChange={(e) => alternarCertificacion(certificacion.clave, e.target.checked)}
+                        className="h-4 w-4 rounded border-corp-border accent-corp-blue"
+                      />
+                      {certificacion.etiqueta}
+                    </label>
+                    {completado && (
+                      <input
+                        type="date"
+                        value={certificaciones[certificacion.clave] ?? ""}
+                        onChange={(e) => fecharCertificacion(certificacion.clave, e.target.value)}
                         className="rounded-lg border border-corp-border px-2 py-1 text-xs outline-none focus:border-corp-blue"
                       />
                     )}

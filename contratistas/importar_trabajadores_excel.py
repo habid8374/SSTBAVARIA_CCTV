@@ -13,10 +13,15 @@ que no pasaría el formulario normal tampoco se crea acá, queda
 reportada como error de esa fila sin tumbar el resto del archivo.
 
 La plantilla trae, además de los datos básicos, una columna de fecha
-por cada curso del catálogo Safety Academy y por el examen médico/
-certificación de alturas — para poder verificar de una vez la vigencia
-de cada uno al importar (ver ENCABEZADOS_CURSOS más abajo), igual que
-si se marcaran uno por uno en el formulario manual.
+por cada curso del catálogo Safety Academy y por cada certificación
+especial (espacios confinados, conducción, manlift, grúa, soldador,
+rescatista, licencia SST, ...) — para poder verificar de una vez la
+vigencia de cada una al importar, igual que si se marcaran uno por uno
+en el formulario manual. Ambos catálogos se leen de la base en el
+momento de generar/leer el Excel (no de una lista fija en código), así
+que si un Administrador agrega o desactiva un curso/certificación
+desde Sistema → Reglas de contratistas, la plantilla lo refleja sin
+tocar código.
 
 La radicación de seguridad social nunca se crea desde acá — cada
 trabajador importado queda igual que si se hubiera registrado a mano:
@@ -30,7 +35,7 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from .models import EmpresaContratista, Trabajador
+from .models import CertificacionEspecial, CursoSafetyAcademy, EmpresaContratista, Trabajador
 
 
 class ErrorImportacionExcel(Exception):
@@ -54,16 +59,6 @@ ENCABEZADOS_BASE = [
     "Vencimiento examen médico alturas (AAAA-MM-DD)",
     "Vencimiento certificación alturas (AAAA-MM-DD)",
 ]
-
-# Una columna de fecha por curso del catálogo Safety Academy (mismo orden
-# que Trabajador.CURSOS) — para poder verificar de una vez la vigencia de
-# cada curso al importar, igual que si se marcaran uno por uno en el
-# formulario. Una fecha diligenciada se toma como "completado esa fecha";
-# vacío se toma como pendiente (ver Trabajador.cursos_pendientes).
-ENCABEZADOS_CURSOS = [f"Curso: {etiqueta} (AAAA-MM-DD)" for etiqueta in Trabajador.CURSOS.values()]
-
-ENCABEZADOS = ENCABEZADOS_BASE + ENCABEZADOS_CURSOS
-_INDICE_PRIMERA_COLUMNA_CURSO = len(ENCABEZADOS_BASE)
 
 # Filas con el desplegable ya aplicado en la plantilla descargable, para
 # poder pegar/escribir varias de una vez sin tener que repetir la validación.
@@ -110,18 +105,42 @@ def _valor_fecha(celda):
     return None
 
 
+def _catalogo_cursos():
+    return list(CursoSafetyAcademy.objects.filter(activo=True).order_by("orden", "etiqueta"))
+
+
+def _catalogo_certificaciones():
+    return list(CertificacionEspecial.objects.filter(activo=True).order_by("orden", "etiqueta"))
+
+
+def _encabezados_y_catalogos():
+    """(encabezados, claves_cursos, claves_certificaciones) — se calcula en
+    cada llamada (no una vez al importar el módulo) porque ambos catálogos
+    son editables desde el dashboard."""
+    cursos = _catalogo_cursos()
+    certificaciones = _catalogo_certificaciones()
+    encabezados_cursos = [f"Curso: {c.etiqueta} (AAAA-MM-DD)" for c in cursos]
+    encabezados_certificaciones = [f"Certificación: {c.etiqueta} (AAAA-MM-DD)" for c in certificaciones]
+    encabezados = ENCABEZADOS_BASE + encabezados_cursos + encabezados_certificaciones
+    claves_cursos = [c.clave for c in cursos]
+    claves_certificaciones = [c.clave for c in certificaciones]
+    return encabezados, claves_cursos, claves_certificaciones
+
+
 def generar_plantilla_trabajadores_excel():
-    """Libro .xlsx en blanco con los encabezados y el desplegable de
-    Contratista (solo empresas activas) ya aplicado a las primeras
-    FILAS_PLANTILLA filas — lista para llenar y volver a subir."""
+    """Libro .xlsx en blanco con los encabezados y los desplegables
+    (Contratista, autorización de datos, tipo de vinculación — solo
+    empresas activas) ya aplicados a las primeras FILAS_PLANTILLA filas —
+    lista para llenar y volver a subir."""
     contratistas = list(
         EmpresaContratista.objects.filter(activa=True).order_by("nombre").values_list("nombre", flat=True)
     )
+    encabezados, claves_cursos, claves_certificaciones = _encabezados_y_catalogos()
 
     libro = openpyxl.Workbook()
     hoja = libro.active
     hoja.title = HOJA_TRABAJADORES
-    hoja.append(ENCABEZADOS)
+    hoja.append(encabezados)
     for celda in hoja[1]:
         celda.font = celda.font.copy(bold=True)
 
@@ -151,7 +170,7 @@ def generar_plantilla_trabajadores_excel():
     dv_vinculacion.add(f"I2:I{FILAS_PLANTILLA + 1}")
 
     anchos_base = [30, 20, 20, 16, 24, 14, 14, 14, 26, 24, 30, 28]
-    anchos = anchos_base + [30] * len(ENCABEZADOS_CURSOS)
+    anchos = anchos_base + [30] * (len(claves_cursos) + len(claves_certificaciones))
     for indice, ancho in enumerate(anchos, start=1):
         hoja.column_dimensions[get_column_letter(indice)].width = ancho
 
@@ -179,14 +198,17 @@ def procesar_trabajadores_excel(archivo):
         _sin_acentos(nombre): id_
         for id_, nombre in EmpresaContratista.objects.filter(activa=True).values_list("id", "nombre")
     }
+    encabezados, claves_cursos, claves_certificaciones = _encabezados_y_catalogos()
+    indice_cursos = len(ENCABEZADOS_BASE)
+    indice_certificaciones = indice_cursos + len(claves_cursos)
 
     filas = []
     errores_lectura = []
     for numero_fila, fila in enumerate(hoja.iter_rows(min_row=2, values_only=True), start=2):
         if fila is None or all(c in (None, "") for c in fila):
             continue
-        celdas = list(fila) + [None] * (len(ENCABEZADOS) - len(fila))
-        celdas = celdas[: len(ENCABEZADOS)]
+        celdas = list(fila) + [None] * (len(encabezados) - len(fila))
+        celdas = celdas[: len(encabezados)]
         (
             contratista_txt,
             nombres,
@@ -200,8 +222,9 @@ def procesar_trabajadores_excel(archivo):
             fecha_inicio,
             fecha_examen,
             fecha_certificacion,
-        ) = celdas[:_INDICE_PRIMERA_COLUMNA_CURSO]
-        celdas_cursos = celdas[_INDICE_PRIMERA_COLUMNA_CURSO:]
+        ) = celdas[:indice_cursos]
+        celdas_cursos = celdas[indice_cursos:indice_certificaciones]
+        celdas_certificaciones = celdas[indice_certificaciones:]
 
         if not any([contratista_txt, nombres, apellidos, documento]):
             continue
@@ -225,10 +248,16 @@ def procesar_trabajadores_excel(archivo):
         )
 
         cursos_safety_academy = {}
-        for clave, celda_curso in zip(Trabajador.CURSOS.keys(), celdas_cursos):
+        for clave, celda_curso in zip(claves_cursos, celdas_cursos):
             fecha_curso = _valor_fecha(celda_curso)
             if fecha_curso is not None:
                 cursos_safety_academy[clave] = fecha_curso.isoformat()
+
+        certificaciones_especiales = {}
+        for clave, celda_cert in zip(claves_certificaciones, celdas_certificaciones):
+            fecha_cert = _valor_fecha(celda_cert)
+            if fecha_cert is not None:
+                certificaciones_especiales[clave] = fecha_cert.isoformat()
 
         filas.append(
             {
@@ -246,6 +275,7 @@ def procesar_trabajadores_excel(archivo):
                 "fecha_vencimiento_examen_medico": _valor_fecha(fecha_examen),
                 "fecha_vencimiento_certificacion_alturas": _valor_fecha(fecha_certificacion),
                 "cursos_safety_academy": cursos_safety_academy,
+                "certificaciones_especiales": certificaciones_especiales,
             }
         )
 
