@@ -1640,6 +1640,60 @@ class AlertasAutomaticasTests(ApiTestsBase):
         alertas = generar_alertas(declaracion)
         self.assertNotIn("texto_sugiere_izaje_sin_permiso", [a["codigo"] for a in alertas])
 
+    def test_texto_sugiere_manejo_manual_cargas_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            tecnicas_herramientas="Levantamiento de carga manual de los sacos hasta la bodega",
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_manejo_manual_cargas_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_manejo_manual_cargas_no_genera_alerta_con_permiso_marcado(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion,
+            orden=0,
+            tecnicas_herramientas="Levantamiento de carga manual de los sacos hasta la bodega",
+            permisos_requeridos=["Manejo de materiales y ergonomía"],
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertNotIn("texto_sugiere_manejo_manual_cargas_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_seguridad_vial_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, tecnicas_herramientas="Conducir vehiculo hasta la zona de descarga"
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_seguridad_vial_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_texto_sugiere_procesos_alto_riesgo_sin_permiso_genera_alerta(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(
+            declaracion=declaracion, orden=0, tecnicas_herramientas="Revisión del sistema de amoniaco de la sala"
+        )
+        alertas = generar_alertas(declaracion)
+        self.assertIn("texto_sugiere_procesos_alto_riesgo_sin_permiso", [a["codigo"] for a in alertas])
+
+    def test_alerta_incluye_medida_control_sugerida(self):
+        from .alertas_automaticas import generar_alertas
+
+        declaracion = self._declaracion()
+        ActividadMetodo.objects.create(declaracion=declaracion, orden=0, tecnicas_herramientas="Soldadura del marco")
+        alertas = generar_alertas(declaracion)
+        alerta = next(a for a in alertas if a["codigo"] == "texto_sugiere_trabajo_caliente_sin_permiso")
+        self.assertTrue(alerta["medida_control_sugerida"])
+
     def test_no_repite_la_misma_alerta_para_filas_de_riesgo_de_una_misma_tarea(self):
         """El Excel real del cliente trae varias filas de riesgo (matriz
         Kinney) bajo una misma 'Secuencia de Actividades' — el importador

@@ -126,11 +126,17 @@ frontend en Vercel — pero viven en el mismo repositorio.
     en el mismo archivo — pedido del cliente, cruzar la GTC 45 contra las
     declaraciones): la misma heurística de texto que altura, generalizada a
     riesgo eléctrico, espacios confinados, sustancias peligrosas, bloqueo y
-    etiquetado de energías (LOTO), trabajos en caliente e izaje de cargas —
-    cada una avisa si el texto de la actividad menciona esa categoría pero
-    el certificado de apoyo correspondiente no está marcado. Cada
-    alerta cita su fuente y trae un motivo de rechazo sugerido, con un
-    botón en el formulario que solo copia ese texto al campo Observaciones.
+    etiquetado de energías (LOTO), trabajos en caliente, izaje de cargas,
+    manejo manual de cargas/riesgo biomecánico, seguridad vial y procesos de
+    alto riesgo (amoniaco, recipientes a presión, calderos) — cada una avisa
+    si el texto de la actividad menciona esa categoría pero el certificado
+    de apoyo correspondiente no está marcado. Cada alerta cita su fuente,
+    trae un motivo de rechazo sugerido (botón que solo copia ese texto al
+    campo Observaciones) y, para las categorías de texto y algunas reglas
+    numéricas, una **medida de control sugerida** (`medida_control_sugerida`)
+    con una recomendación concreta tomada del SOP correspondiente (ej. para
+    izaje: no exceder el 85% de la capacidad de la grúa) que el frontend
+    muestra junto al mensaje de la alerta.
     **Regla dura: el motor nunca decide por sí solo** — no cambia el estado
     de la declaración, no bloquea aprobar/rechazar, y el texto sugerido se
     puede editar o descartar libremente; la aprobación o el rechazo siguen

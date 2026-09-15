@@ -485,9 +485,20 @@ const TEMAS: Tema[] = [
           eléctrico</strong> (ej. &quot;electrocución&quot;), <strong>espacios confinados</strong>,{" "}
           <strong>sustancias peligrosas</strong> (ej. &quot;derrame&quot;), <strong>bloqueo y etiquetado de
           energías / LOTO</strong>, <strong>trabajos en caliente</strong> (ej. &quot;soldadura&quot;) e{" "}
-          <strong>izaje de cargas</strong> (ej. &quot;montacargas&quot;, &quot;grúa&quot;). Igual que con
-          altura, es solo una heurística de texto — el revisor confirma si de verdad aplica antes de usarla
-          como motivo de rechazo.
+          <strong>izaje de cargas</strong> (ej. &quot;montacargas&quot;, &quot;grúa&quot;), <strong>manejo
+          manual de cargas / riesgo biomecánico</strong> (ej. &quot;levantamiento de carga&quot;,
+          &quot;sobreesfuerzo&quot;), <strong>seguridad vial</strong> (ej. &quot;conducir vehículo&quot;) y{" "}
+          <strong>procesos de alto riesgo</strong> (ej. &quot;amoniaco&quot;, &quot;recipiente a
+          presión&quot;). Igual que con altura, es solo una heurística de texto — el revisor confirma si de
+          verdad aplica antes de usarla como motivo de rechazo.
+        </P>
+        <P>
+          Cada una de estas alertas por categoría trae además, debajo del mensaje, una{" "}
+          <strong>medida de control sugerida</strong> — una recomendación concreta tomada del procedimiento
+          de seguridad correspondiente (ej. para izaje: &quot;no exceder el 85% de la capacidad de la
+          grúa&quot;) para que quien revisa tenga a la mano qué debería estar contemplado, sin tener que
+          buscarlo en el SOP completo. Es solo una sugerencia de referencia, igual que el resto de la
+          alerta — no reemplaza el criterio de quien revisa.
         </P>
         <P>
           Cada alerta trae, debajo del botón de motivo de rechazo, un pequeño cuadro para{" "}

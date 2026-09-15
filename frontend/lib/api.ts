@@ -1566,6 +1566,7 @@ export type AlertaAutomatica = {
   mensaje: string;
   motivo_sugerido: string;
   fuente: string;
+  medida_control_sugerida: string;
 };
 
 export function listarAlertasDeclaracion(token: string, id: number): Promise<AlertaAutomatica[]> {

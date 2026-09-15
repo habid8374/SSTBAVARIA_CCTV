@@ -1131,6 +1131,12 @@ function FormularioDeclaracion({
                     <div className="flex-1">
                       <p className="font-medium">{alerta.titulo}</p>
                       <p className="mt-1 text-amber-800">{alerta.mensaje}</p>
+                      {alerta.medida_control_sugerida && (
+                        <p className="mt-1 text-amber-800">
+                          <span className="font-semibold">Medida de control sugerida: </span>
+                          {alerta.medida_control_sugerida}
+                        </p>
+                      )}
                       <p className="mt-1 text-xs text-amber-700">Fuente: {alerta.fuente}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <button

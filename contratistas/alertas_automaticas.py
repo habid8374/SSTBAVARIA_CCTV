@@ -7,10 +7,16 @@ estado de la declaración, no bloquea aprobar/rechazar, y el texto sugerido
 es solo un punto de partida que el revisor edita o descarta libremente.
 
 Las reglas están basadas en los SOP "Safety to Sustain" (trabajos en
-altura, excavaciones, sistemas anticaída) que compartió el cliente, más las
-categorías de peligro del Anexo A de la GTC 45 (guía técnica colombiana de
+altura, excavaciones, sistemas anticaída, ergonomía, seguridad vial,
+procesos de alto riesgo) que compartió el cliente, más las categorías de
+peligro del Anexo A de la GTC 45 (guía técnica colombiana de
 identificación de peligros y valoración de riesgos) — ver
-CATEGORIAS_PELIGRO_TEXTO más abajo para el detalle de cada una.
+CATEGORIAS_PELIGRO_TEXTO más abajo para el detalle de cada una. Cada
+categoría y cada regla numérica incluyen un campo
+"medida_control_sugerida" con una medida de control concreta extraída del
+SOP correspondiente (no genérica) que el frontend muestra junto a la
+alerta — es solo un punto de partida, el revisor la edita o descarta
+libremente igual que el resto de la alerta.
 
 Fase A usa solo datos que el formulario ya capturaba (permisos, EPP,
 riesgo, firmas, tarea SIF). Fase B suma los umbrales numéricos exactos de
@@ -72,6 +78,11 @@ CATEGORIAS_PELIGRO_TEXTO = [
         "palabras_clave": PALABRAS_CLAVE_ALTURA,
         "patron_contexto": _PATRON_ALTURA_CON_CONTEXTO,
         "fuente": "SOP.MAZ.SAFE.1.9 Trabajos en Alturas — heurística de texto, confirmar manualmente",
+        "medida_control_sugerida": (
+            "Arnés de cuerpo completo con doble cabo de vida conectado a un punto de anclaje "
+            "certificado; sistema 100% amarrado. Inspección del sistema anticaída componente "
+            "por componente antes de cada uso, con precinto seriado de inspección vigente."
+        ),
     },
     {
         "codigo": "electrico",
@@ -82,6 +93,11 @@ CATEGORIAS_PELIGRO_TEXTO = [
             "sistema electrico vivo", "subestacion electrica", "alta tension", "energia electrica",
         ],
         "fuente": "GTC 45 — Anexo A, peligro físico: Eléctrico (alta y baja tensión, estática)",
+        "medida_control_sugerida": (
+            "Desenergizar, bloquear y etiquetar (LOTO) antes de intervenir; verificar ausencia "
+            "de tensión con equipo de medición calibrado. Si no es posible desenergizar, permiso "
+            "de trabajo eléctrico específico y EPP dieléctrico según el nivel de tensión."
+        ),
     },
     {
         "codigo": "espacio_confinado",
@@ -89,6 +105,12 @@ CATEGORIAS_PELIGRO_TEXTO = [
         "permiso": "Certificado de apoyo en espacios confinados",
         "palabras_clave": ["espacio confinado", "espacios confinados"],
         "fuente": "GTC 45 — Anexo A, condiciones de seguridad: Espacios confinados",
+        "medida_control_sugerida": (
+            "Medir la atmósfera antes de ingresar (O2 entre 19.5% y 23.5%, sin gases inflamables "
+            "ni tóxicos) y mantener monitoreo continuo. Bloqueo de todas las fuentes de energía, "
+            "vigía permanente en el exterior y plan de rescate practicado con rescatista "
+            "certificado disponible."
+        ),
     },
     {
         "codigo": "sustancias_peligrosas",
@@ -99,6 +121,11 @@ CATEGORIAS_PELIGRO_TEXTO = [
             "derrame de sustancia", "derrame de quimico", "producto quimico peligroso",
         ],
         "fuente": "GTC 45 — Anexo A, peligro químico",
+        "medida_control_sugerida": (
+            "Consultar la hoja de seguridad (MSDS) de la sustancia antes de manipularla, EPP "
+            "químico específico (guantes, careta, protección respiratoria según corresponda) y "
+            "kit de control de derrames disponible en el sitio de trabajo."
+        ),
     },
     {
         "codigo": "loto_bloqueo",
@@ -109,6 +136,11 @@ CATEGORIAS_PELIGRO_TEXTO = [
             "candado y tarjeta", "desenergizar", "energia residual",
         ],
         "fuente": "GTC 45 — Anexo A, condiciones de seguridad: bloqueo de energías (LOTO)",
+        "medida_control_sugerida": (
+            "Identificar todas las fuentes de energía del equipo (eléctrica, neumática, "
+            "hidráulica, mecánica residual), aislarlas con candado y tarjeta personal de cada "
+            "trabajador, y verificar energía cero antes de intervenir."
+        ),
     },
     {
         "codigo": "trabajo_caliente",
@@ -118,6 +150,11 @@ CATEGORIAS_PELIGRO_TEXTO = [
             "soldadura", "esmerilado", "oxicorte", "corte con llama", "trabajo en caliente", "trabajos en caliente",
         ],
         "fuente": "GTC 45 — Anexo A, peligro físico/tecnológico: trabajos en caliente",
+        "medida_control_sugerida": (
+            "Retirar o proteger materiales combustibles en un radio mínimo de seguridad, vigía "
+            "de fuego con extintor disponible durante y después de la actividad, y verificación "
+            "de atmósfera libre de gases inflamables si aplica."
+        ),
     },
     {
         "codigo": "izaje",
@@ -127,6 +164,57 @@ CATEGORIAS_PELIGRO_TEXTO = [
             "izaje", "grua", "tecle", "polipasto", "montacargas", "elevador de motores", "izador de motores",
         ],
         "fuente": "GTC 45 — Anexo A, condiciones de seguridad: mecánico (izaje de cargas)",
+        "medida_control_sugerida": (
+            "Plan de izaje sin exceder el 85% de la capacidad de la grúa/equipo, supervisor de "
+            "izaje dedicado, segregar el radio de giro/boom (nadie debajo de la carga) y "
+            "certificación vigente de grúa, aparejos y operador."
+        ),
+    },
+    {
+        "codigo": "manejo_manual_cargas",
+        "descripcion_corta": "manejo manual de cargas / riesgo biomecánico",
+        "permiso": "Manejo de materiales y ergonomía",
+        "palabras_clave": [
+            "levantamiento de carga", "levantamiento manual", "manejo manual de cargas",
+            "manejo manual de materiales", "sobreesfuerzo", "postura forzada", "movimiento repetitivo",
+            "movimientos repetitivos",
+        ],
+        "fuente": "GTC 45 — Anexo A, peligro biomecánico / VPO.SAFE.1.4 Manejo de Materiales y Ergonomía",
+        "medida_control_sugerida": (
+            "Usar ayudas mecánicas (grúas, carretillas, polipastos, mesas de altura ajustable) "
+            "en vez de levantamiento manual cuando el peso supere 25 kg; para cargas menores, "
+            "aplicar técnica correcta de levantamiento y evitar giros de tronco con la carga."
+        ),
+    },
+    {
+        "codigo": "seguridad_vial",
+        "descripcion_corta": "conducción de vehículos / seguridad vial",
+        "permiso": "Certificado de apoyo en seguridad vial y conducción",
+        "palabras_clave": [
+            "conducir vehiculo", "conduccion de vehiculo", "manejo de vehiculo", "operar vehiculo",
+            "transito vehicular", "manejo defensivo",
+        ],
+        "fuente": "GTC 45 — Anexo A, condiciones de seguridad: tránsito / SAFE 1.8 Seguridad Vial y al Conducir",
+        "medida_control_sugerida": (
+            "Verificar que el conductor tenga licencia vigente para la categoría del vehículo y "
+            "haya aprobado la inspección preoperacional del vehículo antes de circular dentro de "
+            "las instalaciones."
+        ),
+    },
+    {
+        "codigo": "procesos_alto_riesgo",
+        "descripcion_corta": "proceso de alto riesgo (amoniaco, presión, explosión)",
+        "permiso": "Certificado de apoyo en procesos de alto riesgo",
+        "palabras_clave": [
+            "amoniaco", "recipiente a presion", "caldero", "vapor sobrecalentado", "nitrogeno liquido",
+            "explosion por polvo", "explosion por gas",
+        ],
+        "fuente": "GTC 45 — Anexo A, peligro físico/tecnológico / VPO.SAFE.1.2 Gestión de Procesos de Alto Riesgo",
+        "medida_control_sugerida": (
+            "Verificar la evaluación de riesgos específica del proceso (amoniaco, recipientes a "
+            "presión, calderos, N2/CO2 u otro) y que los equipos de detección/control asociados "
+            "estén operativos antes de intervenir."
+        ),
     },
 ]
 
@@ -149,10 +237,11 @@ def _alerta_categoria_texto(actividad, etiqueta, categoria):
         f"Verificar si la actividad realmente implica {descripcion} y, de ser así, marcar el "
         "permiso correspondiente.",
         categoria["fuente"],
+        categoria.get("medida_control_sugerida", ""),
     )
 
 
-def _alerta(codigo, actividad, titulo, mensaje, motivo_sugerido, fuente):
+def _alerta(codigo, actividad, titulo, mensaje, motivo_sugerido, fuente, medida_control_sugerida=""):
     return {
         "codigo": codigo,
         "actividad_id": actividad.id,
@@ -161,6 +250,7 @@ def _alerta(codigo, actividad, titulo, mensaje, motivo_sugerido, fuente):
         "mensaje": mensaje,
         "motivo_sugerido": motivo_sugerido,
         "fuente": fuente,
+        "medida_control_sugerida": medida_control_sugerida,
     }
 
 
@@ -207,6 +297,9 @@ def generar_alertas(declaracion):
                     "retráctil, doble gancho) en una actividad que requiere trabajo en "
                     "altura mayor a 1.8 m.",
                     "SOP.MAZ.SAFE.1.9 Trabajos en Alturas / Requisitos Sistemas Anticaída",
+                    "Arnés industrial de cuerpo completo, con el elemento de enganche dorsal "
+                    "por encima del centro de gravedad, conectado a un punto de anclaje fijo "
+                    "mediante línea de vida con absorbedor de energía.",
                 )
             )
 
@@ -223,6 +316,9 @@ def generar_alertas(declaracion):
                     "señalización del perímetro, distancia de acopio de material, retén "
                     "exterior).",
                     "SOP.MAZ.SAFE.1.9.12 Requisitos de Seguridad Excavaciones",
+                    "Salida de emergencia a máximo 7 m de cualquier trabajador, señalización "
+                    "y barrera física del perímetro, material excavado acopiado a más de 60 "
+                    "cm del borde, y retén (vigía) exterior dedicado.",
                 )
             )
 
@@ -238,6 +334,10 @@ def generar_alertas(declaracion):
                     "El riesgo con mitigación aplicada sigue en banda alta — revisar si "
                     "las medidas descritas son suficientes o si falta información.",
                     "Método Kinney (evaluación de riesgo)",
+                    "Priorizar controles más altos en la jerarquía (eliminación, sustitución, "
+                    "controles de ingeniería) antes de depender solo de EPP o procedimientos; "
+                    "si el riesgo residual sigue alto, la actividad debería detenerse hasta "
+                    "reforzar los controles.",
                 )
             )
 
@@ -264,6 +364,8 @@ def generar_alertas(declaracion):
                     "El SOP de trabajos en altura exige permiso de trabajo a partir de 1.8 m "
                     "— falta marcarlo dado el valor de altura declarado.",
                     "SOP.MAZ.SAFE.1.9 Trabajos en Alturas — Definiciones",
+                    "Marcar el permiso de alturas y verificar sistema anticaída completo "
+                    "(arnés, línea de vida, punto de anclaje certificado) antes de iniciar.",
                 )
             )
 
@@ -280,6 +382,9 @@ def generar_alertas(declaracion):
                     "declaración de método, además de redes de seguridad certificadas o "
                     "plataformas/andamios certificados — confirmar que ese proceso ya se hizo.",
                     "SOP.MAZ.SAFE.1.9 Trabajos en Alturas §8.2.4-8.5.2 / SOP Redes de Seguridad",
+                    "Aprobación previa de ZBS del plan de seguridad, redes de seguridad "
+                    "certificadas o plataforma/andamio certificado (no usar únicamente el "
+                    "sistema anticaída personal como control principal por encima de 4 m).",
                 )
             )
 
@@ -295,6 +400,8 @@ def generar_alertas(declaracion):
                     "escalera) a máximo 7 m de cualquier trabajador dentro de la "
                     "excavación — confirmar que está contemplada.",
                     "SOP.MAZ.SAFE.1.9.12 Requisitos de Seguridad Excavaciones",
+                    "Rampa o escalera de salida de emergencia a no más de 7 m de cualquier "
+                    "punto dentro de la excavación.",
                 )
             )
 
@@ -310,6 +417,8 @@ def generar_alertas(declaracion):
                     "mientras haya trabajadores dentro de la excavación — confirmar que "
                     "está asignado.",
                     "SOP.MAZ.SAFE.1.9.12 Requisitos de Seguridad Excavaciones",
+                    "Asignar un retén (vigía) exterior dedicado, sin otras tareas, durante "
+                    "todo el tiempo que haya personal dentro de la excavación.",
                 )
             )
 
@@ -325,6 +434,8 @@ def generar_alertas(declaracion):
                     "5 m de profundidad — confirmar que está contemplado en la "
                     "declaración.",
                     "SOP.MAZ.SAFE.1.9 Trabajos en Alturas §8.6 (excavaciones)",
+                    "Instalar andamiaje o entibado certificado antes de que el personal "
+                    "ingrese a una excavación de más de 5 m de profundidad.",
                 )
             )
 
