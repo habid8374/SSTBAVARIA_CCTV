@@ -184,6 +184,27 @@ export function IconCandado({ className }: IconProps) {
   );
 }
 
+export function IconOjo({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path d="M2.5 12s3.8-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.8 6.5-9.5 6.5S2.5 12 2.5 12Z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2.75" />
+    </svg>
+  );
+}
+
+export function IconOjoTachado({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path
+        d="M3.5 3.5l17 17M9.9 5.6c.68-.17 1.4-.26 2.1-.26 5.7 0 9.5 6.5 9.5 6.5a15.6 15.6 0 0 1-3.15 3.83M6.6 6.7A15.7 15.7 0 0 0 2.5 12s3.8 6.5 9.5 6.5c1.4 0 2.68-.4 3.82-1.03M14.5 14.5a2.75 2.75 0 0 1-4-3.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function IconIndicadores({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
