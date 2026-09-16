@@ -106,7 +106,7 @@ export default function FormularioRegla({
               type="button"
               onClick={() => alternarDia(i)}
               className={`h-7 w-7 rounded-full text-xs font-semibold transition ${
-                dias.includes(i) ? "bg-corp-blue text-white" : "bg-white text-corp-muted ring-1 ring-corp-border"
+                dias.includes(i) ? "bg-corp-blue text-black" : "bg-white text-corp-muted ring-1 ring-corp-border"
               }`}
             >
               {letra}
@@ -124,7 +124,7 @@ export default function FormularioRegla({
         <button
           type="submit"
           disabled={enviando}
-          className="rounded-md bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy disabled:opacity-60"
+          className="rounded-md bg-corp-blue px-3 py-1.5 text-xs font-semibold text-black hover:bg-corp-navy hover:text-white disabled:opacity-60"
         >
           {enviando ? "Guardando…" : "Guardar regla"}
         </button>

@@ -70,7 +70,7 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
           <button
             type="button"
             onClick={() => setFormulario("nueva")}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
           >
             + Nueva cámara
           </button>
@@ -82,7 +82,7 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
           Tratamiento de datos personales: cada zona cubierta por estas cámaras debe tener un aviso físico
           visible (&quot;Zona vigilada por cámaras con IA&quot;) antes de que la persona ingrese, conforme a
           la{" "}
-          <Link href="/politica-privacidad" target="_blank" className="font-medium text-corp-blue hover:underline">
+          <Link href="/politica-privacidad" target="_blank" className="font-medium text-corp-gold hover:underline">
             política de tratamiento de datos personales
           </Link>
           . Descarga el cartel para imprimir desde Ayuda → Política de privacidad.
@@ -403,7 +403,7 @@ function FormularioCamara({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Guardando…" : camara ? "Guardar cambios" : "Crear cámara"}
             </button>

@@ -273,7 +273,7 @@ function SeccionAuditoria({ token }: { token: string }) {
                       <button
                         type="button"
                         onClick={() => setExpandido(expandido === r.id ? null : r.id)}
-                        className="text-corp-blue hover:underline"
+                        className="text-corp-gold hover:underline"
                       >
                         {expandido === r.id ? "Ocultar" : "Ver cambios"}
                       </button>

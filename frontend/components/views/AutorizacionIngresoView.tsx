@@ -124,7 +124,7 @@ export default function AutorizacionIngresoView({ token, rol }: { token: string;
             onClick={() => setSeleccionada("nueva")}
             disabled={!contratistas?.length}
             title={!contratistas?.length ? "Registra primero una empresa contratista en “Contratistas”" : undefined}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Nueva autorización de ingreso
           </button>
@@ -325,7 +325,7 @@ function FormularioAutorizacion({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <button type="button" onClick={onVolver} className="text-sm font-medium text-corp-blue hover:underline">
+        <button type="button" onClick={onVolver} className="text-sm font-medium text-corp-gold hover:underline">
           ← Volver a la lista
         </button>
         {autorizacion && (
@@ -504,7 +504,7 @@ function FormularioAutorizacion({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Guardando…" : "Guardar autorización"}
             </button>

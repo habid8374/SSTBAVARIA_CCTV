@@ -79,7 +79,7 @@ function BotonPestana({
       type="button"
       onClick={onClick}
       className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition ${
-        activa ? "border-corp-blue text-corp-blue" : "border-transparent text-corp-muted hover:text-corp-navy"
+        activa ? "border-corp-blue text-corp-gold" : "border-transparent text-corp-muted hover:text-corp-navy"
       }`}
     >
       {children}
@@ -176,7 +176,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
           <input
             value={remitenteNombre}
             onChange={(event) => setRemitenteNombre(event.target.value)}
-            placeholder="SST Bavaria — Cámaras IA"
+            placeholder="GuardIA"
             className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
           />
         </Campo>
@@ -194,7 +194,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
           <button
             type="submit"
             disabled={guardando}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
           >
             {guardando ? "Guardando…" : "Guardar"}
           </button>
@@ -310,7 +310,7 @@ function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
           <button
             type="submit"
             disabled={guardando}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
           >
             {guardando ? "Guardando…" : "Guardar"}
           </button>
@@ -380,7 +380,7 @@ function CatalogoEventosIA({ token }: { token: string }) {
         <button
           type="button"
           onClick={() => setMostrarFormulario(true)}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
           + Nuevo evento
         </button>
@@ -549,7 +549,7 @@ function FormularioNuevoTipoEvento({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Creando…" : "Crear evento"}
             </button>
@@ -638,7 +638,7 @@ function EquiposLocales({ token }: { token: string }) {
           <button
             type="button"
             onClick={() => setMostrarFormulario(true)}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
           >
             + Nuevo equipo
           </button>
@@ -692,7 +692,7 @@ function EquiposLocales({ token }: { token: string }) {
                     <button
                       type="button"
                       onClick={() => copiarApiKey(equipo)}
-                      className="text-xs font-medium text-corp-blue hover:underline"
+                      className="text-xs font-medium text-corp-gold hover:underline"
                     >
                       {copiadoId === equipo.id ? "¡Copiado!" : "Copiar"}
                     </button>
@@ -835,7 +835,7 @@ function FormularioNuevoEquipo({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Creando…" : "Crear equipo"}
             </button>

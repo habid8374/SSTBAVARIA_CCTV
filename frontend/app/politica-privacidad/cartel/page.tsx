@@ -8,21 +8,27 @@ export default function CartelVideovigilanciaPage() {
   return (
     <div className="min-h-screen bg-zinc-100 py-10 print:bg-white print:py-0">
       <div className="mx-auto mb-6 flex max-w-[210mm] items-center justify-between px-4 print:hidden">
-        <Link href="/politica-privacidad" className="text-sm font-medium text-corp-blue hover:underline">
+        <Link href="/politica-privacidad" className="text-sm font-medium text-corp-gold hover:underline">
           ← Volver a la política de privacidad
         </Link>
         <button
           type="button"
           onClick={() => window.print()}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
           Imprimir cartel
         </button>
       </div>
 
       <div className="mx-auto flex min-h-[297mm] w-full max-w-[210mm] flex-col items-center justify-center gap-8 border border-corp-border bg-white px-12 py-16 text-center shadow-lg print:min-h-0 print:border-0 print:shadow-none">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-lockup-light.png" alt="SST Bavaria" className="h-20 w-auto" />
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-guardia.png" alt="GuardIA" className="h-16 w-16" />
+          <span className="text-4xl font-extrabold tracking-tight">
+            <span className="text-corp-navy">Guard</span>
+            <span className="text-corp-gold">IA</span>
+          </span>
+        </div>
 
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-corp-navy text-white">
           <svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="1.5">

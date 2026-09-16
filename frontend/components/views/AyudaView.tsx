@@ -20,7 +20,7 @@ const TEMAS: Tema[] = [
     contenido: (
       <>
         <P>
-          SST Bavaria — Cámaras IA tiene tres roles de usuario: <strong>Administrador</strong> (ve y edita
+          GuardIA tiene tres roles de usuario: <strong>Administrador</strong> (ve y edita
           todo, incluida la sección Sistema y Usuarios), <strong>Operador</strong> (ve el día a día — cámaras,
           alertas, contratistas — pero no puede crear/editar zonas, reglas, ni gestionar usuarios o el equipo
           local) y <strong>Contratista</strong> (el portal de la empresa contratista — ver el tema
@@ -1198,7 +1198,7 @@ const TEMAS: Tema[] = [
             El texto completo de la política — qué datos se recogen, para qué, cuánto se conservan y cómo
             ejercer los derechos de acceso/corrección/eliminación — está publicado y es de acceso público
             (sin necesidad de iniciar sesión) en{" "}
-            <Link href="/politica-privacidad" target="_blank" className="text-corp-blue hover:underline">
+            <Link href="/politica-privacidad" target="_blank" className="text-corp-gold hover:underline">
               /politica-privacidad
             </Link>
             , y enlazado también desde la pantalla de inicio de sesión.
@@ -1209,7 +1209,7 @@ const TEMAS: Tema[] = [
             (&quot;Zona vigilada por cámaras con IA&quot;), porque cualquier persona que entre a esa zona —
             no solo trabajadores registrados en el sistema — puede quedar captada. Hay un cartel listo para
             imprimir en{" "}
-            <Link href="/politica-privacidad/cartel" target="_blank" className="text-corp-blue hover:underline">
+            <Link href="/politica-privacidad/cartel" target="_blank" className="text-corp-gold hover:underline">
               /politica-privacidad/cartel
             </Link>
             , también enlazado desde la sección Cámaras.
@@ -1301,7 +1301,7 @@ export default function AyudaView({ rol }: { rol: Rol | null }) {
                   onClick={() => setTemaId(t.id)}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
                     t.id === tema?.id
-                      ? "bg-corp-blue text-white"
+                      ? "bg-corp-blue text-black"
                       : "text-corp-navy hover:bg-corp-blue-light"
                   }`}
                 >

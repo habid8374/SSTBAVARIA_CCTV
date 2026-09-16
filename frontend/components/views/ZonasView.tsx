@@ -241,7 +241,7 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
             <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-corp-border bg-zinc-50 py-16 text-center">
               <p className="text-sm text-corp-muted">Esta cámara todavía no tiene un snapshot de referencia.</p>
               {esAdmin && (
-                <label className="cursor-pointer rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy">
+                <label className="cursor-pointer rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white">
                   {subiendo ? "Subiendo…" : "Subir snapshot"}
                   <input
                     type="file"
@@ -282,7 +282,7 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                     <button
                       type="button"
                       onClick={() => setDibujando(true)}
-                      className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
+                      className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-black hover:bg-corp-navy hover:text-white"
                     >
                       + Nueva zona
                     </button>
@@ -339,7 +339,7 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                     onClick={() => setTipoDraft("poligono")}
                     className={`rounded-md border px-2.5 py-1 text-xs font-medium ${
                       tipoDraft === "poligono"
-                        ? "border-corp-blue bg-corp-blue-light text-corp-blue"
+                        ? "border-corp-blue bg-corp-blue-light text-corp-gold"
                         : "border-corp-border text-corp-navy"
                     }`}
                   >
@@ -350,7 +350,7 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                     onClick={() => setTipoDraft("punto_radio")}
                     className={`rounded-md border px-2.5 py-1 text-xs font-medium ${
                       tipoDraft === "punto_radio"
-                        ? "border-corp-blue bg-corp-blue-light text-corp-blue"
+                        ? "border-corp-blue bg-corp-blue-light text-corp-gold"
                         : "border-corp-border text-corp-navy"
                     }`}
                   >
@@ -480,7 +480,7 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                       <button
                         type="submit"
                         disabled={guardandoZona}
-                        className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white hover:bg-corp-navy disabled:opacity-60"
+                        className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black hover:bg-corp-navy hover:text-white disabled:opacity-60"
                       >
                         {guardandoZona ? "Guardando…" : "Guardar zona"}
                       </button>
@@ -508,7 +508,7 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
                   <button
                     type="submit"
                     disabled={guardandoCalibracion}
-                    className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white hover:bg-corp-navy disabled:opacity-60"
+                    className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black hover:bg-corp-navy hover:text-white disabled:opacity-60"
                   >
                     {guardandoCalibracion ? "Guardando…" : "Guardar calibración"}
                   </button>
@@ -516,7 +516,7 @@ export default function ZonasView({ token, rol }: { token: string; rol: Rol | nu
               )}
 
               {esAdmin && (
-                <label className="mt-3 inline-block cursor-pointer text-xs font-medium text-corp-blue hover:underline">
+                <label className="mt-3 inline-block cursor-pointer text-xs font-medium text-corp-gold hover:underline">
                   {subiendo ? "Subiendo…" : "Reemplazar snapshot de referencia"}
                   <input
                     type="file"
@@ -791,7 +791,7 @@ function ZonaCard({
             {zona.activa ? "Activa" : "Inactiva"}
           </span>
           {zona.tipo === "punto_radio" && (
-            <span className="ml-2 rounded-full bg-corp-blue-light px-2 py-0.5 text-xs font-medium text-corp-blue">
+            <span className="ml-2 rounded-full bg-corp-blue-light px-2 py-0.5 text-xs font-medium text-corp-gold">
               Punto y radio · {zona.radio_metros}m
             </span>
           )}
@@ -876,7 +876,7 @@ function ZonaCard({
               <button
                 type="button"
                 onClick={() => setMostrarForm(true)}
-                className="text-xs font-medium text-corp-blue hover:underline"
+                className="text-xs font-medium text-corp-gold hover:underline"
               >
                 + Agregar regla de horario
               </button>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import PoliticaPrivacidadContenido from "@/components/PoliticaPrivacidadContenido";
 
 export const metadata = {
-  title: "Política de privacidad — SST Bavaria Cámaras IA",
+  title: "Política de privacidad — GuardIA",
 };
 
 export default function PoliticaPrivacidadPage() {
@@ -11,9 +11,15 @@ export default function PoliticaPrivacidadPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-corp-border px-6 py-5 sm:px-10">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-lockup-light.png" alt="SST Bavaria" className="h-10 w-auto" />
-          <Link href="/login" className="text-sm font-medium text-corp-blue hover:underline">
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-guardia.png" alt="GuardIA" className="h-9 w-9" />
+            <span className="text-xl font-extrabold tracking-tight">
+              <span className="text-corp-navy">Guard</span>
+              <span className="text-corp-gold">IA</span>
+            </span>
+          </div>
+          <Link href="/login" className="text-sm font-medium text-corp-gold hover:underline">
             ← Volver al inicio de sesión
           </Link>
         </div>
@@ -24,10 +30,10 @@ export default function PoliticaPrivacidadPage() {
           Política de tratamiento de datos personales
         </h1>
         <p className="mb-2 text-sm text-corp-muted">
-          Sistema SST Bavaria Cámaras IA — Ley 1581 de 2012 (Habeas Data) y Decreto 1377 de 2013.
+          Sistema GuardIA — Ley 1581 de 2012 (Habeas Data) y Decreto 1377 de 2013.
         </p>
         <p className="mb-6 text-sm">
-          <Link href="/politica-privacidad/cartel" target="_blank" className="font-medium text-corp-blue hover:underline">
+          <Link href="/politica-privacidad/cartel" target="_blank" className="font-medium text-corp-gold hover:underline">
             Descargar/imprimir cartel de aviso de videovigilancia →
           </Link>
         </p>

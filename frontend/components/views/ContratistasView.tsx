@@ -154,7 +154,7 @@ export default function ContratistasView({ token, rol }: { token: string; rol: R
               <button
                 type="button"
                 onClick={() => setFormulario("nueva")}
-                className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+                className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
               >
                 + Nueva empresa contratista
               </button>
@@ -537,7 +537,7 @@ function PanelContratista({
             <button
               type="button"
               onClick={() => setFormulario("nuevo")}
-              className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
+              className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-black hover:bg-corp-navy hover:text-white"
             >
               + Nuevo trabajador
             </button>
@@ -621,7 +621,7 @@ function PanelContratista({
                       <button
                         type="button"
                         onClick={() => setSeleccionado(seleccionado === t.id ? null : t.id)}
-                        className="mr-3 text-xs font-semibold text-corp-blue hover:underline"
+                        className="mr-3 text-xs font-semibold text-corp-gold hover:underline"
                       >
                         {seleccionado === t.id ? "Ocultar" : "Ver radicaciones"}
                       </button>
@@ -629,7 +629,7 @@ function PanelContratista({
                         <button
                           type="button"
                           onClick={() => setFormulario(t)}
-                          className="mr-3 text-xs font-semibold text-corp-blue hover:underline"
+                          className="mr-3 text-xs font-semibold text-corp-gold hover:underline"
                         >
                           Editar
                         </button>
@@ -730,7 +730,7 @@ function PanelRadicaciones({
           <button
             type="button"
             onClick={() => setFormulario(true)}
-            className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-corp-navy"
+            className="rounded-lg bg-corp-blue px-3 py-1.5 text-xs font-semibold text-black hover:bg-corp-navy hover:text-white"
           >
             + Radicar
           </button>
@@ -758,7 +758,7 @@ function PanelRadicaciones({
                   href={r.soporte_pago}
                   target="_blank"
                   rel="noreferrer"
-                  className="ml-2 font-medium text-corp-blue hover:underline"
+                  className="ml-2 font-medium text-corp-gold hover:underline"
                 >
                   Ver soporte
                 </a>
@@ -970,7 +970,7 @@ function FormularioContratista({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Guardando…" : contratista ? "Guardar cambios" : "Crear empresa"}
             </button>
@@ -1404,7 +1404,7 @@ function FormularioTrabajador({
               <span>
                 Declaro que cuento con la autorización del trabajador para el tratamiento de sus datos
                 personales, incluidos los de afiliación a seguridad social, conforme a la{" "}
-                <Link href="/politica-privacidad" target="_blank" className="font-medium text-corp-blue hover:underline">
+                <Link href="/politica-privacidad" target="_blank" className="font-medium text-corp-gold hover:underline">
                   política de tratamiento de datos personales
                 </Link>{" "}
                 (Ley 1581 de 2012).
@@ -1417,7 +1417,7 @@ function FormularioTrabajador({
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) => setEvidenciaAutorizacion(e.target.files?.[0] ?? null)}
-              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm text-corp-navy outline-none file:mr-3 file:rounded-md file:border-0 file:bg-corp-blue-light file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-corp-blue"
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm text-corp-navy outline-none file:mr-3 file:rounded-md file:border-0 file:bg-corp-blue-light file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-corp-gold"
             />
             {trabajador?.soporte_autorizacion_datos && !evidenciaAutorizacion && (
               <p className="mt-1 text-xs text-corp-muted">
@@ -1426,7 +1426,7 @@ function FormularioTrabajador({
                   href={trabajador.soporte_autorizacion_datos}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-corp-blue hover:underline"
+                  className="text-corp-gold hover:underline"
                 >
                   verla
                 </a>
@@ -1452,7 +1452,7 @@ function FormularioTrabajador({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Guardando…" : trabajador ? "Guardar cambios" : "Crear trabajador"}
             </button>
@@ -1573,7 +1573,7 @@ function FormularioRadicacion({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Radicando…" : "Radicar"}
             </button>
