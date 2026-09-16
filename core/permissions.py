@@ -83,6 +83,27 @@ class EsPersonalInterno(BasePermission):
         return bool(perfil and perfil.es_interno)
 
 
+class EsPersonalInternoParaLeerYAdministradorParaEscribir(BasePermission):
+    """Leer (GET) requiere ser personal interno (Administrador u Operador,
+    nunca Contratista); escribir requiere Administrador. Para EquipoLocal: el
+    listado/detalle devuelve el api_key en texto plano — la credencial con la
+    que ese equipo inyecta eventos de cámara y reescribe/borra zonas y
+    reglas de una empresa entera — así que ni siquiera debe quedar visible
+    para el portal de contratistas, a diferencia del resto de "Sistema"
+    (ver EsAdministradorOSoloLectura, que sí deja leer a cualquier
+    autenticado porque esas otras vistas no exponen secretos)."""
+
+    message = "Esta sección es solo para el personal de SST/interventoría; escribir requiere administrador."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return EsPersonalInterno().has_permission(request, view)
+        return EsAdministrador().has_permission(request, view)
+
+
 class EsPersonalInternoOSoloLectura(BasePermission):
     """Cualquier usuario autenticado puede leer (GET); crear/editar requiere
     ser personal interno (Administrador u Operador) — para datos que un

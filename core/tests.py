@@ -90,6 +90,34 @@ class LoginThrottleTests(TestCase):
         )
         self.assertEqual(bloqueado.status_code, 429)
 
+    def test_variar_x_forwarded_for_no_evade_el_limite(self):
+        """Sin NUM_PROXIES configurado, DRF identifica al cliente del
+        throttle con el X-Forwarded-For completo tal cual llega — como ese
+        header lo puede mandar cualquiera, bastaba con variarlo en cada
+        intento para que cada uno contara como una "IP" distinta y el límite
+        nunca se alcanzara. Con NUM_PROXIES=1, solo importa el último salto
+        (el que antepone el proxy de verdad), así que aunque el cliente
+        cambie el resto, sigue contando como el mismo origen."""
+        from rest_framework.settings import api_settings
+
+        limite = int(api_settings.DEFAULT_THROTTLE_RATES["login"].split("/")[0])
+        for i in range(limite):
+            response = self.client.post(
+                self.url,
+                {"username": "admin", "password": "mala"},
+                content_type="application/json",
+                HTTP_X_FORWARDED_FOR=f"1.2.3.{i}, 203.0.113.9",
+            )
+            self.assertEqual(response.status_code, 401)
+
+        bloqueado = self.client.post(
+            self.url,
+            {"username": "admin", "password": "clave12345"},
+            content_type="application/json",
+            HTTP_X_FORWARDED_FOR="1.2.3.255, 203.0.113.9",
+        )
+        self.assertEqual(bloqueado.status_code, 429)
+
 
 class RegistroInicioSesionTests(TestCase):
     """El historial de inicios de sesión (Sistema → Auditoría) — solo lo
@@ -139,12 +167,15 @@ class RegistroInicioSesionTests(TestCase):
         self.assertEqual(registro.username_intentado, "dueño")
         self.assertFalse(registro.exitoso)
 
-    def test_ip_se_toma_del_x_forwarded_for(self):
+    def test_ip_se_toma_del_ultimo_salto_del_x_forwarded_for(self):
+        """El primer valor de X-Forwarded-For lo puede mandar el propio
+        cliente (no es de fiar); el último es el que antepone el proxy de
+        Railway al reenviar la petición — ese es el que hay que registrar."""
         self.client.post(
             self.login_url,
             {"username": "dueño", "password": "clave12345"},
             content_type="application/json",
-            HTTP_X_FORWARDED_FOR="203.0.113.5, 10.0.0.1",
+            HTTP_X_FORWARDED_FOR="1.2.3.4-falsificada-por-el-cliente, 203.0.113.5",
         )
         registro = RegistroInicioSesion.objects.latest("fecha")
         self.assertEqual(registro.ip, "203.0.113.5")

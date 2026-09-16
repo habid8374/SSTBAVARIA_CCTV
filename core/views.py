@@ -39,12 +39,16 @@ def _serializar_usuario(user):
 
 def _ip_cliente(request):
     """La IP real del navegador — Railway (y cualquier proxy) pone el
-    REMOTE_ADDR del request en la IP del proxy, no la del cliente; la IP de
-    verdad viaja en X-Forwarded-For (la primera de la lista, de izquierda a
-    derecha, es la del cliente original)."""
+    REMOTE_ADDR del request en la IP del proxy, no la del cliente. La IP de
+    verdad viaja en X-Forwarded-For, pero ese header lo puede mandar
+    cualquiera (no solo un proxy real): tomar el primer valor de la lista
+    (como se hacía antes) es tomar justo el que el cliente puede falsificar.
+    El único salto de confianza es el que antepone el proxy de Railway, que
+    es el ÚLTIMO de la lista — misma asunción de un solo proxy que
+    REST_FRAMEWORK.NUM_PROXIES en settings.py."""
     reenviada = request.META.get("HTTP_X_FORWARDED_FOR")
     if reenviada:
-        return reenviada.split(",")[0].strip()
+        return reenviada.split(",")[-1].strip()
     return request.META.get("REMOTE_ADDR")
 
 
