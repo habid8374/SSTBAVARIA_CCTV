@@ -6,12 +6,13 @@ import Link from "next/link";
 
 import { ApiError, login } from "@/lib/api";
 import { guardarSesion } from "@/lib/auth";
-import { IconCandado, IconUsuario } from "@/components/icons";
+import { IconCandado, IconOjo, IconOjoTachado, IconUsuario } from "@/components/icons";
 
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [recordarme, setRecordarme] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avisoClave, setAvisoClave] = useState(false);
@@ -84,14 +85,27 @@ export default function LoginPage() {
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={mostrarPassword ? "text" : "password"}
                   autoComplete="current-password"
                   required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-lg border border-corp-border py-2.5 pl-10 pr-3 text-sm text-corp-navy outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+                  className="w-full rounded-lg border border-corp-border py-2.5 pl-10 pr-10 text-sm text-corp-navy outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
                 />
+                <button
+                  type="button"
+                  onClick={() => setMostrarPassword((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-corp-muted transition hover:text-corp-navy"
+                >
+                  {mostrarPassword ? (
+                    <IconOjoTachado className="h-4.5 w-4.5" />
+                  ) : (
+                    <IconOjo className="h-4.5 w-4.5" />
+                  )}
+                </button>
               </div>
             </div>
 
