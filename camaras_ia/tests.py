@@ -10,7 +10,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Empresa
+from core.models import Empresa, PerfilUsuario
 
 from .ia_deteccion import _parsear_json, clasificar_evento
 from .models import (
@@ -664,6 +664,9 @@ class DashboardEndpointsTests(TestCase):
         self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.contratista_user = Usuario.objects.create_user("contratista1", "contratista@x.com", "clave12345")
+        self.contratista_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        self.contratista_user.perfil.save(update_fields=["rol"])
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1", activa=True)
         self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
         self.regla = ReglaAlerta.objects.create(
@@ -1087,6 +1090,29 @@ class DashboardEndpointsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)  # el de setUp + el de este test
         self.assertIn("api_key", response.data[0])
+
+    def test_contratista_no_puede_listar_equipos_locales(self):
+        """El api_key de EquipoLocal es la credencial con la que ese equipo
+        inyecta eventos y reescribe/borra zonas y reglas de una empresa —
+        nunca debe quedar visible para el portal de contratistas."""
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.contratista_user)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_contratista_no_puede_ver_detalle_de_equipo_local(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_detalle", args=[self.equipo.pk]),
+            **self._auth(self.contratista_user),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_contratista_no_puede_descargar_el_zip_de_equipo_local(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.contratista_user),
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_operador_no_puede_crear_equipo_local(self):
         response = self.client.post(

@@ -326,6 +326,15 @@ REST_FRAMEWORK = {
         # contraseñas — ver core.throttling.LoginRateThrottle.
         "login": "10/min",
     },
+    # Sin esto, DRF identifica al cliente del throttle con el X-Forwarded-For
+    # completo tal cual llega (documentado así en el propio DRF) — como ese
+    # header lo puede mandar cualquiera (no solo un proxy de verdad), bastaba
+    # con variar su valor en cada intento para saltarse por completo el
+    # límite de "login" de arriba. NUM_PROXIES=1 asume un solo proxy de
+    # confianza delante de la app (el edge de Railway) y toma el único salto
+    # que ese proxy antepone — coherente con SECURE_PROXY_SSL_HEADER más
+    # abajo, que ya asume esa misma topología.
+    "NUM_PROXIES": int(os.environ.get("NUM_PROXIES", "1")),
 }
 
 # Cabeceras de seguridad HTTP — activas siempre (no solo en producción), no

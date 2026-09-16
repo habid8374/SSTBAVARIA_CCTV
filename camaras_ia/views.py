@@ -16,7 +16,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import Empresa
-from core.permissions import EsAdministrador, EsAdministradorOSoloLectura, EsAdministradorParaEliminar
+from core.permissions import (
+    EsAdministrador,
+    EsAdministradorOSoloLectura,
+    EsAdministradorParaEliminar,
+    EsPersonalInternoParaLeerYAdministradorParaEscribir,
+)
 
 from .ia_deteccion import clasificar_evento
 from .models import (
@@ -534,11 +539,17 @@ class TipoEventoIADetalle(generics.RetrieveUpdateDestroyAPIView):
 
 class EquipoLocalListaCrear(generics.ListCreateAPIView):
     """Alta y listado de equipos locales (mini-PC en sitio) desde el
-    dashboard — antes solo existía por el admin de Django."""
+    dashboard — antes solo existía por el admin de Django.
+
+    Leer requiere ser personal interno (Administrador u Operador); escribir,
+    Administrador. Nunca un usuario Contratista: EquipoLocalSerializer
+    devuelve el api_key en texto plano, que es la credencial con la que ese
+    equipo puede inyectar eventos de cámara y reescribir/borrar zonas y
+    reglas de una empresa entera (ver EsPersonalInternoParaLeerYAdministradorParaEscribir)."""
 
     queryset = EquipoLocal.objects.order_by("nombre")
     serializer_class = EquipoLocalSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
     def perform_create(self, serializer):
         empresa = Empresa.objects.first()
@@ -548,11 +559,12 @@ class EquipoLocalListaCrear(generics.ListCreateAPIView):
 
 
 class EquipoLocalDetalle(generics.RetrieveUpdateDestroyAPIView):
-    """Activar/desactivar o eliminar un equipo local."""
+    """Activar/desactivar o eliminar un equipo local. Ver el docstring de
+    EquipoLocalListaCrear (expone el api_key — nunca para Contratista)."""
 
     queryset = EquipoLocal.objects.all()
     serializer_class = EquipoLocalSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
 
 class InstruccionSeguridadListaCrear(generics.ListCreateAPIView):
@@ -603,7 +615,7 @@ def _env_real_para_equipo(request, equipo):
 
 
 @api_view(["GET"])
-@permission_classes([EsAdministradorOSoloLectura])
+@permission_classes([EsPersonalInternoParaLeerYAdministradorParaEscribir])
 def descargar_equipo_local_zip(request):
     """Empaqueta la carpeta equipo_local/ (el programa que corre en el PC
     de la planta) en un .zip listo para copiar a ese PC, con el .env ya
