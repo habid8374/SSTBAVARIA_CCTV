@@ -164,7 +164,7 @@ class Config:
     # red en vez de IP". Si hay más de un equipo local en la misma red,
     # cada uno necesita un VISOR_WEB_MDNS_NOMBRE distinto.
     VISOR_WEB_MDNS_ACTIVO = _booleano("VISOR_WEB_MDNS_ACTIVO", True)
-    VISOR_WEB_MDNS_NOMBRE = os.environ.get("VISOR_WEB_MDNS_NOMBRE", "sstbavaria-camaras")
+    VISOR_WEB_MDNS_NOMBRE = os.environ.get("VISOR_WEB_MDNS_NOMBRE", "guardia-camaras")
 
     @classmethod
     def validar(cls):

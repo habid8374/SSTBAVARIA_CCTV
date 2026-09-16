@@ -40,18 +40,18 @@ $configuracion = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
 Register-ScheduledTask `
-    -TaskName "SSTBavaria-EquipoLocalCamaras" `
+    -TaskName "GuardIA-EquipoLocalCamaras" `
     -Action $accion `
     -Trigger $disparador `
     -Settings $configuracion `
     -Principal $principal `
-    -Description "Equipo local de camaras IA de SST Bavaria - detecta personas en zonas restringidas y reporta al dashboard." `
+    -Description "Equipo local de camaras IA de GuardIA - detecta personas en zonas restringidas y reporta al dashboard." `
     -Force
 
 # Register-ScheduledTask solo actualiza la definicion de la tarea, no mata
 # una instancia que ya este corriendo con la configuracion anterior — se
 # detiene aca para que instalar.bat siempre arranque una limpia despues.
-Stop-ScheduledTask -TaskName "SSTBavaria-EquipoLocalCamaras" -ErrorAction SilentlyContinue
+Stop-ScheduledTask -TaskName "GuardIA-EquipoLocalCamaras" -ErrorAction SilentlyContinue
 
 # Activa el historial de tareas de Windows (viene deshabilitado por
 # defecto) — asi la pestana "Historial" del Programador de tareas muestra
@@ -59,4 +59,4 @@ Stop-ScheduledTask -TaskName "SSTBavaria-EquipoLocalCamaras" -ErrorAction Silent
 wevtutil sl Microsoft-Windows-TaskScheduler/Operational /e:true 2>$null
 
 Write-Host "Tarea programada registrada. Se puede iniciar ahora con:"
-Write-Host "  Start-ScheduledTask -TaskName SSTBavaria-EquipoLocalCamaras"
+Write-Host "  Start-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras"

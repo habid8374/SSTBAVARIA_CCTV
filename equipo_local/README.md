@@ -76,7 +76,7 @@ siempre que el PC ya tenga Python instalado (una sola vez, ver abajo).
    ya trae un archivo `.env` completo (URL del backend + `api_key` de ese
    equipo en particular) — no hay que editar ni pegar nada a mano.
 3. En el PC de la planta, descomprimir el `.zip` (clic derecho → "Extraer
-   todo" en Windows) en una carpeta local fija — ej. `C:\SSTBavaria\`.
+   todo" en Windows) en una carpeta local fija — ej. `C:\GuardIA\`.
    **Evitar Descargas, Escritorio o Documentos**: en la mayoría de PCs con
    cuenta de empresa/Microsoft 365, esas carpetas están sincronizadas con
    OneDrive, y la Tarea Programada (que corre como SYSTEM, no como el
@@ -189,7 +189,7 @@ notificación (ej. Brevo sin configurar en Sistema → Brevo), no de zona. Si
 detectando a nadie, o se detecta pero nunca cae dentro de la zona dibujada.
 
 Para verlo con detalle, poner `LOG_LEVEL=DEBUG` en el `.env` y reiniciar el
-programa (`Restart-ScheduledTask -TaskName SSTBavaria-EquipoLocalCamaras` en
+programa (`Restart-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras` en
 Windows, o el servicio en Linux/Mac) — con eso, cada frame donde YOLO
 detecta a alguien queda registrado en `equipo_local.log`, diga o no diga
 que cayó dentro de una zona:
@@ -264,10 +264,10 @@ evento — y aparecer casi al instante en la bandeja de Alertas del dashboard.
 #### Linux (systemd)
 
 ```bash
-sudo mkdir -p /opt/sstbavaria-camaras
-sudo cp -r . /opt/sstbavaria-camaras/equipo_local
-sudo cp .env /opt/sstbavaria-camaras/equipo_local/.env
-cd /opt/sstbavaria-camaras/equipo_local && sudo python -m venv venv && sudo ./venv/bin/pip install -r requirements.txt
+sudo mkdir -p /opt/guardia-camaras
+sudo cp -r . /opt/guardia-camaras/equipo_local
+sudo cp .env /opt/guardia-camaras/equipo_local/.env
+cd /opt/guardia-camaras/equipo_local && sudo python -m venv venv && sudo ./venv/bin/pip install -r requirements.txt
 
 sudo cp equipo_local/systemd/equipo-local-camaras.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -289,10 +289,10 @@ Ajustar las rutas y el `User=` del `.service` si se instala en otro lugar
    .\windows\instalar_tarea_programada.ps1
    ```
 
-3. Esto registra la tarea "SSTBavaria-EquipoLocalCamaras", que arranca sola
+3. Esto registra la tarea "GuardIA-EquipoLocalCamaras", que arranca sola
    con Windows (sin ventana) y se reinicia sola si el proceso se cae.
    Para iniciarla ya, sin reiniciar el PC: `Start-ScheduledTask -TaskName
-   SSTBavaria-EquipoLocalCamaras`. Para ver que esté corriendo: Administrador
+   GuardIA-EquipoLocalCamaras`. Para ver que esté corriendo: Administrador
    de tareas → pestaña Detalles → buscar `pythonw.exe`.
 
 ## Grabaciones y visor en vivo
@@ -365,7 +365,7 @@ Para no tener que buscar/memorizar la IP cada vez, el equipo local anuncia
 un nombre fijo en la red (mDNS/Bonjour, activado por defecto):
 
 ```
-http://sstbavaria-camaras.local:8090
+http://guardia-camaras.local:8090
 ```
 
 (el nombre es `VISOR_WEB_MDNS_NOMBRE`, configurable — necesario si hay más
@@ -395,6 +395,13 @@ ver nada. Si se dejan vacíos (default), el visor queda abierto a quien esté
 en la misma red — solo recomendable si esa red ya es de confianza (la
 consola arranca con una advertencia si quedan vacíos, para no pasarlo por
 alto). Para desactivar el visor por completo: `VISOR_WEB_ACTIVO=false`.
+
+La forma más simple de configurarlo: desde el dashboard, Sistema → Equipo
+local → columna "Visor web" de la fila del equipo → definir usuario y
+contraseña ahí. El botón "Descargar equipo_local (.zip)" ya incluye esas
+dos líneas en el `.env` generado — no hace falta editarlo a mano. Si se
+cambia después de ya instalado, hay que volver a descargar el `.zip` y
+reinstalar para que tome el usuario/contraseña nuevos.
 
 ## Altavoz de disuasión (luz + sirena) — experimental, apagado por defecto
 

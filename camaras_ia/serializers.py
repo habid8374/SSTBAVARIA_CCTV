@@ -363,13 +363,26 @@ class EquipoLocalSerializer(serializers.ModelSerializer):
     """CRUD de equipos locales (mini-PC en sitio) desde el dashboard —
     antes solo se podían crear desde el admin de Django. api_key se genera
     sola al crear el registro (ver models.generar_api_key) y se muestra acá
-    para que el administrador la copie al .env del equipo local."""
+    para que el administrador la copie al .env del equipo local.
+
+    visor_usuario/visor_password son opcionales: si se dejan vacíos, el
+    visor web local (equipo_local/visor_web.py) queda sin autenticación."""
 
     conectado = serializers.SerializerMethodField()
 
     class Meta:
         model = EquipoLocal
-        fields = ["id", "nombre", "api_key", "activo", "ultima_conexion", "conectado", "creado_en"]
+        fields = [
+            "id",
+            "nombre",
+            "api_key",
+            "activo",
+            "visor_usuario",
+            "visor_password",
+            "ultima_conexion",
+            "conectado",
+            "creado_en",
+        ]
         read_only_fields = ["id", "api_key", "ultima_conexion", "creado_en"]
 
     def get_conectado(self, equipo):

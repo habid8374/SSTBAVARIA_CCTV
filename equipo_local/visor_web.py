@@ -104,7 +104,7 @@ def crear_app(sincronizador, config):
             return Response(
                 "Autenticación requerida.",
                 401,
-                {"WWW-Authenticate": 'Basic realm="Equipo Local SST Bavaria"'},
+                {"WWW-Authenticate": 'Basic realm="Equipo Local GuardIA"'},
             )
         return None
 
@@ -325,7 +325,7 @@ _PAGINA_HTML = """<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>SST Bavaria — Equipo Local</title>
+<title>GuardIA — Equipo Local</title>
 <style>
   body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
   header { padding: 1rem 1.5rem; background: #1e2761; }
@@ -348,7 +348,7 @@ _PAGINA_HTML = """<!doctype html>
 </style>
 </head>
 <body>
-<header><h1>SST Bavaria — Equipo Local (cámaras y grabaciones)</h1>
+<header><h1>GuardIA — Equipo Local (cámaras y grabaciones)</h1>
   <a href="/configurar" style="color:#93c5fd">Configurar zonas y horarios →</a>
 </header>
 <main>
@@ -468,7 +468,7 @@ _PAGINA_CONFIGURAR_INDEX = """<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Configurar zonas y horarios — SST Bavaria</title>
+<title>Configurar zonas y horarios — GuardIA</title>
 <style>
   body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
   header { padding: 1rem 1.5rem; background: #1e2761; }
@@ -517,7 +517,7 @@ _PAGINA_CONFIGURAR_CAMARA = """<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Configurar cámara — SST Bavaria</title>
+<title>Configurar cámara — GuardIA</title>
 <style>
   body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
   header { padding: 1rem 1.5rem; background: #1e2761; display: flex; justify-content: space-between;

@@ -1,5 +1,5 @@
 [Unit]
-Description=SST Bavaria - Equipo local de camaras IA
+Description=GuardIA - Equipo local de camaras IA
 After=network-online.target
 Wants=network-online.target
 
@@ -10,9 +10,9 @@ Type=simple
 # equipo_local mismo) para que "-m equipo_local.main" pueda importar el
 # paquete — Python solo lo busca como subcarpeta de la carpeta de trabajo.
 User=camaras
-WorkingDirectory=/opt/sstbavaria-camaras
-EnvironmentFile=/opt/sstbavaria-camaras/equipo_local/.env
-ExecStart=/opt/sstbavaria-camaras/equipo_local/venv/bin/python -m equipo_local.main
+WorkingDirectory=/opt/guardia-camaras
+EnvironmentFile=/opt/guardia-camaras/equipo_local/.env
+ExecStart=/opt/guardia-camaras/equipo_local/venv/bin/python -m equipo_local.main
 Restart=always
 RestartSec=5
 

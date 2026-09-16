@@ -28,7 +28,7 @@ if not "%errorlevel%"=="0" (
 
 cd /d "%~dp0"
 echo.
-echo === Instalador del Equipo local de camaras SST Bavaria (version compilada) ===
+echo === Instalador del Equipo local de camaras GuardIA (version compilada) ===
 echo Carpeta: %cd%
 echo.
 
@@ -65,7 +65,7 @@ if errorlevel 1 (
 )
 
 echo [2/2] Iniciando ahora...
-powershell -NoProfile -Command "Start-ScheduledTask -TaskName SSTBavaria-EquipoLocalCamaras"
+powershell -NoProfile -Command "Start-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras"
 
 echo.
 echo ================================================================
@@ -75,7 +75,7 @@ echo  tenga que abrir nada ni tener Python instalado.
 echo.
 echo  Para ver las camaras en vivo y las grabaciones desde un
 echo  navegador (en la misma red de la planta):
-echo    http://sstbavaria-camaras.local:8090
+echo    http://guardia-camaras.local:8090
 echo ================================================================
 echo.
 pause

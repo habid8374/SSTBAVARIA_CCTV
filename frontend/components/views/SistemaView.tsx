@@ -566,6 +566,7 @@ function EquiposLocales({ token }: { token: string }) {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
   const [descargandoZipId, setDescargandoZipId] = useState<number | null>(null);
+  const [equipoVisorEditando, setEquipoVisorEditando] = useState<EquipoLocal | null>(null);
   const { confirmar } = useDialog();
 
   function cargar() {
@@ -659,7 +660,7 @@ function EquiposLocales({ token }: { token: string }) {
           (no desde acá, para no subir video a internet), en:
         </p>
         <p className="mt-2 rounded-md bg-white px-3 py-2 font-mono text-xs text-corp-navy">
-          http://sstbavaria-camaras.local:8090
+          http://guardia-camaras.local:8090
         </p>
         <p className="mt-1 text-xs text-corp-muted">
           Nombre fijo en la red (funciona directo en Mac/Linux; en Windows hace falta instalar &quot;Bonjour
@@ -677,6 +678,7 @@ function EquiposLocales({ token }: { token: string }) {
               <th className="px-4 py-3">API key</th>
               <th className="px-4 py-3">Conexión</th>
               <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Visor web</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
@@ -721,6 +723,18 @@ function EquiposLocales({ token }: { token: string }) {
                     {equipo.activo ? "Activo" : "Inactivo"}
                   </span>
                 </td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setEquipoVisorEditando(equipo)}
+                    title="Usuario/contraseña del visor web local (http://guardia-camaras.local:8090)"
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium transition hover:underline ${
+                      equipo.visor_usuario ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {equipo.visor_usuario ? "Con contraseña" : "Sin autenticar"}
+                  </button>
+                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
                     <button
@@ -764,6 +778,18 @@ function EquiposLocales({ token }: { token: string }) {
           onCerrar={() => setMostrarFormulario(false)}
           onCreado={() => {
             setMostrarFormulario(false);
+            cargar();
+          }}
+        />
+      )}
+
+      {equipoVisorEditando && (
+        <FormularioAccesoVisor
+          token={token}
+          equipo={equipoVisorEditando}
+          onCerrar={() => setEquipoVisorEditando(null)}
+          onGuardado={() => {
+            setEquipoVisorEditando(null);
             cargar();
           }}
         />
@@ -838,6 +864,108 @@ function FormularioNuevoEquipo({
               className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Creando…" : "Crear equipo"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function FormularioAccesoVisor({
+  token,
+  equipo,
+  onCerrar,
+  onGuardado,
+}: {
+  token: string;
+  equipo: EquipoLocal;
+  onCerrar: () => void;
+  onGuardado: () => void;
+}) {
+  const [usuario, setUsuario] = useState(equipo.visor_usuario);
+  const [password, setPassword] = useState(equipo.visor_password);
+  const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if (usuario.trim() && !password.trim()) {
+      setError("Si pones un usuario, también hace falta una contraseña.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      await actualizarEquipoLocal(token, equipo.id, {
+        visor_usuario: usuario.trim(),
+        visor_password: usuario.trim() ? password : "",
+      });
+      onGuardado();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar el acceso del visor.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 className="text-lg font-semibold text-corp-navy">Acceso al visor web — {equipo.nombre}</h2>
+        <p className="mt-1 text-sm text-corp-muted">
+          Usuario y contraseña para entrar a <code>http://guardia-camaras.local:8090</code> desde la red de
+          planta. Déjalos vacíos para que el visor quede sin autenticación — cualquiera en esa red podrá
+          verlo y configurarlo.
+        </p>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <Campo label="Usuario">
+            <input
+              autoFocus
+              value={usuario}
+              onChange={(event) => setUsuario(event.target.value)}
+              placeholder="Vacío = sin autenticación"
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+
+          <Campo label="Contraseña">
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Vacío = sin autenticación"
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+          </Campo>
+
+          {error && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
+              {error}
+            </div>
+          )}
+
+          <p className="text-xs text-corp-muted">
+            Al guardar, vuelve a descargar el <code>equipo_local (.zip)</code> de este equipo e instálalo de
+            nuevo para que tome el usuario/contraseña nuevos.
+          </p>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-corp-muted hover:bg-zinc-100"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={enviando}
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
+            >
+              {enviando ? "Guardando…" : "Guardar"}
             </button>
           </div>
         </form>

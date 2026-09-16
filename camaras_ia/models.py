@@ -201,6 +201,14 @@ class EquipoLocal(models.Model):
     nombre = models.CharField(max_length=150)
     api_key = models.CharField(max_length=64, unique=True, default=generar_api_key, editable=False)
     activo = models.BooleanField(default=True)
+    # Usuario/contraseña del visor web local (equipo_local/visor_web.py,
+    # autenticación HTTP Basic) — se guardan en texto plano porque hay que
+    # poder volver a escribirlos tal cual en el .env que se genera para el
+    # equipo (ver views._env_real_para_equipo), igual que con api_key. Sin
+    # visor_usuario, el visor queda sin autenticación (comportamiento
+    # histórico, documentado en equipo_local/README.md).
+    visor_usuario = models.CharField("usuario del visor web", max_length=64, blank=True)
+    visor_password = models.CharField("contraseña del visor web", max_length=128, blank=True)
     ultima_conexion = models.DateTimeField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
