@@ -190,7 +190,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
           <button
             type="button"
             onClick={() => setPaso("registro")}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
           >
             + Nueva capacitación
           </button>
@@ -239,7 +239,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
                           type="button"
                           onClick={() => descargarCertificado(r.id)}
                           disabled={descargandoCertificado === r.id}
-                          className="text-xs font-medium text-corp-blue hover:underline disabled:opacity-60"
+                          className="text-xs font-medium text-corp-gold hover:underline disabled:opacity-60"
                         >
                           {descargandoCertificado === r.id ? "Descargando…" : "Certificado"}
                         </button>
@@ -248,7 +248,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
                         <button
                           type="button"
                           onClick={() => continuarEvaluacion(r)}
-                          className="text-xs font-medium text-corp-blue hover:underline"
+                          className="text-xs font-medium text-corp-gold hover:underline"
                         >
                           Continuar evaluación
                         </button>
@@ -316,7 +316,7 @@ function FormularioRegistro({
 
   return (
     <div>
-      <button type="button" onClick={onCancelar} className="text-sm font-medium text-corp-blue hover:underline">
+      <button type="button" onClick={onCancelar} className="text-sm font-medium text-corp-gold hover:underline">
         ← Volver
       </button>
       <div className="mx-auto mt-4 max-w-md rounded-2xl border border-corp-border bg-white p-6 shadow-sm">
@@ -372,7 +372,7 @@ function FormularioRegistro({
           <button
             type="submit"
             disabled={enviando}
-            className="w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enviando ? "Cargando…" : "Iniciar curso"}
           </button>
@@ -419,7 +419,7 @@ function PasoVideo({
 
   return (
     <div>
-      <button type="button" onClick={onCancelar} className="text-sm font-medium text-corp-blue hover:underline">
+      <button type="button" onClick={onCancelar} className="text-sm font-medium text-corp-gold hover:underline">
         ← Cancelar
       </button>
       <div className="mx-auto mt-4 max-w-2xl rounded-2xl border border-corp-border bg-white p-6 shadow-sm">
@@ -463,7 +463,7 @@ function PasoVideo({
           type="button"
           disabled={!terminado}
           onClick={onContinuar}
-          className="mt-4 w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-4 w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           Continuar a evaluación
         </button>
@@ -513,7 +513,7 @@ function PasoEvaluacion({
 
   return (
     <div>
-      <button type="button" onClick={onCancelar} className="text-sm font-medium text-corp-blue hover:underline">
+      <button type="button" onClick={onCancelar} className="text-sm font-medium text-corp-gold hover:underline">
         ← Cancelar
       </button>
       <form onSubmit={handleSubmit} className="mx-auto mt-4 max-w-2xl space-y-5 rounded-2xl border border-corp-border bg-white p-6 shadow-sm">
@@ -548,7 +548,7 @@ function PasoEvaluacion({
         <button
           type="submit"
           disabled={enviando || preguntas.length === 0}
-          className="w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           {enviando ? "Calificando…" : "Enviar evaluación"}
         </button>
@@ -586,7 +586,7 @@ function PasoResultado({
           <div className="mt-6 rounded-xl border-2 border-corp-navy p-6">
             <h3 className="text-lg font-bold text-corp-navy">CERTIFICADO DE CAPACITACIÓN</h3>
             <p className="mt-2 text-sm text-corp-muted">
-              SST Bavaria otorga el presente reconocimiento a:
+              GuardIA otorga el presente reconocimiento a:
             </p>
             <p className="mt-2 text-2xl font-semibold text-corp-navy">{resultado.nombres}</p>
             <p className="mt-2 text-sm text-corp-muted">

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const TITULO = "SST Bavaria — Cámaras IA";
+const TITULO = "GuardIA — Seguridad Laboral + CCTV + Inteligencia Artificial";
 const DESCRIPCION = "Plataforma de videovigilancia con IA y cumplimiento SST para contratistas.";
 
 export const metadata: Metadata = {
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Cámaras IA",
+    title: "GuardIA",
   },
   icons: {
     icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     title: TITULO,
     description: DESCRIPCION,
     url: "/",
-    siteName: "SST Bavaria",
+    siteName: "GuardIA",
     images: [{ url: "/og-image.png", width: 1200, height: 630, alt: TITULO }],
     locale: "es_CO",
     type: "website",
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0b1f3a",
+  themeColor: "#111111",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

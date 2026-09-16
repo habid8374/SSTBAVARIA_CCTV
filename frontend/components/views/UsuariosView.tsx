@@ -98,7 +98,7 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
         <button
           type="button"
           onClick={() => setMostrarFormulario(true)}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
           + Nuevo usuario
         </button>
@@ -271,7 +271,7 @@ function FormularioElegirEmpresa({
             type="button"
             disabled={!contratistaId}
             onClick={() => onElegir(Number(contratistaId))}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
           >
             Guardar
           </button>
@@ -376,7 +376,7 @@ function FormularioEditarUsuario({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Guardando…" : "Guardar cambios"}
             </button>
@@ -508,7 +508,7 @@ function FormularioNuevoUsuario({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Creando…" : "Crear usuario"}
             </button>

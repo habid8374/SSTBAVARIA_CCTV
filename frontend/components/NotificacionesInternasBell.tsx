@@ -209,7 +209,7 @@ export default function NotificacionesInternasBell({
                 <button
                   type="button"
                   onClick={marcarTodas}
-                  className="text-xs font-semibold text-corp-blue hover:underline"
+                  className="text-xs font-semibold text-corp-gold hover:underline"
                 >
                   Marcar todas leídas
                 </button>
@@ -269,7 +269,7 @@ export default function NotificacionesInternasBell({
                 type="button"
                 onClick={suscritoPush ? desactivarPush : activarPush}
                 disabled={cargandoPush}
-                className="text-xs font-medium text-corp-blue hover:underline disabled:opacity-60"
+                className="text-xs font-medium text-corp-gold hover:underline disabled:opacity-60"
               >
                 {cargandoPush
                   ? "Un momento…"

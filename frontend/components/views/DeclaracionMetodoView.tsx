@@ -209,7 +209,7 @@ export default function DeclaracionMetodoView({ token, rol }: { token: string; r
           onClick={() => setSeleccionada("nueva")}
           disabled={!contratistas?.length}
           title={!contratistas?.length ? "Registra primero una empresa contratista en “Contratistas”" : undefined}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           + Nueva declaración
         </button>
@@ -652,7 +652,7 @@ function FormularioDeclaracion({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <button type="button" onClick={onVolver} className="text-sm font-medium text-corp-blue hover:underline">
+        <button type="button" onClick={onVolver} className="text-sm font-medium text-corp-gold hover:underline">
           ← Volver a la lista
         </button>
         {declaracion && (
@@ -718,7 +718,7 @@ function FormularioDeclaracion({
               if (archivo) importarExcel(archivo);
               e.target.value = "";
             }}
-            className="mt-3 block text-sm text-corp-navy file:mr-3 file:rounded-lg file:border-0 file:bg-corp-blue file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-corp-navy disabled:opacity-60"
+            className="mt-3 block text-sm text-corp-navy file:mr-3 file:rounded-lg file:border-0 file:bg-corp-blue file:px-3 file:py-2 file:text-sm file:font-semibold file:text-black hover:file:bg-corp-navy hover:file:text-white disabled:opacity-60"
           />
           {importandoExcel && <p className="mt-2 text-sm text-corp-muted">Leyendo el archivo…</p>}
           {avisosImportacion.length > 0 && (
@@ -835,7 +835,7 @@ function FormularioDeclaracion({
               <button
                 type="button"
                 onClick={() => setMostrarActividades((actual) => !actual)}
-                className="text-sm font-medium text-corp-blue hover:underline"
+                className="text-sm font-medium text-corp-gold hover:underline"
               >
                 {mostrarActividades ? "Ocultar detalle de actividades" : "Ver detalle de actividades"}
               </button>
@@ -1081,7 +1081,7 @@ function FormularioDeclaracion({
           <button
             type="button"
             onClick={agregarActividad}
-            className="mt-4 rounded-lg border border-dashed border-corp-blue px-4 py-2 text-sm font-semibold text-corp-blue hover:bg-corp-blue-light"
+            className="mt-4 rounded-lg border border-dashed border-corp-blue px-4 py-2 text-sm font-semibold text-corp-gold hover:bg-corp-blue-light"
           >
             + Agregar actividad
           </button>
@@ -1181,7 +1181,7 @@ function FormularioDeclaracion({
           <button
             type="submit"
             disabled={enviando}
-            className="rounded-lg bg-corp-blue px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+            className="rounded-lg bg-corp-blue px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
           >
             {enviando ? "Guardando…" : declaracion ? "Guardar cambios" : "Crear declaración"}
           </button>
@@ -1431,7 +1431,7 @@ function PanelFirmas({
           <button
             type="submit"
             disabled={enviando || !consientoFirma}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enviando ? "Firmando…" : "Firmar"}
           </button>

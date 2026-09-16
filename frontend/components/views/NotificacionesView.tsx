@@ -46,7 +46,7 @@ function BotonPestana({
       type="button"
       onClick={onClick}
       className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
-        activa ? "border-corp-blue text-corp-blue" : "border-transparent text-corp-muted hover:text-corp-navy"
+        activa ? "border-corp-blue text-corp-gold" : "border-transparent text-corp-muted hover:text-corp-navy"
       }`}
     >
       {children}

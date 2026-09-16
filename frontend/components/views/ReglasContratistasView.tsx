@@ -130,7 +130,7 @@ function DiasAlerta({ token }: { token: string }) {
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Guardando…" : "Guardar"}
             </button>
@@ -269,16 +269,16 @@ function Cursos({ token }: { token: string }) {
               </span>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <button type="button" onClick={() => alternarObligatorio(c)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => alternarObligatorio(c)} className="text-corp-gold hover:underline">
                 {c.obligatorio ? "Quitar obligatoriedad" : "Marcar obligatorio"}
               </button>
-              <button type="button" onClick={() => editarVigencia(c)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => editarVigencia(c)} className="text-corp-gold hover:underline">
                 Vigencia
               </button>
-              <button type="button" onClick={() => editar(c)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => editar(c)} className="text-corp-gold hover:underline">
                 Editar
               </button>
-              <button type="button" onClick={() => alternarActivo(c)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => alternarActivo(c)} className="text-corp-gold hover:underline">
                 {c.activo ? "Desactivar" : "Activar"}
               </button>
               <button type="button" onClick={() => eliminar(c)} className="text-red-600 hover:underline">
@@ -304,7 +304,7 @@ function Cursos({ token }: { token: string }) {
         </label>
         <button
           type="submit"
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
           + Agregar
         </button>
@@ -429,13 +429,13 @@ function CertificacionesEspeciales({ token }: { token: string }) {
               </span>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <button type="button" onClick={() => editarVigencia(c)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => editarVigencia(c)} className="text-corp-gold hover:underline">
                 Vigencia
               </button>
-              <button type="button" onClick={() => editar(c)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => editar(c)} className="text-corp-gold hover:underline">
                 Editar
               </button>
-              <button type="button" onClick={() => alternarActivo(c)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => alternarActivo(c)} className="text-corp-gold hover:underline">
                 {c.activo ? "Desactivar" : "Activar"}
               </button>
               <button type="button" onClick={() => eliminar(c)} className="text-red-600 hover:underline">
@@ -461,7 +461,7 @@ function CertificacionesEspeciales({ token }: { token: string }) {
         </label>
         <button
           type="submit"
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
           + Agregar
         </button>
@@ -553,10 +553,10 @@ function Permisos({ token }: { token: string }) {
           >
             <span className={p.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{p.nombre}</span>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <button type="button" onClick={() => editar(p)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => editar(p)} className="text-corp-gold hover:underline">
                 Editar
               </button>
-              <button type="button" onClick={() => alternarActivo(p)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => alternarActivo(p)} className="text-corp-gold hover:underline">
                 {p.activo ? "Desactivar" : "Activar"}
               </button>
               <button type="button" onClick={() => eliminar(p)} className="text-red-600 hover:underline">
@@ -573,7 +573,7 @@ function Permisos({ token }: { token: string }) {
         </label>
         <button
           type="submit"
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
           + Agregar
         </button>
@@ -660,10 +660,10 @@ function EquiposEpp({ token }: { token: string }) {
           >
             <span className={e.activo ? "text-corp-navy" : "text-corp-muted line-through"}>{e.nombre}</span>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <button type="button" onClick={() => editar(e)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => editar(e)} className="text-corp-gold hover:underline">
                 Editar
               </button>
-              <button type="button" onClick={() => alternarActivo(e)} className="text-corp-blue hover:underline">
+              <button type="button" onClick={() => alternarActivo(e)} className="text-corp-gold hover:underline">
                 {e.activo ? "Desactivar" : "Activar"}
               </button>
               <button type="button" onClick={() => eliminar(e)} className="text-red-600 hover:underline">
@@ -680,7 +680,7 @@ function EquiposEpp({ token }: { token: string }) {
         </label>
         <button
           type="submit"
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
           + Agregar
         </button>

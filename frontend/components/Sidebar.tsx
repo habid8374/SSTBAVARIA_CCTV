@@ -101,10 +101,13 @@ export default function Sidebar({
     >
       <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-sstbavaria.png" alt="SST Bavaria" className="h-9 w-9 shrink-0 rounded-lg" />
+        <img src="/logo-guardia.png" alt="GuardIA" className="h-9 w-9 shrink-0" />
         <div className={`min-w-0 ${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[160px] opacity-100"}`}>
-          <p className="truncate text-sm font-semibold">SST BAVARIA</p>
-          <p className="truncate text-xs text-white/60">Cámaras IA</p>
+          <p className="truncate text-sm font-semibold">
+            <span className="text-white">Guard</span>
+            <span className="text-corp-blue">IA</span>
+          </p>
+          <p className="truncate text-xs text-white/60">Seguridad + CCTV + IA</p>
         </div>
       </div>
 
@@ -119,7 +122,7 @@ export default function Sidebar({
               onClick={() => onSeleccionar(item.id)}
               title={colapsado ? item.label : undefined}
               className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
-                activo ? "bg-corp-blue text-white" : "text-white/80 hover:bg-white/10"
+                activo ? "bg-corp-blue text-black" : "text-white/80 hover:bg-white/10"
               }`}
             >
               <Icon className="h-5 w-5 shrink-0" />

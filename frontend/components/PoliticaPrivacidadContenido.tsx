@@ -16,8 +16,8 @@ export default function PoliticaPrivacidadContenido() {
   return (
     <div className="space-y-2">
       <Nota tipo="aviso">
-        Este documento es un <strong>borrador técnico</strong> generado como parte del sistema SST Bavaria
-        Cámaras IA. Los campos marcados como <Placeholder>dato pendiente</Placeholder> deben completarse con
+        Este documento es un <strong>borrador técnico</strong> generado como parte del sistema GuardIA. Los
+        campos marcados como <Placeholder>dato pendiente</Placeholder> deben completarse con
         la información real de la empresa, y el texto completo debe ser revisado por el área jurídica o un
         abogado antes de publicarse como política definitiva y vinculante.
       </Nota>
@@ -26,8 +26,8 @@ export default function PoliticaPrivacidadContenido() {
       <P>
         <Placeholder>Razón social de la empresa</Placeholder>, identificada con NIT{" "}
         <Placeholder>NIT</Placeholder>, con domicilio en <Placeholder>ciudad / dirección</Placeholder>, es
-        responsable del tratamiento de los datos personales que se recolectan a través del sistema SST
-        Bavaria Cámaras IA, en los términos de la Ley 1581 de 2012, el Decreto 1377 de 2013 y las demás
+        responsable del tratamiento de los datos personales que se recolectan a través del sistema
+        GuardIA, en los términos de la Ley 1581 de 2012, el Decreto 1377 de 2013 y las demás
         normas que los reglamenten o sustituyan.
       </P>
       <P>

@@ -84,7 +84,7 @@ export default function ConfiguracionAlertasView({ token, rol }: { token: string
           <button
             type="button"
             onClick={() => setCreando(true)}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
           >
             + Nueva regla
           </button>

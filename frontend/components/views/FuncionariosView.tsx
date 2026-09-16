@@ -67,7 +67,7 @@ export default function FuncionariosView({ token, rol }: { token: string; rol: R
         <button
           type="button"
           onClick={() => setFormulario("nuevo")}
-          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy"
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
           + Nuevo funcionario
         </button>
@@ -117,7 +117,7 @@ export default function FuncionariosView({ token, rol }: { token: string; rol: R
                       <button
                         type="button"
                         onClick={() => setFormulario(f)}
-                        className="font-medium text-corp-blue hover:underline"
+                        className="font-medium text-corp-gold hover:underline"
                       >
                         Editar
                       </button>
@@ -264,7 +264,7 @@ function FormularioFuncionario({
             <button
               type="submit"
               disabled={enviando}
-              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:opacity-60"
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
               {enviando ? "Guardando…" : funcionario ? "Guardar cambios" : "Crear funcionario"}
             </button>

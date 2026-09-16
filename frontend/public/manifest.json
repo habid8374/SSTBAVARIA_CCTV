@@ -1,12 +1,12 @@
 {
-  "name": "SST Bavaria — Cámaras IA",
-  "short_name": "Cámaras IA",
-  "description": "Panel de videovigilancia con IA de SST Bavaria: cámaras, zonas restringidas y alertas.",
+  "name": "GuardIA",
+  "short_name": "GuardIA",
+  "description": "GuardIA — Seguridad laboral + CCTV + Inteligencia Artificial: cámaras, zonas restringidas y alertas.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0b1f3a",
-  "theme_color": "#0b1f3a",
+  "background_color": "#111111",
+  "theme_color": "#111111",
   "orientation": "portrait-primary",
   "icons": [
     {

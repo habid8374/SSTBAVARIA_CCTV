@@ -128,10 +128,10 @@ export default function DialogProvider({ children }: { children: ReactNode }) {
                     cerrar(true);
                   }
                 }}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${
+                className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
                   estado.tipo === "confirmar" && estado.opciones.peligroso
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-corp-blue hover:bg-corp-navy"
+                    ? "text-white bg-red-600 hover:bg-red-700"
+                    : "text-black bg-corp-blue hover:bg-corp-navy hover:text-white"
                 }`}
               >
                 {estado.opciones.textoConfirmar ?? "Confirmar"}

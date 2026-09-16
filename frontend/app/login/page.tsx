@@ -43,8 +43,14 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10">
         <div className="w-full max-w-sm">
           <div className="mb-8">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-lockup-light.png" alt="SST Bavaria" className="mb-5 h-28 w-auto" />
+            <div className="mb-5 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-guardia.png" alt="GuardIA" className="h-14 w-14" />
+              <span className="text-3xl font-extrabold tracking-tight">
+                <span className="text-corp-navy">Guard</span>
+                <span className="text-corp-gold">IA</span>
+              </span>
+            </div>
             <h1 className="text-2xl font-semibold text-corp-navy">Iniciar sesión</h1>
           </div>
 
@@ -102,7 +108,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setAvisoClave(true)}
-                className="font-medium text-corp-blue hover:underline"
+                className="font-medium text-corp-gold hover:underline"
               >
                 ¿Olvidaste tu contraseña?
               </button>
@@ -126,7 +132,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={cargando}
-              className="w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-white transition hover:bg-corp-navy disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg bg-corp-blue py-2.5 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {cargando ? "Verificando…" : "Entrar"}
             </button>
@@ -136,7 +142,7 @@ export default function LoginPage() {
             Acceso exclusivo para personal autorizado.
           </p>
           <p className="mt-2 text-center text-xs text-corp-muted">
-            <Link href="/politica-privacidad" target="_blank" className="text-corp-blue hover:underline">
+            <Link href="/politica-privacidad" target="_blank" className="text-corp-gold hover:underline">
               Política de tratamiento de datos personales
             </Link>
           </p>
@@ -171,7 +177,7 @@ function PanelIlustracion() {
         aria-hidden
         className="absolute inset-0"
         style={{
-          background: "linear-gradient(190deg, rgba(11,31,58,0.15) 0%, rgba(6,15,33,0.85) 100%)",
+          background: "linear-gradient(190deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.88) 100%)",
         }}
       />
 

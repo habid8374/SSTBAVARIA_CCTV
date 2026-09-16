@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f6fb;
-  --foreground: #101828;
-  --color-corp-navy: #0b1f3a;
-  --color-corp-navy-deep: #071427;
-  --color-corp-blue: #2f6fed;
-  --color-corp-blue-light: #eaf0ff;
-  --color-corp-border: #d9dfec;
-  --color-corp-muted: #5b6472;
+  --background: #f7f6f1;
+  --foreground: #111111;
+  --color-corp-navy: #111111;
+  --color-corp-navy-deep: #000000;
+  --color-corp-blue: #fde202;
+  --color-corp-blue-light: #fef6d8;
+  --color-corp-gold: #7a5e00;
+  --color-corp-border: #e6e1d0;
+  --color-corp-muted: #5c5c5c;
   --color-dusk-1: #1a1240;
   --color-dusk-2: #5b2a86;
   --color-dusk-3: #b8548a;
@@ -22,6 +23,7 @@
   --color-corp-navy-deep: var(--color-corp-navy-deep);
   --color-corp-blue: var(--color-corp-blue);
   --color-corp-blue-light: var(--color-corp-blue-light);
+  --color-corp-gold: var(--color-corp-gold);
   --color-corp-border: var(--color-corp-border);
   --color-corp-muted: var(--color-corp-muted);
   --color-dusk-1: var(--color-dusk-1);
