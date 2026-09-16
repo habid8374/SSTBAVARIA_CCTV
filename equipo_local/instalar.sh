@@ -19,7 +19,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo ""
-echo "=== Instalador del Equipo local de camaras SST Bavaria ==="
+echo "=== Instalador del Equipo local de camaras GuardIA ==="
 echo "Carpeta: $(pwd)"
 echo ""
 
@@ -63,9 +63,9 @@ USUARIO_ACTUAL="$(whoami)"
 # — necesario para que "-m equipo_local.main" encuentre el paquete (ver
 # systemd/equipo-local-camaras.service).
 sed \
-    -e "s#WorkingDirectory=/opt/sstbavaria-camaras#WorkingDirectory=${CARPETA_PADRE}#" \
-    -e "s#EnvironmentFile=/opt/sstbavaria-camaras/equipo_local/.env#EnvironmentFile=${CARPETA_ACTUAL}/.env#" \
-    -e "s#ExecStart=/opt/sstbavaria-camaras/equipo_local/venv/bin/python#ExecStart=${CARPETA_ACTUAL}/venv/bin/python#" \
+    -e "s#WorkingDirectory=/opt/guardia-camaras#WorkingDirectory=${CARPETA_PADRE}#" \
+    -e "s#EnvironmentFile=/opt/guardia-camaras/equipo_local/.env#EnvironmentFile=${CARPETA_ACTUAL}/.env#" \
+    -e "s#ExecStart=/opt/guardia-camaras/equipo_local/venv/bin/python#ExecStart=${CARPETA_ACTUAL}/venv/bin/python#" \
     -e "s#User=camaras#User=${USUARIO_ACTUAL}#" \
     systemd/equipo-local-camaras.service | sudo tee /etc/systemd/system/equipo-local-camaras.service >/dev/null
 
@@ -84,6 +84,6 @@ echo " tenga que abrir nada."
 echo ""
 echo " Para ver las camaras en vivo y las grabaciones desde un"
 echo " navegador (en la misma red de la planta):"
-echo "   http://sstbavaria-camaras.local:8090"
+echo "   http://guardia-camaras.local:8090"
 echo "================================================================"
 echo ""

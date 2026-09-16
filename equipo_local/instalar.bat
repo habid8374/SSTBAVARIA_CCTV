@@ -31,7 +31,7 @@ if not "%errorlevel%"=="0" (
 
 cd /d "%~dp0"
 echo.
-echo === Instalador del Equipo local de camaras SST Bavaria ===
+echo === Instalador del Equipo local de camaras GuardIA ===
 echo Carpeta: %cd%
 echo.
 
@@ -54,7 +54,7 @@ if not errorlevel 1 (
     echo como "Conectado" en el dashboard.
     echo.
     echo Recomendado: mueve toda esta carpeta a una ruta fuera de OneDrive
-    echo antes de continuar, por ejemplo C:\SSTBavaria\equipo_local, y
+    echo antes de continuar, por ejemplo C:\GuardIA\equipo_local, y
     echo corre este instalador desde ahi.
     echo.
     choice /c SN /n /m "Continuar de todas formas aqui en OneDrive? (S/N): "
@@ -112,7 +112,7 @@ if errorlevel 1 (
 )
 
 echo [4/4] Iniciando ahora...
-powershell -NoProfile -Command "Start-ScheduledTask -TaskName SSTBavaria-EquipoLocalCamaras"
+powershell -NoProfile -Command "Start-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras"
 
 echo.
 echo ================================================================
@@ -122,7 +122,7 @@ echo  tenga que abrir nada.
 echo.
 echo  Para ver las camaras en vivo y las grabaciones desde un
 echo  navegador (en la misma red de la planta):
-echo    http://sstbavaria-camaras.local:8090
+echo    http://guardia-camaras.local:8090
 echo ================================================================
 echo.
 pause

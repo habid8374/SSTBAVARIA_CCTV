@@ -602,16 +602,21 @@ _EQUIPO_LOCAL_EXCLUIR_DEL_ZIP = {"venv", "__pycache__", "grabaciones", "tests", 
 
 def _env_real_para_equipo(request, equipo):
     """Arma el contenido de un .env ya completo (URL del backend + api_key
-    de este equipo en particular) — la persona que instala en el PC de la
-    planta no tiene que editar ni pegar nada a mano."""
+    de este equipo en particular, y usuario/contraseña del visor web local
+    si se configuraron) — la persona que instala en el PC de la planta no
+    tiene que editar ni pegar nada a mano."""
     api_base_url = request.build_absolute_uri("/").rstrip("/")
-    return (
+    contenido = (
         "# Generado automáticamente para este equipo — ya viene completo,\n"
         "# no hace falta editar nada. No lo compartas: trae una API key.\n"
         "\n"
         f"API_BASE_URL={api_base_url}\n"
         f"API_KEY={equipo.api_key}\n"
     )
+    if equipo.visor_usuario:
+        contenido += f"VISOR_WEB_USUARIO={equipo.visor_usuario}\n"
+        contenido += f"VISOR_WEB_PASSWORD={equipo.visor_password}\n"
+    return contenido
 
 
 @api_view(["GET"])

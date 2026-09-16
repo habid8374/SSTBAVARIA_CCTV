@@ -1210,6 +1210,33 @@ class DashboardEndpointsTests(TestCase):
         env = contenido.read("equipo_local/.env").decode("utf-8")
         self.assertIn(f"API_KEY={self.equipo.api_key}", env)
         self.assertIn("API_BASE_URL=http://testserver", env)
+        self.assertNotIn("VISOR_WEB_USUARIO", env)
+        self.assertNotIn("VISOR_WEB_PASSWORD", env)
+
+    def test_env_generado_trae_credenciales_del_visor_si_estan_configuradas(self):
+        self.equipo.visor_usuario = "admin"
+        self.equipo.visor_password = "clave-del-visor"
+        self.equipo.save(update_fields=["visor_usuario", "visor_password"])
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.admin),
+        )
+        contenido = zipfile.ZipFile(io.BytesIO(response.content))
+        env = contenido.read("equipo_local/.env").decode("utf-8")
+        self.assertIn("VISOR_WEB_USUARIO=admin", env)
+        self.assertIn("VISOR_WEB_PASSWORD=clave-del-visor", env)
+
+    def test_admin_configura_el_acceso_del_visor_web(self):
+        response = self.client.patch(
+            reverse("camaras_ia:equipos_locales_detalle", args=[self.equipo.pk]),
+            {"visor_usuario": "admin", "visor_password": "clave-del-visor"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.equipo.refresh_from_db()
+        self.assertEqual(self.equipo.visor_usuario, "admin")
+        self.assertEqual(self.equipo.visor_password, "clave-del-visor")
 
     def test_descargar_zip_sin_equipo_id_falla(self):
         response = self.client.get(reverse("camaras_ia:equipos_locales_descargar_zip"), **self._auth(self.admin))

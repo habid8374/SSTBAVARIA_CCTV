@@ -1060,7 +1060,7 @@ const TEMAS: Tema[] = [
         <Sub>Paso 3 — Instalar y dejarlo corriendo</Sub>
         <Ol>
           <li>En el PC de la planta, descomprimir el <Mono>.zip</Mono> del paso anterior (clic derecho →
-            &quot;Extraer todo&quot; en Windows) en una carpeta local fija, ej. <Mono>C:\SSTBavaria\</Mono> —
+            &quot;Extraer todo&quot; en Windows) en una carpeta local fija, ej. <Mono>C:\GuardIA\</Mono> —
             queda una carpeta <Mono>equipo_local</Mono> con todo listo adentro.
             <br /><strong>Evitar Escritorio, Documentos o Descargas</strong>: en la mayoría de PCs con cuenta
             de empresa/Microsoft 365 esas carpetas están sincronizadas con OneDrive, y el programa arranca
@@ -1088,7 +1088,7 @@ const TEMAS: Tema[] = [
         <Ul>
           <li>En el dashboard, <strong>Sistema → Equipo local</strong>: el badge de ese equipo debe ponerse en
             verde (&quot;Conectado&quot;) dentro de un par de minutos.</li>
-          <li>Abrir <Mono>http://sstbavaria-camaras.local:8090</Mono> desde un navegador en esa misma red —
+          <li>Abrir <Mono>http://guardia-camaras.local:8090</Mono> desde un navegador en esa misma red —
             debería verse la página del visor (aunque todavía sin cámaras, si aún no se registró ninguna).</li>
         </Ul>
         <Sub>Paso 5 — Registrar las cámaras y sus zonas</Sub>
@@ -1099,7 +1099,7 @@ const TEMAS: Tema[] = [
           <li>Desde el dashboard, sección <strong>Cámaras</strong>: dar de alta cada cámara (IP, usuario/
             contraseña) — esto es solo el dato de instalación física, no la vigilancia.</li>
           <li>Desde el propio PC de la planta (no el dashboard): entrar a{" "}
-            <Mono>http://sstbavaria-camaras.local:8090/configurar</Mono> (o el botón &quot;Configurar zonas y
+            <Mono>http://guardia-camaras.local:8090/configurar</Mono> (o el botón &quot;Configurar zonas y
             horarios&quot; del visor) y ahí, por cada cámara, dibujar sus zonas restringidas sobre el video en
             vivo y definir los horarios que disparan alerta — ese es el equipo local haciendo de NVR, ver la
             sección <strong>Zonas y horarios</strong> de esta Ayuda para el detalle.</li>
@@ -1144,7 +1144,7 @@ const TEMAS: Tema[] = [
           subir a internet. Se accede desde un navegador <strong>en la misma red de la planta</strong>:
         </P>
         <p className="rounded-md bg-zinc-100 px-3 py-2 font-mono text-xs text-corp-navy">
-          http://sstbavaria-camaras.local:8090
+          http://guardia-camaras.local:8090
         </p>
         <Ul>
           <li>Funciona directo en Mac y en la mayoría de Linux de escritorio.</li>
@@ -1153,6 +1153,13 @@ const TEMAS: Tema[] = [
             <Mono>http://NOMBRE-DEL-PC:8090</Mono>).</li>
           <li>Si nada de eso funciona, la IP directa del PC siempre sirve como respaldo.</li>
         </Ul>
+        <Nota>
+          Por defecto ese visor queda <strong>sin contraseña</strong> — cualquiera en la red de la planta
+          puede verlo y configurar zonas/horarios. Para pedir usuario/contraseña: en el dashboard, Sistema →
+          Equipo local → columna &quot;Visor web&quot; de la fila del equipo → definir usuario y contraseña.
+          Después hay que volver a descargar el <Mono>equipo_local (.zip)</Mono> de ese equipo y reinstalarlo
+          para que tome las credenciales nuevas.
+        </Nota>
         <Sub>Cómo saber que todo está funcionando</Sub>
         <Ul>
           <li><strong>Cámara conectada</strong>: en Cámaras, el último snapshot se actualiza solo.</li>
@@ -1242,7 +1249,7 @@ const TEMAS: Tema[] = [
           distinta a la del usuario — esa cuenta no puede acceder a las carpetas de OneDrive, así que la
           tarea falla en silencio (ni siquiera queda registrado el error) mientras que correrlo a mano sí
           funciona. Solución: mover toda la carpeta <Mono>equipo_local</Mono> a una ruta local fija fuera de
-          OneDrive (ej. <Mono>C:\SSTBavaria\equipo_local</Mono>) y volver a correr{" "}
+          OneDrive (ej. <Mono>C:\GuardIA\equipo_local</Mono>) y volver a correr{" "}
           <Mono>instalar.bat</Mono> desde ahí — ver el tema &quot;El equipo local&quot;, Paso 3.
         </P>
         <Sub>Configuré la zona y el horario pero no llega ninguna alerta</Sub>
@@ -1261,7 +1268,7 @@ const TEMAS: Tema[] = [
         <P>
           Primero confirma que el equipo local esté &quot;Conectado&quot; en Sistema → Equipo local — si no
           lo está, el problema es de ese PC, no del visor. Si está conectado pero{" "}
-          <Mono>sstbavaria-camaras.local</Mono> no abre, prueba con la IP directa del PC (ver el tema
+          <Mono>guardia-camaras.local</Mono> no abre, prueba con la IP directa del PC (ver el tema
           &quot;El equipo local&quot;).
         </P>
         <Sub>Elimina cosas por accidente</Sub>

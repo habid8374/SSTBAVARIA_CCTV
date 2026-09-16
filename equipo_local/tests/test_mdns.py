@@ -6,7 +6,7 @@ from equipo_local.mdns import anunciar, dejar_de_anunciar, resolver_ip_local
 
 
 class _ConfigDePrueba:
-    VISOR_WEB_MDNS_NOMBRE = "sstbavaria-camaras"
+    VISOR_WEB_MDNS_NOMBRE = "guardia-camaras"
     VISOR_WEB_PUERTO = 8090
 
 
@@ -33,7 +33,7 @@ class AnunciarTests(unittest.TestCase):
         mock_service_info.assert_called_once()
         _, kwargs = mock_service_info.call_args
         self.assertEqual(kwargs["port"], 8090)
-        self.assertEqual(kwargs["server"], "sstbavaria-camaras.local.")
+        self.assertEqual(kwargs["server"], "guardia-camaras.local.")
         self.assertEqual(kwargs["addresses"], [socket.inet_aton("192.168.1.50")])
 
         zeroconf_instancia.register_service.assert_called_once()

@@ -639,6 +639,8 @@ export type EquipoLocal = {
   nombre: string;
   api_key: string;
   activo: boolean;
+  visor_usuario: string;
+  visor_password: string;
   ultima_conexion: string | null;
   conectado: boolean;
   creado_en: string;
@@ -659,7 +661,7 @@ export function crearEquipoLocal(token: string, nombre: string): Promise<EquipoL
 export function actualizarEquipoLocal(
   token: string,
   id: number,
-  cambios: Partial<Pick<EquipoLocal, "nombre" | "activo">>
+  cambios: Partial<Pick<EquipoLocal, "nombre" | "activo" | "visor_usuario" | "visor_password">>
 ): Promise<EquipoLocal> {
   return request<EquipoLocal>(`/api/camaras-ia/dashboard/equipos-locales/${id}/`, {
     method: "PATCH",
