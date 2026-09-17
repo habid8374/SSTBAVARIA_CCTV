@@ -10,15 +10,20 @@ Usuario = get_user_model()
 
 
 def _validar_contratista_segun_rol(datos):
-    """El campo contratista solo tiene sentido para el rol Contratista — se
-    exige si se elige ese rol, y se limpia si se elige cualquier otro."""
+    """El campo contratista solo tiene sentido para los roles Contratista y
+    Visitante/Auditor. Para Contratista se exige elegir la empresa a mano;
+    para Visitante/Auditor se autoasigna la empresa pseudo-contratista
+    compartida (no se elige, es una sola cuenta genérica para todas las
+    visitas) — cualquier otro rol lo deja en blanco."""
     rol = datos.get("rol")
-    contratista = datos.get("contratista")
-    if rol == PerfilUsuario.Rol.CONTRATISTA and contratista is None:
-        raise serializers.ValidationError(
-            {"contratista": "Hay que elegir la empresa contratista para este usuario."}
-        )
-    if rol != PerfilUsuario.Rol.CONTRATISTA:
+    if rol == PerfilUsuario.Rol.CONTRATISTA:
+        if datos.get("contratista") is None:
+            raise serializers.ValidationError(
+                {"contratista": "Hay que elegir la empresa contratista para este usuario."}
+            )
+    elif rol == PerfilUsuario.Rol.VISITANTE:
+        datos["contratista"] = EmpresaContratista.obtener_visitantes()
+    else:
         datos["contratista"] = None
     return datos
 

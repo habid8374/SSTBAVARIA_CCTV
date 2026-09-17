@@ -486,6 +486,54 @@ class UsuarioContratistaTests(TestCase):
         self.assertEqual(response.data["usuario"]["contratista_nombre"], "SCEPSA")
 
 
+class UsuarioVisitanteTests(TestCase):
+    """El rol Visitante/Auditor se autoasigna a la empresa pseudo-contratista
+    compartida — no se elige a mano como con Contratista (ver
+    EmpresaContratista.obtener_visitantes)."""
+
+    def setUp(self):
+        cache.clear()
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.lista_url = reverse("core:usuarios_lista")
+
+    def _token(self, user):
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        )
+        return response.data["token"]
+
+    def test_crear_usuario_visitante_no_exige_elegir_empresa(self):
+        token = self._token(self.admin)
+        response = self.client.post(
+            self.lista_url,
+            {"username": "visitantes", "email": "", "password": "otraclave123", "rol": "visitante"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        nuevo = Usuario.objects.get(username="visitantes")
+        self.assertEqual(nuevo.perfil.rol, PerfilUsuario.Rol.VISITANTE)
+        self.assertEqual(nuevo.perfil.contratista, EmpresaContratista.obtener_visitantes())
+        self.assertFalse(nuevo.perfil.es_interno)
+
+    def test_dos_usuarios_visitantes_comparten_la_misma_empresa(self):
+        token = self._token(self.admin)
+        for username in ("visitantes1", "visitantes2"):
+            self.client.post(
+                self.lista_url,
+                {"username": username, "email": "", "password": "otraclave123", "rol": "visitante"},
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Token {token}",
+            )
+        contratista_ids = {
+            Usuario.objects.get(username=u).perfil.contratista_id for u in ("visitantes1", "visitantes2")
+        }
+        self.assertEqual(len(contratista_ids), 1)
+        self.assertEqual(EmpresaContratista.objects.filter(es_visitantes=True).count(), 1)
+
+
 class UsuarioAdminTests(TestCase):
     """El admin.py de Django (no el endpoint del dashboard) tiene su propio
     camino de alta: PerfilUsuarioInline sobre UserAdmin. La señal
@@ -809,3 +857,60 @@ class GenerarClavesVapidCommandTests(TestCase):
         self.assertEqual(len(lineas), 2)
         self.assertTrue(lineas[0].startswith("VAPID_PUBLIC_KEY="))
         self.assertTrue(lineas[1].startswith("VAPID_PRIVATE_KEY="))
+
+
+class RestringirVisitanteMiddlewareTests(TestCase):
+    """El rol Visitante/Auditor (visitas externas/auditorías a planta) solo
+    puede llegar a las rutas de Capacitación — ver core.middleware."""
+
+    def setUp(self):
+        cache.clear()
+        self.visitante = Usuario.objects.create_user("visitantes", "visitantes@x.com", "clave12345")
+        self.visitante.perfil.rol = PerfilUsuario.Rol.VISITANTE
+        self.visitante.perfil.contratista = EmpresaContratista.obtener_visitantes()
+        self.visitante.perfil.save(update_fields=["rol", "contratista"])
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+
+    def _auth(self, user):
+        token = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        ).data["token"]
+        return {"HTTP_AUTHORIZATION": f"Token {token}"}
+
+    def test_visitante_puede_ver_su_perfil(self):
+        response = self.client.get(reverse("core:perfil"), **self._auth(self.visitante))
+        self.assertEqual(response.status_code, 200)
+
+    def test_visitante_puede_pedir_preguntas_de_capacitacion(self):
+        response = self.client.get(
+            reverse("contratistas:capacitacion_preguntas"), **self._auth(self.visitante)
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_visitante_no_puede_ver_trabajadores(self):
+        response = self.client.get(reverse("contratistas:trabajadores_lista"), **self._auth(self.visitante))
+        self.assertEqual(response.status_code, 403)
+
+    def test_visitante_no_puede_ver_reporte_de_capacitacion(self):
+        """Es la única ruta de capacitación que sí se corta — es un reporte
+        de todos los intentos, no el propio del visitante."""
+        response = self.client.get(
+            reverse("contratistas:capacitacion_registros"), **self._auth(self.visitante)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_visitante_no_puede_ver_declaraciones_de_metodo(self):
+        response = self.client.get(
+            reverse("contratistas:declaraciones_lista"), **self._auth(self.visitante)
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_operador_no_esta_restringido(self):
+        response = self.client.get(reverse("contratistas:trabajadores_lista"), **self._auth(self.operador))
+        self.assertNotEqual(response.status_code, 403)
+
+    def test_anonimo_no_lo_toca(self):
+        response = self.client.get(reverse("contratistas:trabajadores_lista"))
+        self.assertEqual(response.status_code, 401)

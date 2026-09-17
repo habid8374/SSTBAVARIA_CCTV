@@ -3323,6 +3323,40 @@ class CapacitacionTests(ApiTestsBase):
         self.trabajador.refresh_from_db()
         self.assertIn("induccion_sst", self.trabajador.cursos_safety_academy)
 
+    def test_visitante_puede_iniciar_y_calificar_su_propia_capacitacion(self):
+        """El rol Visitante/Auditor (visitas externas/auditorías a planta)
+        queda escopeado a la empresa pseudo-contratista compartida — sin
+        elegir empresa a mano y sin necesitar Declaración de Método
+        aprobada, ver EmpresaContratista.obtener_visitantes."""
+        visitante_user = Usuario.objects.create_user("visitantes", "visitantes@x.com", "clave12345")
+        visitante_user.perfil.rol = PerfilUsuario.Rol.VISITANTE
+        visitante_user.perfil.contratista = EmpresaContratista.obtener_visitantes()
+        visitante_user.perfil.save(update_fields=["rol", "contratista"])
+
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"nombres": "Visitante de prueba", "documento": "99999999"},
+            content_type="application/json",
+            **self._auth(visitante_user),
+        )
+        self.assertEqual(inicio.status_code, 201, inicio.data)
+        self.assertEqual(inicio.data["contratista"], EmpresaContratista.obtener_visitantes().pk)
+        registro_id = inicio.data["id"]
+
+        respuesta = self.client.post(
+            reverse("contratistas:capacitacion_calificar", args=[registro_id]),
+            {"respuestas": self._respuestas_correctas()},
+            content_type="application/json",
+            **self._auth(visitante_user),
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual(respuesta.data["estado"], "aprobado")
+
+        certificado = self.client.get(
+            reverse("contratistas:capacitacion_certificado", args=[registro_id]), **self._auth(visitante_user)
+        )
+        self.assertEqual(certificado.status_code, 200)
+
     def test_reprueba_no_marca_induccion_en_el_trabajador(self):
         self.contratista.capacitacion_habilitada_manual = True
         self.contratista.save(update_fields=["capacitacion_habilitada_manual"])

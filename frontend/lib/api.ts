@@ -51,7 +51,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export type Rol = "administrador" | "operador" | "contratista";
+export type Rol = "administrador" | "operador" | "contratista" | "visitante";
 
 export type Usuario = {
   id: number;

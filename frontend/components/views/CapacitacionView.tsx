@@ -42,10 +42,15 @@ function EstadoBadge({ registro }: { registro: RegistroCapacitacion }) {
 }
 
 export default function CapacitacionView({ token, rol }: { token: string; rol: Rol | null }) {
-  const esInterno = rol !== "contratista";
+  // El rol Visitante/Auditor (visitas externas/auditorías a planta, cuenta
+  // genérica compartida) solo puede tomar el curso — el backend le corta el
+  // reporte de registros y el listado de empresas contratistas (ver
+  // core.middleware.RestringirVisitanteMiddleware), así que acá ni se piden.
+  const esVisitante = rol === "visitante";
+  const esInterno = rol !== "contratista" && !esVisitante;
   const esAdmin = rol === "administrador";
   const { confirmar } = useDialog();
-  const [paso, setPaso] = useState<Paso>("reporte");
+  const [paso, setPaso] = useState<Paso>(esVisitante ? "registro" : "reporte");
   const [registros, setRegistros] = useState<RegistroCapacitacion[] | null>(null);
   const [contratistas, setContratistas] = useState<EmpresaContratista[] | null>(null);
   const [config, setConfig] = useState<ConfiguracionCapacitacion | null>(null);
@@ -58,12 +63,13 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
   const [eliminando, setEliminando] = useState<number | null>(null);
 
   function cargarRegistros() {
+    if (esVisitante) return;
     listarRegistrosCapacitacion(token)
       .then(setRegistros)
       .catch(() => setError("No se pudo cargar el reporte de capacitación."));
   }
 
-  useEffect(cargarRegistros, [token]);
+  useEffect(cargarRegistros, [token, esVisitante]);
   useEffect(() => {
     if (esInterno) listarContratistas(token).then(setContratistas).catch(() => {});
   }, [token, esInterno]);
@@ -72,10 +78,16 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
     listarPreguntasCapacitacion(token).then(setPreguntas).catch(() => {});
   }, [token]);
 
+  // Para un visitante no hay "reporte" al que volver — cierra el intento
+  // actual y deja lista la pantalla de registro para la próxima persona.
   function volverAlReporte() {
-    setPaso("reporte");
     setRegistroActivo(null);
     setResultado(null);
+    if (esVisitante) {
+      setPaso("registro");
+      return;
+    }
+    setPaso("reporte");
     cargarRegistros();
   }
 

@@ -20,17 +20,20 @@ const TEMAS: Tema[] = [
     contenido: (
       <>
         <P>
-          GuardIA tiene tres roles de usuario: <strong>Administrador</strong> (ve y edita
+          GuardIA tiene cuatro roles de usuario: <strong>Administrador</strong> (ve y edita
           todo, incluida la sección Sistema y Usuarios), <strong>Operador</strong> (ve el día a día — cámaras,
           alertas, contratistas — pero no puede crear/editar zonas, reglas, ni gestionar usuarios o el equipo
-          local) y <strong>Contratista</strong> (el portal de la empresa contratista — ver el tema
-          &quot;Portal de contratistas&quot; para el detalle de qué puede hacer).
+          local), <strong>Contratista</strong> (el portal de la empresa contratista — ver el tema
+          &quot;Portal de contratistas&quot; para el detalle de qué puede hacer) y <strong>Visitante/Auditor</strong>{" "}
+          (una sola cuenta genérica compartida para visitas externas y auditorías a planta — solo puede
+          tomar el curso de Capacitación, nada más del dashboard).
         </P>
         <Sub>El menú de la izquierda</Sub>
         <P>Cada ítem del menú es una sección independiente — no hay direcciones web sueltas que recordar. Un
           usuario con rol Contratista solo ve Contratistas (su propia empresa, de solo lectura), Declaración
-          de Método, Autorización de Ingreso (de solo lectura), Capacitación y Ayuda — el resto de ítems son
-          para el personal interno de SST/interventoría:</P>
+          de Método, Autorización de Ingreso (de solo lectura), Capacitación y Ayuda; uno con rol
+          Visitante/Auditor solo ve Capacitación (ni siquiera Ayuda) — el resto de ítems son para el
+          personal interno de SST/interventoría:</P>
         <Ul>
           <li><strong>Tablero</strong>: resumen general (KPIs y gráfico).</li>
           <li><strong>Cámaras</strong>: alta y estado de cada cámara.</li>
@@ -709,6 +712,16 @@ const TEMAS: Tema[] = [
           declaración de método). Si ninguna de las dos aplica, el botón &quot;Iniciar curso&quot; devuelve un
           aviso en vez de arrancar.
         </P>
+        <Sub>Visitas externas y auditorías a planta</Sub>
+        <P>
+          Para quien viene de afuera solo a tomar la inducción (visitas, auditores) sin necesitar el resto
+          del dashboard, hay un rol de usuario aparte: <strong>Visitante/Auditor</strong> — se crea desde
+          Usuarios (solo Administrador), es una sola cuenta genérica pensada para compartir en portería, no
+          una por persona. Al entrar, ese usuario ve únicamente la pantalla de registro del curso (nada de
+          menú, reportes ni otras secciones) y queda agrupado bajo una empresa &quot;Visitas y Auditorías
+          Externas&quot; creada sola la primera vez, con la capacitación ya habilitada — no depende de una
+          Declaración de Método.
+        </P>
         <Sub>El flujo</Sub>
         <Ol>
           <li><strong>Registro</strong>: nombre, correo y documento (los dos últimos opcionales). El personal
@@ -944,6 +957,14 @@ const TEMAS: Tema[] = [
           <strong>empresa contratista</strong> representa — es lo que define qué datos puede ver y editar ese
           usuario. Es <strong>un usuario por empresa</strong>, no uno por persona: si varios contactos de la
           misma empresa necesitan entrar al portal, comparten esa misma cuenta.
+        </P>
+        <Sub>Dar de alta la cuenta de visitantes/auditores</Sub>
+        <P>
+          Al elegir el rol <strong>Visitante/Auditor</strong> no se pide elegir empresa — se autoasigna a la
+          empresa pseudo-contratista compartida &quot;Visitas y Auditorías Externas&quot; (se crea sola la
+          primera vez). Igual que Contratista, es pensado como <strong>una sola cuenta genérica</strong>{" "}
+          compartida (ej. &quot;visitantes&quot;), no una por persona — quien entra con ella solo puede tomar
+          el curso de Capacitación (ver esa sección de Ayuda para el detalle), nada más del dashboard.
         </P>
         <Nota>No puedes desactivarte ni eliminarte a ti mismo — esos botones aparecen deshabilitados en tu
           propia fila.</Nota>

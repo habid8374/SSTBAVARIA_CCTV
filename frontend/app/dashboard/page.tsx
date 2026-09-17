@@ -70,7 +70,12 @@ function DashboardContent() {
         guardarSesion({ token: sesion.token, nombre: data.nombre, rol: data.rol });
         setToken(sesion.token);
         setUsuario(data);
-        if (irInicial && irInicial in TITULOS) {
+        if (data.rol === "visitante") {
+          // Único módulo al que este rol tiene acceso (ver Sidebar.tsx y
+          // core.middleware.RestringirVisitanteMiddleware) — nunca desvía a
+          // otra sección, ni siquiera con un "?ir=" viejo de una notificación.
+          setSeccion("capacitacion");
+        } else if (irInicial && irInicial in TITULOS) {
           setSeccion(irInicial as SeccionId);
         } else if (data.rol === "contratista") {
           setSeccion("declaracion-metodo");

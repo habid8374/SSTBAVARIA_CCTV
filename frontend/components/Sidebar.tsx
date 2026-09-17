@@ -88,10 +88,17 @@ export default function Sidebar({
   nombre,
   className = "",
 }: Props) {
-  const items = ITEMS.filter(
-    (item) =>
-      (!item.adminOnly || rol === "administrador") && (!item.soloPersonalInterno || rol !== "contratista")
-  );
+  // El rol Visitante/Auditor (visitas externas/auditorías a planta) solo ve
+  // Capacitación — nada más, ni siquiera Ayuda. El backend hace cumplir lo
+  // mismo (ver core.middleware.RestringirVisitanteMiddleware): esto es solo
+  // para que el menú no muestre accesos que de todas formas van a fallar.
+  const items =
+    rol === "visitante"
+      ? ITEMS.filter((item) => item.id === "capacitacion")
+      : ITEMS.filter(
+          (item) =>
+            (!item.adminOnly || rol === "administrador") && (!item.soloPersonalInterno || rol !== "contratista")
+        );
 
   return (
     <aside

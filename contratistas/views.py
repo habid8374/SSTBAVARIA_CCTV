@@ -96,12 +96,19 @@ class AuditoriaMixin:
         instance.delete()
 
 
+_ROLES_ESCOPADOS_A_SU_CONTRATISTA = (PerfilUsuario.Rol.CONTRATISTA, PerfilUsuario.Rol.VISITANTE)
+
+
 def _contratista_de(request):
     """El id de la EmpresaContratista del usuario autenticado, si su rol es
-    Contratista (portal externo) — o None para personal interno, que ve y
-    filtra sin restricción."""
+    Contratista (portal externo) o Visitante/Auditor (ve/crea solo bajo la
+    empresa pseudo-contratista de visitas, ver EmpresaContratista.
+    obtener_visitantes) — o None para personal interno, que ve y filtra sin
+    restricción. En la práctica, un Visitante/Auditor nunca llega a la
+    mayoría de estas vistas: RestringirVisitanteMiddleware ya lo corta antes
+    de que la vista corra, salvo en las rutas de Capacitación."""
     perfil = getattr(request.user, "perfil", None)
-    if perfil and perfil.rol == PerfilUsuario.Rol.CONTRATISTA:
+    if perfil and perfil.rol in _ROLES_ESCOPADOS_A_SU_CONTRATISTA:
         return perfil.contratista_id
     return None
 
