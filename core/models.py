@@ -32,6 +32,7 @@ class PerfilUsuario(models.Model):
         ADMINISTRADOR = "administrador", "Administrador"
         OPERADOR = "operador", "Operador"
         CONTRATISTA = "contratista", "Contratista"
+        VISITANTE = "visitante", "Visitante/Auditor"
 
     usuario = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="perfil"
@@ -43,8 +44,10 @@ class PerfilUsuario(models.Model):
         null=True,
         blank=True,
         related_name="usuarios_portal",
-        help_text="Solo aplica para el rol Contratista: la empresa a la que representa este usuario "
-        "en el portal — define qué datos puede ver y editar.",
+        help_text="Para el rol Contratista: la empresa a la que representa este usuario en el "
+        "portal. Para el rol Visitante/Auditor: se autoasigna a la empresa pseudo-contratista "
+        "'Visitas y Auditorías Externas' (ver EmpresaContratista.obtener_visitantes) — no se elige "
+        "a mano.",
     )
 
     class Meta:

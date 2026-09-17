@@ -37,6 +37,15 @@ class EmpresaContratista(models.Model):
             "que no requieren declaración de método)."
         ),
     )
+    es_visitantes = models.BooleanField(
+        "es la empresa pseudo-contratista de visitantes",
+        default=False,
+        help_text=(
+            "Marca la única fila usada para agrupar las inducciones de visitas externas y auditorías a "
+            "planta (rol de usuario Visitante/Auditor, ver PerfilUsuario) — no es una empresa contratista "
+            "real. Se crea sola la primera vez que hace falta, ver EmpresaContratista.obtener_visitantes()."
+        ),
+    )
     creada_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -55,6 +64,26 @@ class EmpresaContratista(models.Model):
         if self.capacitacion_habilitada_manual:
             return True
         return self.declaraciones_metodo.filter(estado=DeclaracionMetodo.Estado.APROBADA).exists()
+
+    @classmethod
+    def obtener_visitantes(cls):
+        """La empresa pseudo-contratista compartida por todas las visitas
+        externas/auditorías (rol Visitante/Auditor) — un único registro,
+        creado la primera vez que se necesita, igual que
+        ConfiguracionCapacitacion.obtener(). Con capacitación habilitada de
+        entrada: un visitante no tiene Declaración de Método que aprobar."""
+        from core.models import Empresa
+
+        objeto = cls.objects.filter(es_visitantes=True).first()
+        if objeto is not None:
+            return objeto
+        empresa = Empresa.objects.first() or Empresa.objects.create(nombre="Empresa")
+        return cls.objects.create(
+            empresa=empresa,
+            nombre="Visitas y Auditorías Externas",
+            es_visitantes=True,
+            capacitacion_habilitada_manual=True,
+        )
 
 
 def soporte_autorizacion_upload_to(instance, filename):

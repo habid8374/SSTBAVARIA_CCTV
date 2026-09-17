@@ -138,9 +138,13 @@ export default function UsuariosView({ token, usuarioActualId }: Props) {
                       <option value="administrador">Administrador</option>
                       <option value="operador">Operador</option>
                       <option value="contratista">Contratista</option>
+                      <option value="visitante">Visitante/Auditor</option>
                     </select>
                     {usuario.rol === "contratista" && (
                       <p className="mt-1 text-xs text-corp-muted">{usuario.contratista_nombre || "Sin empresa"}</p>
+                    )}
+                    {usuario.rol === "visitante" && (
+                      <p className="mt-1 text-xs text-corp-muted">Solo Capacitación</p>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -465,8 +469,17 @@ function FormularioNuevoUsuario({
               <option value="operador">Operador</option>
               <option value="administrador">Administrador</option>
               <option value="contratista">Contratista</option>
+              <option value="visitante">Visitante/Auditor</option>
             </select>
           </Campo>
+
+          {rol === "visitante" && (
+            <p className="text-xs text-corp-muted">
+              Cuenta genérica para visitas externas y auditorías a planta — solo puede tomar el curso de
+              Capacitación, nada más del dashboard. Se recomienda una sola cuenta compartida (ej.
+              &quot;visitantes&quot;) en vez de una por persona.
+            </p>
+          )}
 
           {rol === "contratista" && (
             <Campo label="Empresa contratista">
