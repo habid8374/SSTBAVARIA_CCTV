@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import urllib.error
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -551,8 +552,10 @@ class UsuarioVisitanteTests(TestCase):
 @override_settings(BREVO_API_KEY="clave-de-prueba", BREVO_REMITENTE_EMAIL="a@x.com", BREVO_REMITENTE_NOMBRE="Test")
 class EnviarAccesoVisitantesTests(TestCase):
     """Sistema → Visitantes: manda por correo el link + usuario/contraseña
-    de la cuenta compartida de Visitante/Auditor, rotando la contraseña en
-    cada envío."""
+    de la cuenta compartida de Visitante/Auditor. La contraseña dura
+    vigente 24 horas — un envío dentro de esa ventana reutiliza la misma
+    (para poder mandar el acceso en varias tandas sin invalidar a quien ya
+    lo recibió); pasadas las 24 horas, el siguiente envío rota."""
 
     def setUp(self):
         cache.clear()
@@ -662,6 +665,65 @@ class EnviarAccesoVisitantesTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self._token(self.operador)}",
         )
         self.assertEqual(response.status_code, 403)
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_reenvio_dentro_de_24_horas_reutiliza_la_misma_contrasena(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        generada_en = timezone.now() - timedelta(hours=2)
+        self.visitante.perfil.visitante_password_texto_plano = "clave-de-la-manana"
+        self.visitante.perfil.visitante_password_generada_en = generada_en
+        self.visitante.perfil.save(
+            update_fields=["visitante_password_texto_plano", "visitante_password_generada_en"]
+        )
+        self.visitante.set_password("clave-de-la-manana")
+        self.visitante.save(update_fields=["password"])
+        password_hash_anterior = self.visitante.password
+
+        response = self.client.post(
+            self.url,
+            {"correos": ["visita2@empresa.com"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.admin)}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(response.data["password_rotada"])
+
+        self.visitante.refresh_from_db()
+        self.assertEqual(self.visitante.password, password_hash_anterior)
+        self.assertTrue(self.visitante.check_password("clave-de-la-manana"))
+
+        payload = json.loads(mock_urlopen.call_args[0][0].data)
+        self.assertIn("clave-de-la-manana", payload["htmlContent"])
+
+        self.visitante.perfil.refresh_from_db()
+        self.assertEqual(self.visitante.perfil.visitante_password_generada_en, generada_en)
+        self.assertEqual(response.data["vence_en"], (generada_en + timedelta(hours=24)).isoformat())
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_reenvio_pasadas_24_horas_rota_la_contrasena(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        self.visitante.perfil.visitante_password_texto_plano = "clave-de-ayer"
+        self.visitante.perfil.visitante_password_generada_en = timezone.now() - timedelta(hours=25)
+        self.visitante.perfil.save(
+            update_fields=["visitante_password_texto_plano", "visitante_password_generada_en"]
+        )
+        self.visitante.set_password("clave-de-ayer")
+        self.visitante.save(update_fields=["password"])
+
+        response = self.client.post(
+            self.url,
+            {"correos": ["visita1@empresa.com"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.admin)}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["password_rotada"])
+
+        self.visitante.refresh_from_db()
+        self.assertFalse(self.visitante.check_password("clave-de-ayer"))
+
+        payload = json.loads(mock_urlopen.call_args[0][0].data)
+        self.assertNotIn("clave-de-ayer", payload["htmlContent"])
 
 
 class UsuarioAdminTests(TestCase):

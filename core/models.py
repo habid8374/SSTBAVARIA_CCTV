@@ -49,6 +49,21 @@ class PerfilUsuario(models.Model):
         "'Visitas y Auditorías Externas' (ver EmpresaContratista.obtener_visitantes) — no se elige "
         "a mano.",
     )
+    visitante_password_texto_plano = models.CharField(
+        "contraseña vigente (texto plano)",
+        max_length=64,
+        blank=True,
+        help_text=(
+            "Solo para el rol Visitante/Auditor — ver core.views.enviar_acceso_visitantes. Se guarda "
+            "en texto plano (además del hash normal de la contraseña) para poder reenviarla igual a "
+            "nuevos destinatarios mientras siga vigente (24 horas desde visitante_password_generada_en), "
+            "sin invalidar de una la que ya recibieron otras visitas — es una cuenta compartida y de "
+            "propósito único (solo el curso de Capacitación), pensada para distribuirse por correo."
+        ),
+    )
+    visitante_password_generada_en = models.DateTimeField(
+        "contraseña generada en", null=True, blank=True
+    )
 
     class Meta:
         verbose_name = "perfil de usuario"

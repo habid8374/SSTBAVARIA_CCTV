@@ -689,6 +689,8 @@ export type ResultadoEnvioAccesoVisitantes = {
   enviados: number;
   errores: { correo: string; detail: string }[];
   password_rotada: boolean;
+  /** ISO datetime — hasta cuándo es válida la contraseña enviada (24h desde que se generó). Null si no se envió ninguno. */
+  vence_en: string | null;
 };
 
 export function enviarAccesoVisitantes(

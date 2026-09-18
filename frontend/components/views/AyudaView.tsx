@@ -895,10 +895,11 @@ const TEMAS: Tema[] = [
           dashboard y el usuario/contraseña de la cuenta compartida del rol{" "}
           <strong>Visitante/Auditor</strong> (ver &quot;Portal de contratistas&quot; y &quot;Usuarios&quot;
           para el detalle de ese rol) — uno o varios destinatarios a la vez, un correo por línea o separados
-          por coma. <strong>Cada envío genera una contraseña nueva</strong> y reemplaza la anterior: es la
-          forma de invalidar copias viejas del correo (reenviado, guardado de más) sin necesitar un botón
-          aparte de &quot;regenerar&quot; — para cortarle el acceso a quien ya lo recibió, basta con volver a
-          mandar el acceso a quien sí debe seguir teniéndolo.
+          por coma. La contraseña es <strong>válida por máximo 24 horas</strong> desde que se genera, y cada
+          correo indica la hora exacta hasta la que sirve. Si se vuelve a usar el formulario dentro de esas
+          24 horas, se reenvía la misma contraseña — así se puede mandar el acceso en varias tandas durante
+          el día (una visita a las 8am, otra a las 11am) sin que la primera deje de servir. Pasadas las 24
+          horas, el siguiente envío genera una contraseña nueva y arranca de nuevo el plazo.
         </P>
         <Sub>Reglas de contratistas</Sub>
         <P>
