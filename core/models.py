@@ -54,6 +54,16 @@ class PerfilUsuario(models.Model):
         verbose_name = "perfil de usuario"
         verbose_name_plural = "perfiles de usuario"
 
+    def save(self, *args, **kwargs):
+        # Se hace acá (no solo en el serializer del API) para que quede
+        # garantizado sin importar por dónde se cree/edite el perfil — Django
+        # admin, shell, fixtures — y no solo desde Usuarios en el dashboard.
+        if self.rol == self.Rol.VISITANTE and self.contratista_id is None:
+            from contratistas.models import EmpresaContratista
+
+            self.contratista = EmpresaContratista.obtener_visitantes()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.usuario.username} ({self.get_rol_display()})"
 

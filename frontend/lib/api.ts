@@ -1976,11 +1976,16 @@ export type ResultadoEnvioAprobadosCapacitacion = {
 export function enviarCapacitacionesAprobadasExcel(
   token: string,
   correos: string[],
-  contratistaId?: number
+  opciones?: { contratistaId?: number; incluirVisitantes?: boolean; incluirContratistas?: boolean }
 ): Promise<ResultadoEnvioAprobadosCapacitacion> {
   return request<ResultadoEnvioAprobadosCapacitacion>("/api/contratistas/capacitacion/exportar/enviar/", {
     method: "POST",
     headers: authHeaders(token),
-    body: JSON.stringify({ correos, ...(contratistaId ? { contratista: contratistaId } : {}) }),
+    body: JSON.stringify({
+      correos,
+      ...(opciones?.contratistaId ? { contratista: opciones.contratistaId } : {}),
+      incluir_visitantes: opciones?.incluirVisitantes ?? true,
+      incluir_contratistas: opciones?.incluirContratistas ?? true,
+    }),
   });
 }

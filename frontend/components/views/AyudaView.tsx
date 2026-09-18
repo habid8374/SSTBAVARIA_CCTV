@@ -762,7 +762,10 @@ const TEMAS: Tema[] = [
             escriban, por ejemplo la de portería de la planta, para que sepan quién tiene el acceso
             aprobado sin tener que descargarlo y reenviarlo a mano. Las direcciones quedan guardadas
             (en la configuración de Capacitación) y aparecen precargadas la próxima vez, aunque se
-            pueden cambiar en el momento.</li>
+            pueden cambiar en el momento. Un checklist deja elegir si el listado incluye
+            &quot;Visitantes y auditorías externas&quot;, &quot;Trabajadores de empresas contratistas&quot;,
+            o ambos — por ejemplo, para mandarle a portería solo el listado del día de auditoría sin
+            mezclar los trabajadores fijos de los contratistas.</li>
         </Ul>
         <Sub>Continuar una evaluación a medias, y eliminar registros</Sub>
         <Ul>

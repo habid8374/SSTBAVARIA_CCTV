@@ -1403,10 +1403,28 @@ def capacitacion_certificado_pdf(request, pk):
     return respuesta
 
 
+def _valor_booleano(request, campo, default):
+    """Lee un booleano tanto de query params (GET, viene como texto) como
+    del body JSON (POST, ya puede venir como bool) — así ambos endpoints que
+    comparten _queryset_capacitaciones_aprobadas lo pueden usar igual."""
+    crudo = request.query_params.get(campo)
+    if crudo is None:
+        crudo = request.data.get(campo)
+    if crudo is None:
+        return default
+    if isinstance(crudo, bool):
+        return crudo
+    return str(crudo).strip().lower() not in ("0", "false", "")
+
+
 def _queryset_capacitaciones_aprobadas(request):
     """Aprobados de inducción, más recientes primero — scopeado a la propia
     empresa para el portal de contratistas, o filtrable por ?contratista=
-    (query params o body, según venga la solicitud) para personal interno."""
+    (query params o body, según venga la solicitud) para personal interno.
+    Para personal interno también se puede filtrar por tipo de empresa con
+    incluir_visitantes/incluir_contratistas (ambos true por defecto, así el
+    comportamiento no cambia para quien no los manda) — ver
+    contratistas.models.EmpresaContratista.es_visitantes."""
     qs = RegistroCapacitacion.objects.select_related("contratista", "trabajador").filter(
         estado=RegistroCapacitacion.Estado.APROBADO
     )
@@ -1417,6 +1435,14 @@ def _queryset_capacitaciones_aprobadas(request):
         filtro = request.query_params.get("contratista") or request.data.get("contratista")
         if filtro:
             qs = qs.filter(contratista_id=filtro)
+        incluir_visitantes = _valor_booleano(request, "incluir_visitantes", True)
+        incluir_contratistas = _valor_booleano(request, "incluir_contratistas", True)
+        if incluir_visitantes and not incluir_contratistas:
+            qs = qs.filter(contratista__es_visitantes=True)
+        elif incluir_contratistas and not incluir_visitantes:
+            qs = qs.exclude(contratista__es_visitantes=True)
+        elif not incluir_visitantes and not incluir_contratistas:
+            qs = qs.none()
     return qs.order_by("-finalizado_en")
 
 

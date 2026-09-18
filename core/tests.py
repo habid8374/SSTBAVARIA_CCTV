@@ -519,6 +519,19 @@ class UsuarioVisitanteTests(TestCase):
         self.assertEqual(nuevo.perfil.contratista, EmpresaContratista.obtener_visitantes())
         self.assertFalse(nuevo.perfil.es_interno)
 
+    def test_perfil_visitante_se_autoasigna_aunque_no_pase_por_el_serializer(self):
+        """Ver PerfilUsuario.save() — un perfil Visitante/Auditor creado o
+        editado directo por el modelo (como hace Django admin, que no pasa
+        por UsuarioCrearSerializer/_validar_contratista_segun_rol) también
+        debe quedar con la empresa pseudo-contratista asignada; si no, el
+        participante se topa con 'Hace falta indicar la empresa
+        contratista' al intentar iniciar el curso."""
+        usuario = Usuario.objects.create_user("visitantes2", "v2@x.com", "clave12345")
+        usuario.perfil.rol = PerfilUsuario.Rol.VISITANTE
+        usuario.perfil.save()
+        usuario.perfil.refresh_from_db()
+        self.assertEqual(usuario.perfil.contratista, EmpresaContratista.obtener_visitantes())
+
     def test_dos_usuarios_visitantes_comparten_la_misma_empresa(self):
         token = self._token(self.admin)
         for username in ("visitantes1", "visitantes2"):

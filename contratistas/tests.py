@@ -3604,6 +3604,10 @@ class CapacitacionEnviarAprobadosTests(ApiTestsBase):
         RegistroCapacitacion.objects.create(
             contratista=self.contratista, nombres="No Aprobado", estado=RegistroCapacitacion.Estado.NO_APROBADO,
         )
+        RegistroCapacitacion.objects.create(
+            contratista=EmpresaContratista.obtener_visitantes(), nombres="Visitante Aprobado",
+            estado=RegistroCapacitacion.Estado.APROBADO, calificacion=90,
+        )
 
     @patch("camaras_ia.notificaciones.urllib.request.urlopen")
     def test_admin_envia_listado_por_correo(self, mock_urlopen):
@@ -3617,7 +3621,7 @@ class CapacitacionEnviarAprobadosTests(ApiTestsBase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["enviados"], 1)
         self.assertEqual(response.data["errores"], [])
-        self.assertEqual(response.data["total_aprobados"], 1)
+        self.assertEqual(response.data["total_aprobados"], 2)
         mock_urlopen.assert_called_once()
         payload = json.loads(mock_urlopen.call_args[0][0].data)
         self.assertEqual(payload["to"], [{"email": "porteria@planta.com"}])
@@ -3649,6 +3653,57 @@ class CapacitacionEnviarAprobadosTests(ApiTestsBase):
             **self._auth(self.operador),
         )
         self.assertEqual(response.status_code, 403)
+
+    def _nombres_exportados(self, respuesta):
+        from io import BytesIO
+
+        import openpyxl
+
+        libro = openpyxl.load_workbook(BytesIO(respuesta.content))
+        filas = list(libro.active.iter_rows(values_only=True))
+        return [fila[1] for fila in filas[1:]]
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_solo_visitantes(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        response = self.client.post(
+            reverse("contratistas:capacitacion_exportar_enviar"),
+            {"correos": ["porteria@planta.com"], "incluir_visitantes": True, "incluir_contratistas": False},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["total_aprobados"], 1)
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_solo_contratistas(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        response = self.client.post(
+            reverse("contratistas:capacitacion_exportar_enviar"),
+            {"correos": ["porteria@planta.com"], "incluir_visitantes": False, "incluir_contratistas": True},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["total_aprobados"], 1)
+
+    def test_ninguno_marcado_devuelve_cero_aprobados(self):
+        response = self.client.post(
+            reverse("contratistas:capacitacion_exportar_enviar"),
+            {"correos": ["porteria@planta.com"], "incluir_visitantes": False, "incluir_contratistas": False},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["total_aprobados"], 0)
+
+    def test_exportar_solo_visitantes_via_query_param(self):
+        response = self.client.get(
+            reverse("contratistas:capacitacion_exportar") + "?incluir_contratistas=false",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._nombres_exportados(response), ["Visitante Aprobado"])
 
     @patch("camaras_ia.notificaciones.urllib.request.urlopen")
     def test_envio_guarda_los_correos_para_la_proxima_vez(self, mock_urlopen):
