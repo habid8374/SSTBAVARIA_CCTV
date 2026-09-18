@@ -679,6 +679,7 @@ class RegistroCapacitacionSerializer(serializers.ModelSerializer):
             "estado_display",
             "iniciado_en",
             "finalizado_en",
+            "fecha_vencimiento",
         ]
         read_only_fields = fields
 

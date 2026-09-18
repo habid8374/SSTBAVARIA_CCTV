@@ -1351,15 +1351,21 @@ def calificar_capacitacion(request, pk):
     registro.calificacion = calificacion
     registro.estado = RegistroCapacitacion.Estado.APROBADO if aprobado else RegistroCapacitacion.Estado.NO_APROBADO
     registro.finalizado_en = timezone.now()
-    registro.save(update_fields=["respuestas", "calificacion", "estado", "finalizado_en"])
+
+    vencimiento = None
+    if aprobado:
+        hoy = timezone.localdate()
+        induccion = CursoSafetyAcademy.objects.filter(clave="induccion_sst").first()
+        if induccion and induccion.meses_vigencia:
+            vencimiento = _sumar_meses(hoy, induccion.meses_vigencia)
+        registro.fecha_vencimiento = vencimiento
+
+    registro.save(update_fields=["respuestas", "calificacion", "estado", "finalizado_en", "fecha_vencimiento"])
 
     if aprobado and registro.trabajador:
         trabajador = registro.trabajador
-        hoy = timezone.localdate()
-        induccion = CursoSafetyAcademy.objects.filter(clave="induccion_sst").first()
-        vencimiento = _sumar_meses(hoy, induccion.meses_vigencia) if induccion and induccion.meses_vigencia else hoy
         cursos = dict(trabajador.cursos_safety_academy or {})
-        cursos["induccion_sst"] = vencimiento.isoformat()
+        cursos["induccion_sst"] = (vencimiento or timezone.localdate()).isoformat()
         trabajador.cursos_safety_academy = cursos
         trabajador.save(update_fields=["cursos_safety_academy"])
 
@@ -1453,7 +1459,10 @@ def _construir_libro_aprobados(qs):
     hoja = libro.active
     hoja.title = "Aprobados"
     hoja.append(
-        ["Empresa", "Nombre", "Correo", "Documento", "Trabajador vinculado", "Calificación", "Fecha de aprobación"]
+        [
+            "Empresa", "Nombre", "Correo", "Documento", "Trabajador vinculado", "Calificación",
+            "Fecha de aprobación", "Vigente hasta",
+        ]
     )
     for registro in qs:
         hoja.append(
@@ -1465,6 +1474,7 @@ def _construir_libro_aprobados(qs):
                 str(registro.trabajador) if registro.trabajador else "",
                 registro.calificacion,
                 timezone.localtime(registro.finalizado_en).strftime("%Y-%m-%d %H:%M") if registro.finalizado_en else "",
+                registro.fecha_vencimiento.strftime("%Y-%m-%d") if registro.fecha_vencimiento else "",
             ]
         )
     return libro

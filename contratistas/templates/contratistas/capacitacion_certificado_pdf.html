@@ -31,6 +31,7 @@
           {% if registro.documento %}&nbsp;&nbsp;·&nbsp;&nbsp;Documento: {{ registro.documento }}{% endif %}
           &nbsp;&nbsp;·&nbsp;&nbsp;Calificación: {{ registro.calificacion }}%
           &nbsp;&nbsp;·&nbsp;&nbsp;Fecha de emisión: {{ registro.finalizado_en|date:"d/m/Y" }}
+          {% if registro.fecha_vencimiento %}&nbsp;&nbsp;·&nbsp;&nbsp;Vigente hasta: {{ registro.fecha_vencimiento|date:"d/m/Y" }}{% endif %}
         </p>
       </td>
     </tr>

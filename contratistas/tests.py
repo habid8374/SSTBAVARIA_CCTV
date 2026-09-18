@@ -3353,6 +3353,13 @@ class CapacitacionTests(ApiTestsBase):
         )
         self.assertEqual(respuesta.status_code, 200, respuesta.data)
         self.assertEqual(respuesta.data["estado"], "aprobado")
+        # La vigencia de 6 meses aplica igual a un Visitante/Auditor que a
+        # un trabajador de una empresa contratista — no depende de que
+        # quede vinculado a un Trabajador radicado (los visitantes nunca lo
+        # están, ver EmpresaContratista.obtener_visitantes).
+        self.assertEqual(
+            respuesta.data["fecha_vencimiento"], _sumar_meses(timezone.localdate(), 6).isoformat()
+        )
 
         certificado = self.client.get(
             reverse("contratistas:capacitacion_certificado", args=[registro_id]), **self._auth(visitante_user)
@@ -3407,8 +3414,55 @@ class CapacitacionTests(ApiTestsBase):
         self.assertEqual(respuesta.status_code, 200, respuesta.data)
 
         self.trabajador.refresh_from_db()
-        esperado = _sumar_meses(timezone.localdate(), 12).isoformat()
-        self.assertEqual(self.trabajador.cursos_safety_academy["induccion_sst"], esperado)
+        esperado = _sumar_meses(timezone.localdate(), 12)
+        self.assertEqual(self.trabajador.cursos_safety_academy["induccion_sst"], esperado.isoformat())
+
+        registro = RegistroCapacitacion.objects.get(pk=registro_id)
+        self.assertEqual(registro.fecha_vencimiento, esperado)
+
+    def test_vigencia_por_defecto_es_de_seis_meses(self):
+        """La migración 0037 siembra meses_vigencia=6 para 'induccion_sst' —
+        sin que nadie lo configure a mano, un registro recién aprobado debe
+        quedar vigente por 6 meses."""
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": "Juan Pérez"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        registro_id = inicio.data["id"]
+
+        respuesta = self.client.post(
+            reverse("contratistas:capacitacion_calificar", args=[registro_id]),
+            {"respuestas": self._respuestas_correctas()},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual(respuesta.data["fecha_vencimiento"], _sumar_meses(timezone.localdate(), 6).isoformat())
+
+    def test_no_aprobado_no_tiene_fecha_de_vencimiento(self):
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        inicio = self.client.post(
+            reverse("contratistas:capacitacion_iniciar"),
+            {"contratista": self.contratista.pk, "nombres": "Juan Pérez"},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        registro_id = inicio.data["id"]
+
+        respuesta = self.client.post(
+            reverse("contratistas:capacitacion_calificar", args=[registro_id]),
+            {"respuestas": self._respuestas_incorrectas()},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertIsNone(respuesta.data["fecha_vencimiento"])
 
     def test_no_se_puede_calificar_dos_veces(self):
         self.contratista.capacitacion_habilitada_manual = True
@@ -3520,9 +3574,14 @@ class CapacitacionTests(ApiTestsBase):
         libro = openpyxl.load_workbook(BytesIO(response.content))
         filas = list(libro.active.iter_rows(values_only=True))
         self.assertEqual(filas[0][0], "Empresa")
+        self.assertEqual(filas[0][-1], "Vigente hasta")
         nombres_exportados = [fila[1] for fila in filas[1:]]
         self.assertIn("Aprobado Uno", nombres_exportados)
         self.assertNotIn("No Aprobado", nombres_exportados)
+
+        fila_aprobado = next(fila for fila in filas[1:] if fila[1] == "Aprobado Uno")
+        registro = RegistroCapacitacion.objects.get(nombres="Aprobado Uno")
+        self.assertEqual(fila_aprobado[-1], registro.fecha_vencimiento.strftime("%Y-%m-%d"))
 
     def test_portal_contratista_exporta_solo_su_empresa(self):
         registro_id = self._aprobar_registro(nombres="De Scepsa")

@@ -1884,6 +1884,8 @@ export type RegistroCapacitacion = {
   estado_display: string;
   iniciado_en: string;
   finalizado_en: string | null;
+  /** Solo tiene valor si estado es "aprobado" — inducción SST vigente por 6 meses. */
+  fecha_vencimiento: string | null;
 };
 
 export type ResultadoCapacitacion = RegistroCapacitacion & {
