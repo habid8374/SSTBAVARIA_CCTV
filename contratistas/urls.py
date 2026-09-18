@@ -110,6 +110,7 @@ urlpatterns = [
         name="capacitacion_registro_detalle",
     ),
     path("capacitacion/exportar/", views.capacitacion_exportar_aprobados, name="capacitacion_exportar"),
+    path("capacitacion/exportar/enviar/", views.capacitacion_enviar_aprobados, name="capacitacion_exportar_enviar"),
     path("capacitacion/iniciar/", views.iniciar_capacitacion, name="capacitacion_iniciar"),
     path("capacitacion/<int:pk>/calificar/", views.calificar_capacitacion, name="capacitacion_calificar"),
     path(

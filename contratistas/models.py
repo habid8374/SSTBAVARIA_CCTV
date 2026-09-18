@@ -985,6 +985,14 @@ class ConfiguracionCapacitacion(models.Model):
     puntaje_minimo_aprobacion = models.PositiveIntegerField(
         "puntaje mínimo para aprobar (%)", default=80
     )
+    correos_porteria = models.TextField(
+        "correos de portería", blank=True,
+        help_text=(
+            "Direcciones (separadas por coma) a las que se manda el listado de aprobados — se "
+            "actualiza sola cada vez que un Administrador usa \"Enviar listado a portería\", así "
+            "queda precargada la próxima vez sin tener que volver a escribirla."
+        ),
+    )
     actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
 
     class Meta:

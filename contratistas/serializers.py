@@ -630,8 +630,22 @@ class NotificacionInternaSerializer(serializers.ModelSerializer):
 class ConfiguracionCapacitacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConfiguracionCapacitacion
-        fields = ["titulo_curso", "video_url", "puntaje_minimo_aprobacion", "actualizada_en"]
+        fields = ["titulo_curso", "video_url", "puntaje_minimo_aprobacion", "correos_porteria", "actualizada_en"]
         read_only_fields = ["actualizada_en"]
+
+    def to_representation(self, instance):
+        """correos_porteria no se expone a quien no sea Administrador — la
+        lectura de esta configuración queda abierta a cualquier autenticado
+        (para el video/puntaje), pero el destinatario del listado de
+        aprobados no le incumbe a un portal de contratistas ni a un
+        Visitante/Auditor."""
+        from core.permissions import EsAdministrador
+
+        datos = super().to_representation(instance)
+        request = self.context.get("request")
+        if not (request and EsAdministrador().has_permission(request, None)):
+            datos.pop("correos_porteria", None)
+        return datos
 
 
 class PreguntaCapacitacionPublicaSerializer(serializers.ModelSerializer):
