@@ -50,7 +50,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
   const esVisitante = rol === "visitante";
   const esInterno = rol !== "contratista" && !esVisitante;
   const esAdmin = rol === "administrador";
-  const { confirmar, pedirTexto } = useDialog();
+  const { confirmar } = useDialog();
   const [paso, setPaso] = useState<Paso>(esVisitante ? "registro" : "reporte");
   const [registros, setRegistros] = useState<RegistroCapacitacion[] | null>(null);
   const [contratistas, setContratistas] = useState<EmpresaContratista[] | null>(null);
@@ -62,6 +62,10 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
   const [enviandoListado, setEnviandoListado] = useState(false);
+  const [modalPorteriaAbierto, setModalPorteriaAbierto] = useState(false);
+  const [correosPorteria, setCorreosPorteria] = useState("");
+  const [incluirVisitantes, setIncluirVisitantes] = useState(true);
+  const [incluirContratistas, setIncluirContratistas] = useState(true);
   const [descargandoCertificado, setDescargandoCertificado] = useState<number | null>(null);
   const [eliminando, setEliminando] = useState<number | null>(null);
 
@@ -105,28 +109,31 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
     }
   }
 
-  async function enviarListadoAprobados() {
-    const texto = await pedirTexto({
-      titulo: "Enviar listado a portería",
-      mensaje:
-        "El Excel de aprobados se manda como adjunto, junto con el total, a las direcciones que escribas — por ejemplo, la de portería, para que sepan quién tiene el acceso habilitado. Quedan guardadas para la próxima vez.",
-      placeholder: "porteria@planta.com, seguridad@planta.com",
-      opcional: false,
-      valorInicial: config?.correos_porteria ?? "",
-    });
-    if (!texto) return;
-    const lista = texto
+  function abrirModalPorteria() {
+    setCorreosPorteria(config?.correos_porteria ?? "");
+    setIncluirVisitantes(true);
+    setIncluirContratistas(true);
+    setModalPorteriaAbierto(true);
+  }
+
+  async function enviarListadoAprobados(event: FormEvent) {
+    event.preventDefault();
+    const lista = correosPorteria
       .split(/[,\n]/)
       .map((c) => c.trim())
       .filter(Boolean);
-    if (lista.length === 0) return;
+    if (lista.length === 0 || (!incluirVisitantes && !incluirContratistas)) return;
 
     setEnviandoListado(true);
     setError(null);
     setMensaje(null);
     try {
-      const respuesta = await enviarCapacitacionesAprobadasExcel(token, lista);
+      const respuesta = await enviarCapacitacionesAprobadasExcel(token, lista, {
+        incluirVisitantes,
+        incluirContratistas,
+      });
       setConfig((previo) => (previo ? { ...previo, correos_porteria: lista.join(", ") } : previo));
+      setModalPorteriaAbierto(false);
       if (respuesta.errores.length > 0) {
         setError(respuesta.errores.map((e) => `${e.correo}: ${e.detail}`).join(" — "));
       } else {
@@ -241,7 +248,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
           {esAdmin && (
             <button
               type="button"
-              onClick={enviarListadoAprobados}
+              onClick={abrirModalPorteria}
               disabled={enviandoListado}
               className="rounded-lg border border-corp-border px-4 py-2 text-sm font-medium text-corp-navy transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -335,6 +342,76 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {modalPorteriaAbierto && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setModalPorteriaAbierto(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-corp-navy">Enviar listado a portería</h2>
+            <p className="mt-1 text-sm text-corp-muted">
+              El Excel se manda como adjunto, junto con el total, a las direcciones que escribas. Quedan
+              guardadas para la próxima vez.
+            </p>
+            <form onSubmit={enviarListadoAprobados}>
+              <textarea
+                autoFocus
+                required
+                rows={3}
+                value={correosPorteria}
+                onChange={(event) => setCorreosPorteria(event.target.value)}
+                placeholder="porteria@planta.com, seguridad@planta.com"
+                className="mt-3 w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+              />
+              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-corp-muted">Incluir</p>
+              <div className="mt-1 space-y-1.5">
+                <label className="flex items-center gap-2 text-sm text-corp-navy">
+                  <input
+                    type="checkbox"
+                    checked={incluirVisitantes}
+                    onChange={(event) => setIncluirVisitantes(event.target.checked)}
+                  />
+                  Visitantes y auditorías externas
+                </label>
+                <label className="flex items-center gap-2 text-sm text-corp-navy">
+                  <input
+                    type="checkbox"
+                    checked={incluirContratistas}
+                    onChange={(event) => setIncluirContratistas(event.target.checked)}
+                  />
+                  Trabajadores de empresas contratistas
+                </label>
+              </div>
+              {!incluirVisitantes && !incluirContratistas && (
+                <p className="mt-2 text-xs text-red-600">Hay que marcar al menos una opción.</p>
+              )}
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalPorteriaAbierto(false)}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-corp-muted hover:bg-zinc-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={enviandoListado || (!incluirVisitantes && !incluirContratistas)}
+                  className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {enviandoListado ? "Enviando…" : "Confirmar"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
