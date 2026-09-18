@@ -830,7 +830,7 @@ const TEMAS: Tema[] = [
     soloAdmin: true,
     contenido: (
       <>
-        <P>Solo Administrador. Cinco pestañas:</P>
+        <P>Solo Administrador. Seis pestañas:</P>
         <Sub>Brevo (correo)</Sub>
         <P>
           Acá se digita la API key de Brevo (el proveedor que envía los correos de alerta) y el remitente —
@@ -874,6 +874,17 @@ const TEMAS: Tema[] = [
           manual. El badge <strong>Conectado</strong> se pone verde cuando ese equipo sincronizó hace menos
           de 5 minutos. Ver el tema <strong>&quot;El equipo local&quot;</strong> más abajo para el flujo
           completo de cómo se conecta a las cámaras y cómo ver el video en vivo.
+        </P>
+        <Sub>Visitantes</Sub>
+        <P>
+          Manda por correo (usando la configuración de la pestaña &quot;Brevo (correo)&quot;) el link del
+          dashboard y el usuario/contraseña de la cuenta compartida del rol{" "}
+          <strong>Visitante/Auditor</strong> (ver &quot;Portal de contratistas&quot; y &quot;Usuarios&quot;
+          para el detalle de ese rol) — uno o varios destinatarios a la vez, un correo por línea o separados
+          por coma. <strong>Cada envío genera una contraseña nueva</strong> y reemplaza la anterior: es la
+          forma de invalidar copias viejas del correo (reenviado, guardado de más) sin necesitar un botón
+          aparte de &quot;regenerar&quot; — para cortarle el acceso a quien ya lo recibió, basta con volver a
+          mandar el acceso a quien sí debe seguir teniéndolo.
         </P>
         <Sub>Reglas de contratistas</Sub>
         <P>
@@ -964,7 +975,9 @@ const TEMAS: Tema[] = [
           empresa pseudo-contratista compartida &quot;Visitas y Auditorías Externas&quot; (se crea sola la
           primera vez). Igual que Contratista, es pensado como <strong>una sola cuenta genérica</strong>{" "}
           compartida (ej. &quot;visitantes&quot;), no una por persona — quien entra con ella solo puede tomar
-          el curso de Capacitación (ver esa sección de Ayuda para el detalle), nada más del dashboard.
+          el curso de Capacitación (ver esa sección de Ayuda para el detalle), nada más del dashboard. Para
+          mandarle el link y la contraseña a cada visita por correo, ver Sistema →{" "}
+          <strong>Visitantes</strong>.
         </P>
         <Nota>No puedes desactivarte ni eliminarte a ti mismo — esos botones aparecen deshabilitados en tu
           propia fila.</Nota>

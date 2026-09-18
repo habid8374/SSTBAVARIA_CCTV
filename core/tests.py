@@ -2,6 +2,7 @@ import gzip
 import json
 import os
 import tempfile
+import urllib.error
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -532,6 +533,122 @@ class UsuarioVisitanteTests(TestCase):
         }
         self.assertEqual(len(contratista_ids), 1)
         self.assertEqual(EmpresaContratista.objects.filter(es_visitantes=True).count(), 1)
+
+
+@override_settings(BREVO_API_KEY="clave-de-prueba", BREVO_REMITENTE_EMAIL="a@x.com", BREVO_REMITENTE_NOMBRE="Test")
+class EnviarAccesoVisitantesTests(TestCase):
+    """Sistema → Visitantes: manda por correo el link + usuario/contraseña
+    de la cuenta compartida de Visitante/Auditor, rotando la contraseña en
+    cada envío."""
+
+    def setUp(self):
+        cache.clear()
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.visitante = Usuario.objects.create_user("visitantes", "visitantes@x.com", "una-clave-vieja")
+        self.visitante.perfil.rol = PerfilUsuario.Rol.VISITANTE
+        self.visitante.perfil.contratista = EmpresaContratista.obtener_visitantes()
+        self.visitante.perfil.save(update_fields=["rol", "contratista"])
+        self.url = reverse("core:visitantes_enviar_acceso")
+
+    def _token(self, user):
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        )
+        return response.data["token"]
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_admin_envia_acceso_y_rota_la_contrasena(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        password_anterior = self.visitante.password
+
+        response = self.client.post(
+            self.url,
+            {"correos": ["visita1@empresa.com", "auditor@empresa.com"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.admin)}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["enviados"], 2)
+        self.assertEqual(response.data["errores"], [])
+        self.assertTrue(response.data["password_rotada"])
+        self.assertEqual(mock_urlopen.call_count, 2)
+
+        self.visitante.refresh_from_db()
+        self.assertNotEqual(self.visitante.password, password_anterior)
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_correo_de_cada_destinatario_no_ve_al_otro(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        self.client.post(
+            self.url,
+            {"correos": ["visita1@empresa.com", "auditor@empresa.com"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.admin)}",
+        )
+        destinatarios_por_llamada = [
+            json.loads(llamada.args[0].data)["to"] for llamada in mock_urlopen.call_args_list
+        ]
+        self.assertEqual(destinatarios_por_llamada, [[{"email": "visita1@empresa.com"}], [{"email": "auditor@empresa.com"}]])
+
+    def test_correo_invalido_devuelve_400_sin_enviar_nada(self):
+        response = self.client.post(
+            self.url,
+            {"correos": ["esto-no-es-un-correo"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.admin)}",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_lista_vacia_devuelve_400(self):
+        response = self.client.post(
+            self.url,
+            {"correos": []},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.admin)}",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_sin_cuenta_visitante_devuelve_400(self):
+        self.visitante.delete()
+        response = self.client.post(
+            self.url,
+            {"correos": ["visita1@empresa.com"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.admin)}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Usuarios", response.data["detail"])
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_si_brevo_falla_para_todos_no_rota_la_contrasena(self, mock_urlopen):
+        mock_urlopen.side_effect = urllib.error.URLError("timeout")
+        password_anterior = self.visitante.password
+
+        response = self.client.post(
+            self.url,
+            {"correos": ["visita1@empresa.com"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.admin)}",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["enviados"], 0)
+        self.assertEqual(len(response.data["errores"]), 1)
+        self.assertFalse(response.data["password_rotada"])
+
+        self.visitante.refresh_from_db()
+        self.assertEqual(self.visitante.password, password_anterior)
+
+    def test_operador_no_puede_enviar_acceso(self):
+        response = self.client.post(
+            self.url,
+            {"correos": ["visita1@empresa.com"]},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self._token(self.operador)}",
+        )
+        self.assertEqual(response.status_code, 403)
 
 
 class UsuarioAdminTests(TestCase):
