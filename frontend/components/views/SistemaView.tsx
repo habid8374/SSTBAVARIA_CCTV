@@ -983,7 +983,9 @@ function EnviarAccesoVisitantes({ token }: { token: string }) {
   const [correos, setCorreos] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<{ enviados: number; errores: number } | null>(null);
+  const [resultado, setResultado] = useState<{ enviados: number; errores: number; venceEn: string | null } | null>(
+    null
+  );
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -1000,7 +1002,7 @@ function EnviarAccesoVisitantes({ token }: { token: string }) {
     setEnviando(true);
     try {
       const respuesta = await enviarAccesoVisitantes(token, lista);
-      setResultado({ enviados: respuesta.enviados, errores: respuesta.errores.length });
+      setResultado({ enviados: respuesta.enviados, errores: respuesta.errores.length, venceEn: respuesta.vence_en });
       if (respuesta.errores.length === 0) setCorreos("");
       if (respuesta.errores.length > 0) {
         setError(respuesta.errores.map((e) => `${e.correo}: ${e.detail}`).join(" — "));
@@ -1021,9 +1023,11 @@ function EnviarAccesoVisitantes({ token }: { token: string }) {
         Capacitación.
       </p>
       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        Cada envío <strong>genera una contraseña nueva</strong> y reemplaza la anterior — es la forma de
-        invalidar copias viejas del correo. Los destinatarios previos dejan de poder entrar en cuanto vuelves
-        a usar este formulario.
+        La contraseña es válida por <strong>máximo 24 horas</strong> desde que se genera. Si vuelves a usar
+        este formulario dentro de esas 24 horas, se reenvía la misma contraseña (para mandar el acceso en
+        varias tandas durante el día sin invalidar a los destinatarios anteriores); pasadas las 24 horas, el
+        siguiente envío genera una nueva y arranca de nuevo el plazo. Cada correo indica la hora exacta hasta
+        la que es válida.
       </div>
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-3">
@@ -1048,6 +1052,17 @@ function EnviarAccesoVisitantes({ token }: { token: string }) {
         {resultado && resultado.errores === 0 && (
           <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
             Acceso enviado a {resultado.enviados} destinatario{resultado.enviados === 1 ? "" : "s"}.
+            {resultado.venceEn && (
+              <>
+                {" "}
+                Válido hasta el{" "}
+                {new Date(resultado.venceEn).toLocaleString("es-CO", {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })}
+                .
+              </>
+            )}
           </div>
         )}
 

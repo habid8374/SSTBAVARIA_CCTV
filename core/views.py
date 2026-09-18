@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth import authenticate, get_user_model
 from django.utils import timezone
 from rest_framework import generics, status
@@ -145,19 +147,25 @@ class UsuarioDetalle(generics.RetrieveUpdateDestroyAPIView):
         instance.delete()
 
 
-def _correo_bienvenida_visitante(usuario, password, enlace_login, logo_url):
+def _correo_bienvenida_visitante(usuario, password, enlace_login, logo_url, vence_en):
     """HTML del correo de bienvenida para la cuenta compartida de
     Visitante/Auditor — ver camaras_ia.notificaciones.plantilla_correo_marca
     para el diseño (identidad de marca GuardIA) compartido con el correo de
-    bienvenida del portal de contratistas."""
+    bienvenida del portal de contratistas. `vence_en` es un datetime (hora
+    local) — hasta cuándo es válida esta contraseña."""
     from camaras_ia.notificaciones import plantilla_correo_marca
 
-    intro_html = """
+    vence_texto = timezone.localtime(vence_en).strftime("%d/%m/%Y a las %I:%M %p")
+    intro_html = f"""
             <p style="margin:0 0 16px; font-size:14px; line-height:1.6; color:#3a3a3a;">
               Es un gusto darle la bienvenida a nuestra plataforma de videovigilancia con inteligencia
               artificial y cumplimiento en seguridad y salud en el trabajo. A continuación encontrará las
               credenciales de acceso para completar la capacitación de seguridad previa a su visita o
               auditoría en planta.
+            </p>
+            <p style="margin:0 0 16px; font-size:14px; line-height:1.6; color:#3a3a3a;">
+              <strong>Esta contraseña es válida hasta el {vence_texto}</strong> (máximo 24 horas) —
+              por favor complete la capacitación antes de esa hora.
             </p>"""
     nota_html = (
         "Este acceso es compartido con otras visitas y auditorías, y está habilitado únicamente para "
@@ -182,17 +190,25 @@ def _correo_bienvenida_visitante(usuario, password, enlace_login, logo_url):
 @api_view(["POST"])
 @permission_classes([EsAdministrador])
 def enviar_acceso_visitantes(request):
-    """Genera una contraseña nueva para la cuenta compartida del rol
-    Visitante/Auditor (ver PerfilUsuario.Rol.VISITANTE) y la manda por
-    correo, vía Brevo, a los destinatarios indicados junto con el link del
-    dashboard. Cada envío rota la contraseña — así no hace falta un botón
-    aparte de "regenerar": para invalidar copias viejas (correos
-    reenviados, guardados de más), basta con volver a mandar el acceso.
+    """Manda por correo, vía Brevo, la contraseña de la cuenta compartida
+    del rol Visitante/Auditor (ver PerfilUsuario.Rol.VISITANTE) a los
+    destinatarios indicados, junto con el link del dashboard.
 
-    La contraseña solo se guarda en la cuenta si al menos un correo se
-    mandó con éxito — si Brevo no está configurado o todos los envíos
-    fallan, la cuenta se queda con la contraseña que ya tenía, en vez de
-    quedar con una nueva que nadie recibió."""
+    La contraseña dura vigente VENTANA_PASSWORD_VISITANTE (24 horas) desde
+    que se generó: mientras no haya pasado ese tiempo, un envío nuevo
+    reutiliza la misma contraseña (en vez de rotarla) — así se puede mandar
+    el acceso en varias tandas a lo largo del día (una visita a las 8am,
+    otra a las 11am) sin que la primera deje de servir. Pasadas las 24
+    horas, el siguiente envío genera una contraseña nueva y arranca de
+    nuevo el conteo. Cada correo indica la hora exacta hasta la que es
+    válida.
+
+    La contraseña (y el texto plano que hace falta guardar para poder
+    reenviarla igual mientras esté vigente — ver
+    PerfilUsuario.visitante_password_texto_plano) solo se guarda si al
+    menos un correo se mandó con éxito — si Brevo no está configurado o
+    todos los envíos fallan, la cuenta se queda como estaba, en vez de
+    quedar con una contraseña que nadie recibió."""
     import secrets
 
     from django.core.exceptions import ValidationError as DjangoValidationError
@@ -202,6 +218,8 @@ def enviar_acceso_visitantes(request):
     from contratistas.portal_usuarios import URL_PORTAL
 
     from .models import PerfilUsuario
+
+    VENTANA_PASSWORD_VISITANTE = timedelta(hours=24)
 
     correos_crudos = request.data.get("correos", [])
     if not isinstance(correos_crudos, list):
@@ -229,7 +247,21 @@ def enviar_acceso_visitantes(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    password_nueva = secrets.token_urlsafe(9)
+    perfil = visitante.perfil
+    ahora = timezone.now()
+    sigue_vigente = (
+        perfil.visitante_password_generada_en is not None
+        and perfil.visitante_password_texto_plano
+        and ahora - perfil.visitante_password_generada_en < VENTANA_PASSWORD_VISITANTE
+    )
+    if sigue_vigente:
+        password_nueva = perfil.visitante_password_texto_plano
+        generada_en = perfil.visitante_password_generada_en
+    else:
+        password_nueva = secrets.token_urlsafe(9)
+        generada_en = ahora
+    vence_en = generada_en + VENTANA_PASSWORD_VISITANTE
+
     # Se usa el dominio propio fijo (igual que el correo de bienvenida de
     # contratistas, ver contratistas/portal_usuarios.URL_PORTAL) en vez de
     # settings.FRONTEND_URL, que en producción cae al dominio de Vercel.
@@ -237,7 +269,8 @@ def enviar_acceso_visitantes(request):
     logo_url = f"{URL_PORTAL}/logo-guardia.png"
     asunto = "Bienvenido(a) a GuardIA — acceso a la capacitación de seguridad"
     contenido_html = _correo_bienvenida_visitante(
-        usuario=visitante.username, password=password_nueva, enlace_login=enlace_login, logo_url=logo_url
+        usuario=visitante.username, password=password_nueva, enlace_login=enlace_login, logo_url=logo_url,
+        vence_en=vence_en,
     )
 
     errores = []
@@ -249,11 +282,24 @@ def enviar_acceso_visitantes(request):
         except ErrorEnvioCorreo as err:
             errores.append({"correo": correo, "detail": str(err)})
 
+    password_rotada = False
     if enviados:
-        visitante.set_password(password_nueva)
-        visitante.save(update_fields=["password"])
+        if not sigue_vigente:
+            visitante.set_password(password_nueva)
+            visitante.save(update_fields=["password"])
+            password_rotada = True
+        perfil.visitante_password_texto_plano = password_nueva
+        perfil.visitante_password_generada_en = generada_en
+        perfil.save(update_fields=["visitante_password_texto_plano", "visitante_password_generada_en"])
 
-    return Response({"enviados": enviados, "errores": errores, "password_rotada": enviados > 0})
+    return Response(
+        {
+            "enviados": enviados,
+            "errores": errores,
+            "password_rotada": password_rotada,
+            "vence_en": vence_en.isoformat() if enviados else None,
+        }
+    )
 
 
 @api_view(["GET"])
