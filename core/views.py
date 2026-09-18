@@ -145,6 +145,85 @@ class UsuarioDetalle(generics.RetrieveUpdateDestroyAPIView):
         instance.delete()
 
 
+@api_view(["POST"])
+@permission_classes([EsAdministrador])
+def enviar_acceso_visitantes(request):
+    """Genera una contraseña nueva para la cuenta compartida del rol
+    Visitante/Auditor (ver PerfilUsuario.Rol.VISITANTE) y la manda por
+    correo, vía Brevo, a los destinatarios indicados junto con el link del
+    dashboard. Cada envío rota la contraseña — así no hace falta un botón
+    aparte de "regenerar": para invalidar copias viejas (correos
+    reenviados, guardados de más), basta con volver a mandar el acceso.
+
+    La contraseña solo se guarda en la cuenta si al menos un correo se
+    mandó con éxito — si Brevo no está configurado o todos los envíos
+    fallan, la cuenta se queda con la contraseña que ya tenía, en vez de
+    quedar con una nueva que nadie recibió."""
+    import secrets
+
+    from django.conf import settings
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from django.core.validators import validate_email
+
+    from camaras_ia.notificaciones import ErrorEnvioCorreo, enviar_correo_brevo
+
+    from .models import PerfilUsuario
+
+    correos_crudos = request.data.get("correos", [])
+    if not isinstance(correos_crudos, list):
+        return Response({"detail": "correos debe ser una lista de direcciones."}, status=status.HTTP_400_BAD_REQUEST)
+
+    correos = []
+    for correo in correos_crudos:
+        correo = (correo or "").strip()
+        if not correo:
+            continue
+        try:
+            validate_email(correo)
+        except DjangoValidationError:
+            return Response({"detail": f"«{correo}» no es un correo válido."}, status=status.HTTP_400_BAD_REQUEST)
+        correos.append(correo)
+    if not correos:
+        return Response({"detail": "Hace falta al menos un correo."}, status=status.HTTP_400_BAD_REQUEST)
+
+    visitante = (
+        Usuario.objects.filter(perfil__rol=PerfilUsuario.Rol.VISITANTE, is_active=True).order_by("id").first()
+    )
+    if visitante is None:
+        return Response(
+            {"detail": "Todavía no existe la cuenta de Visitante/Auditor activa — créala primero desde Usuarios."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    password_nueva = secrets.token_urlsafe(9)
+    enlace_login = f"{settings.FRONTEND_URL.rstrip('/')}/login"
+    asunto = "Acceso a GuardIA — Capacitación de seguridad"
+    contenido_html = f"""
+        <p>Hola,</p>
+        <p>Te compartimos el acceso para completar la capacitación de seguridad en GuardIA
+        antes de tu visita/auditoría a planta:</p>
+        <p><a href="{enlace_login}">{enlace_login}</a></p>
+        <p><b>Usuario:</b> {visitante.username}<br><b>Contraseña:</b> {password_nueva}</p>
+        <p>Este acceso es compartido con otras visitas y solo permite tomar el curso de
+        Capacitación — nada más del sistema.</p>
+    """
+
+    errores = []
+    enviados = 0
+    for correo in correos:
+        try:
+            enviar_correo_brevo(correo, asunto, contenido_html)
+            enviados += 1
+        except ErrorEnvioCorreo as err:
+            errores.append({"correo": correo, "detail": str(err)})
+
+    if enviados:
+        visitante.set_password(password_nueva)
+        visitante.save(update_fields=["password"])
+
+    return Response({"enviados": enviados, "errores": errores, "password_rotada": enviados > 0})
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def push_vapid_public_key(request):

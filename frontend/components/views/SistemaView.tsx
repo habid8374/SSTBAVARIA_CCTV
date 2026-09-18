@@ -14,6 +14,7 @@ import {
   descargarEquipoLocalZip,
   eliminarEquipoLocal,
   eliminarTipoEventoIA,
+  enviarAccesoVisitantes,
   listarEquiposLocales,
   listarTiposEventoIA,
   obtenerConfiguracionIA,
@@ -29,7 +30,7 @@ import {
 import AuditoriaView from "./AuditoriaView";
 import ReglasContratistasView from "./ReglasContratistasView";
 
-type Pestana = "brevo" | "ia" | "equipo-local" | "reglas" | "auditoria";
+type Pestana = "brevo" | "ia" | "equipo-local" | "visitantes" | "reglas" | "auditoria";
 
 export default function SistemaView({ token, esSuperusuario }: { token: string; esSuperusuario: boolean }) {
   const [pestana, setPestana] = useState<Pestana>("brevo");
@@ -46,6 +47,9 @@ export default function SistemaView({ token, esSuperusuario }: { token: string; 
         <BotonPestana activa={pestana === "equipo-local"} onClick={() => setPestana("equipo-local")}>
           Equipo local
         </BotonPestana>
+        <BotonPestana activa={pestana === "visitantes"} onClick={() => setPestana("visitantes")}>
+          Visitantes
+        </BotonPestana>
         <BotonPestana activa={pestana === "reglas"} onClick={() => setPestana("reglas")}>
           Reglas de contratistas
         </BotonPestana>
@@ -59,6 +63,7 @@ export default function SistemaView({ token, esSuperusuario }: { token: string; 
       {pestana === "brevo" && <ConfiguracionBrevo token={token} />}
       {pestana === "ia" && <ConfiguracionInteligenciaArtificial token={token} />}
       {pestana === "equipo-local" && <EquiposLocales token={token} />}
+      {pestana === "visitantes" && <EnviarAccesoVisitantes token={token} />}
       {pestana === "reglas" && <ReglasContratistasView token={token} />}
       {pestana === "auditoria" && esSuperusuario && <AuditoriaView token={token} />}
     </div>
@@ -970,6 +975,90 @@ function FormularioAccesoVisor({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function EnviarAccesoVisitantes({ token }: { token: string }) {
+  const [correos, setCorreos] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<{ enviados: number; errores: number } | null>(null);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setResultado(null);
+    const lista = correos
+      .split(/[,\n]/)
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (lista.length === 0) {
+      setError("Escribe al menos un correo.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      const respuesta = await enviarAccesoVisitantes(token, lista);
+      setResultado({ enviados: respuesta.enviados, errores: respuesta.errores.length });
+      if (respuesta.errores.length === 0) setCorreos("");
+      if (respuesta.errores.length > 0) {
+        setError(respuesta.errores.map((e) => `${e.correo}: ${e.detail}`).join(" — "));
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo enviar el acceso.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="max-w-xl">
+      <p className="text-sm text-corp-muted">
+        Manda por correo (usando la configuración de Brevo de la pestaña &quot;Brevo (correo)&quot;) el link
+        del dashboard y el usuario/contraseña de la cuenta compartida de <strong>Visitante/Auditor</strong> —
+        la misma para todas las visitas y auditorías a planta, pensada solo para tomar el curso de
+        Capacitación.
+      </p>
+      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Cada envío <strong>genera una contraseña nueva</strong> y reemplaza la anterior — es la forma de
+        invalidar copias viejas del correo. Los destinatarios previos dejan de poder entrar en cuanto vuelves
+        a usar este formulario.
+      </div>
+
+      <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+        <Campo label="Correos de los destinatarios">
+          <textarea
+            required
+            rows={4}
+            value={correos}
+            onChange={(event) => setCorreos(event.target.value)}
+            placeholder={"visita1@empresa.com\nauditor@empresa.com"}
+            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          />
+        </Campo>
+        <p className="text-xs text-corp-muted">Uno por línea, o separados por coma.</p>
+
+        {error && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {resultado && resultado.errores === 0 && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+            Acceso enviado a {resultado.enviados} destinatario{resultado.enviados === 1 ? "" : "s"}.
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={enviando}
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {enviando ? "Enviando…" : "Enviar acceso"}
+        </button>
+      </form>
     </div>
   );
 }

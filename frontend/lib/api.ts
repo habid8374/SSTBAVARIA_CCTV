@@ -685,6 +685,23 @@ export function descargarEquipoLocalZip(token: string, equipoId: number): Promis
   );
 }
 
+export type ResultadoEnvioAccesoVisitantes = {
+  enviados: number;
+  errores: { correo: string; detail: string }[];
+  password_rotada: boolean;
+};
+
+export function enviarAccesoVisitantes(
+  token: string,
+  correos: string[]
+): Promise<ResultadoEnvioAccesoVisitantes> {
+  return request<ResultadoEnvioAccesoVisitantes>("/api/auth/visitantes/enviar-acceso/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ correos }),
+  });
+}
+
 // --- Contratistas: empresas, trabajadores, seguridad social, declaración de método ---
 
 export type Opcion = { clave: string; etiqueta: string };
