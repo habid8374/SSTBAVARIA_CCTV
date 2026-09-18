@@ -8,6 +8,7 @@ import {
   calificarCapacitacion,
   descargarCertificadoCapacitacion,
   eliminarRegistroCapacitacion,
+  enviarCapacitacionesAprobadasExcel,
   exportarCapacitacionesAprobadasExcel,
   iniciarCapacitacion,
   listarContratistas,
@@ -49,7 +50,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
   const esVisitante = rol === "visitante";
   const esInterno = rol !== "contratista" && !esVisitante;
   const esAdmin = rol === "administrador";
-  const { confirmar } = useDialog();
+  const { confirmar, pedirTexto } = useDialog();
   const [paso, setPaso] = useState<Paso>(esVisitante ? "registro" : "reporte");
   const [registros, setRegistros] = useState<RegistroCapacitacion[] | null>(null);
   const [contratistas, setContratistas] = useState<EmpresaContratista[] | null>(null);
@@ -58,7 +59,9 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
   const [registroActivo, setRegistroActivo] = useState<RegistroCapacitacion | null>(null);
   const [resultado, setResultado] = useState<ResultadoCapacitacion | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mensaje, setMensaje] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
+  const [enviandoListado, setEnviandoListado] = useState(false);
   const [descargandoCertificado, setDescargandoCertificado] = useState<number | null>(null);
   const [eliminando, setEliminando] = useState<number | null>(null);
 
@@ -99,6 +102,42 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
       setError("No se pudo exportar el Excel de aprobados.");
     } finally {
       setExportando(false);
+    }
+  }
+
+  async function enviarListadoAprobados() {
+    const texto = await pedirTexto({
+      titulo: "Enviar listado a portería",
+      mensaje:
+        "El Excel de aprobados se manda como adjunto, junto con el total, a las direcciones que escribas — por ejemplo, la de portería, para que sepan quién tiene el acceso habilitado. Quedan guardadas para la próxima vez.",
+      placeholder: "porteria@planta.com, seguridad@planta.com",
+      opcional: false,
+      valorInicial: config?.correos_porteria ?? "",
+    });
+    if (!texto) return;
+    const lista = texto
+      .split(/[,\n]/)
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (lista.length === 0) return;
+
+    setEnviandoListado(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      const respuesta = await enviarCapacitacionesAprobadasExcel(token, lista);
+      setConfig((previo) => (previo ? { ...previo, correos_porteria: lista.join(", ") } : previo));
+      if (respuesta.errores.length > 0) {
+        setError(respuesta.errores.map((e) => `${e.correo}: ${e.detail}`).join(" — "));
+      } else {
+        setMensaje(
+          `Listado de ${respuesta.total_aprobados} aprobado${respuesta.total_aprobados === 1 ? "" : "s"} enviado a ${respuesta.enviados} destinatario${respuesta.enviados === 1 ? "" : "s"}.`
+        );
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo enviar el listado.");
+    } finally {
+      setEnviandoListado(false);
     }
   }
 
@@ -190,7 +229,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
           empresa contratista cuando tiene una Declaración de Método aprobada, o cuando un Administrador la
           habilita manualmente desde la ficha de la empresa en Contratistas.
         </p>
-        <div className="flex shrink-0 gap-3">
+        <div className="flex shrink-0 flex-wrap gap-3">
           <button
             type="button"
             onClick={exportarAprobados}
@@ -199,6 +238,16 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
           >
             {exportando ? "Exportando…" : "Exportar aprobados (Excel)"}
           </button>
+          {esAdmin && (
+            <button
+              type="button"
+              onClick={enviarListadoAprobados}
+              disabled={enviandoListado}
+              className="rounded-lg border border-corp-border px-4 py-2 text-sm font-medium text-corp-navy transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {enviandoListado ? "Enviando…" : "Enviar listado a portería"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setPaso("registro")}
@@ -211,6 +260,11 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
 
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+      {mensaje && (
+        <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+          {mensaje}
+        </div>
       )}
 
       {registros?.length === 0 && (

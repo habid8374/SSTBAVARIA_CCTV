@@ -16,7 +16,7 @@ import secrets
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 
-from camaras_ia.notificaciones import ErrorEnvioCorreo, enviar_correo_brevo
+from camaras_ia.notificaciones import ErrorEnvioCorreo, enviar_correo_brevo, plantilla_correo_marca
 from core.models import PerfilUsuario
 
 logger = logging.getLogger("contratistas.portal_usuarios")
@@ -58,14 +58,29 @@ def crear_usuario_portal_si_hace_falta(contratista):
     usuario.perfil.contratista = contratista
     usuario.perfil.save(update_fields=["rol", "contratista"])
 
-    asunto = f"Acceso al portal SST Bavaria — {contratista.nombre}"
-    contenido_html = (
-        f"<p>Se creó el acceso al portal de SST Bavaria para <strong>{contratista.nombre}</strong>, "
-        "para radicar seguridad social y gestionar la Declaración de Método de sus trabajadores.</p>"
-        f"<p><strong>Usuario:</strong> {username}<br>"
-        f"<strong>Contraseña:</strong> {contrasena}</p>"
-        f"<p><strong>Portal:</strong> <a href=\"{URL_PORTAL}\">{URL_PORTAL}</a></p>"
-        "<p>Por seguridad, cambia la contraseña después de tu primer ingreso.</p>"
+    asunto = f"Bienvenido(a) a GuardIA — acceso al portal de {contratista.nombre}"
+    intro_html = f"""
+            <p style="margin:0 0 16px; font-size:14px; line-height:1.6; color:#3a3a3a;">
+              Es un gusto darle la bienvenida al portal de contratistas de GuardIA en representación de
+              <strong>{contratista.nombre}</strong>. A continuación encontrará las credenciales de acceso
+              para radicar la seguridad social y gestionar la Declaración de Método de sus trabajadores.
+            </p>"""
+    nota_html = (
+        "Este acceso es exclusivo para el equipo de <strong>" + contratista.nombre + "</strong>. Por su "
+        "seguridad, le recomendamos cambiar la contraseña después de su primer ingreso y no compartirla "
+        "fuera de su organización."
+    )
+    contenido_html = plantilla_correo_marca(
+        preheader="Su acceso al portal de contratistas de GuardIA ya está listo.",
+        eyebrow="Invitación de acceso",
+        titulo="Bienvenido(a) a GuardIA",
+        intro_html=intro_html,
+        usuario=username,
+        password=contrasena,
+        cta_url=f"{URL_PORTAL}/login",
+        cta_label="Ingresar al portal",
+        logo_url=f"{URL_PORTAL}/logo-guardia.png",
+        nota_html=nota_html,
     )
     try:
         enviar_correo_brevo(contratista.contacto_correo, asunto, contenido_html)

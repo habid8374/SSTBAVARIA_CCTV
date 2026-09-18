@@ -147,101 +147,36 @@ class UsuarioDetalle(generics.RetrieveUpdateDestroyAPIView):
 
 def _correo_bienvenida_visitante(usuario, password, enlace_login, logo_url):
     """HTML del correo de bienvenida para la cuenta compartida de
-    Visitante/Auditor — con la paleta de marca de GuardIA (negro/amarillo,
-    ver frontend/app/globals.css) y maquetado con tablas + estilos en línea,
-    como exige el HTML de correo (la mayoría de clientes de correo ignora
-    <style> y flexbox/grid)."""
-    return f"""
-<!doctype html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0; padding:0; background-color:#f7f6f1; font-family:Arial, Helvetica, sans-serif;">
-  <span style="display:none; font-size:1px; color:#f7f6f1; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">
-    Su acceso a GuardIA ya está listo — credenciales de ingreso adjuntas.
-  </span>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f7f6f1; padding:32px 16px;">
-    <tr><td align="center">
-      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%; background-color:#ffffff; border:1px solid #e6e1d0; border-radius:12px; overflow:hidden;">
-        <tr>
-          <td style="background-color:#111111; padding:28px 32px; text-align:center;">
-            <img src="{logo_url}" alt="GuardIA" width="56" height="56" style="display:block; margin:0 auto 12px; border:0;">
-            <span style="font-size:22px; font-weight:bold;">
-              <span style="color:#ffffff;">Guard</span><span style="color:#fde202;">IA</span>
-            </span>
-            <div style="color:#a8a8a8; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; margin-top:6px;">
-              Seguridad Laboral &middot; CCTV &middot; Inteligencia Artificial
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:36px 32px 8px;">
-            <p style="margin:0 0 6px; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#7a5e00; font-weight:bold;">
-              Invitación de acceso
-            </p>
-            <h1 style="margin:0 0 20px; font-size:20px; line-height:1.3; color:#111111; font-weight:600;">
-              Bienvenido(a) a GuardIA
-            </h1>
+    Visitante/Auditor — ver camaras_ia.notificaciones.plantilla_correo_marca
+    para el diseño (identidad de marca GuardIA) compartido con el correo de
+    bienvenida del portal de contratistas."""
+    from camaras_ia.notificaciones import plantilla_correo_marca
+
+    intro_html = """
             <p style="margin:0 0 16px; font-size:14px; line-height:1.6; color:#3a3a3a;">
               Es un gusto darle la bienvenida a nuestra plataforma de videovigilancia con inteligencia
               artificial y cumplimiento en seguridad y salud en el trabajo. A continuación encontrará las
               credenciales de acceso para completar la capacitación de seguridad previa a su visita o
               auditoría en planta.
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:0 32px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fef6d8; border:1px solid #fde202; border-radius:8px;">
-              <tr><td style="padding:20px 24px;">
-                <p style="margin:0 0 12px; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:#7a5e00; font-weight:bold;">
-                  Credenciales de acceso
-                </p>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td style="padding:4px 0; font-size:13px; color:#5c5c5c; width:100px;">Usuario</td>
-                    <td style="padding:4px 0; font-size:14px; color:#111111; font-family:'Courier New', monospace; font-weight:bold;">{usuario}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:4px 0; font-size:13px; color:#5c5c5c;">Contraseña</td>
-                    <td style="padding:4px 0; font-size:14px; color:#111111; font-family:'Courier New', monospace; font-weight:bold;">{password}</td>
-                  </tr>
-                </table>
-              </td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:28px 32px; text-align:center;">
-            <a href="{enlace_login}" style="display:inline-block; background-color:#fde202; color:#111111; text-decoration:none; font-size:14px; font-weight:bold; padding:14px 32px; border-radius:8px;">
-              Ingresar a la plataforma
-            </a>
-            <p style="margin:16px 0 0; font-size:11px; color:#9a9a9a; word-break:break-all;">
-              {enlace_login}
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:0 32px 32px;">
-            <p style="margin:0; font-size:12px; line-height:1.6; color:#7a7a7a; border-top:1px solid #e6e1d0; padding-top:16px;">
-              Este acceso es compartido con otras visitas y auditorías, y está habilitado únicamente para
-              tomar el curso de Capacitación — sin visibilidad sobre ningún otro módulo del sistema. Por su
-              seguridad, le solicitamos no reenviar este correo ni compartir la contraseña fuera de este
-              propósito.
-            </p>
-          </td>
-        </tr>
-      </table>
-      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%; margin-top:20px;">
-        <tr><td style="text-align:center; font-size:11px; line-height:1.6; color:#9a9a9a; padding:0 16px;">
-          Este es un mensaje automático de GuardIA — Seguridad Laboral + CCTV + Inteligencia Artificial.<br>
-          Si usted no esperaba este correo, puede ignorarlo con tranquilidad.
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>
-"""
+            </p>"""
+    nota_html = (
+        "Este acceso es compartido con otras visitas y auditorías, y está habilitado únicamente para "
+        "tomar el curso de Capacitación — sin visibilidad sobre ningún otro módulo del sistema. Por su "
+        "seguridad, le solicitamos no reenviar este correo ni compartir la contraseña fuera de este "
+        "propósito."
+    )
+    return plantilla_correo_marca(
+        preheader="Su acceso a GuardIA ya está listo — credenciales de ingreso adjuntas.",
+        eyebrow="Invitación de acceso",
+        titulo="Bienvenido(a) a GuardIA",
+        intro_html=intro_html,
+        usuario=usuario,
+        password=password,
+        cta_url=enlace_login,
+        cta_label="Ingresar a la plataforma",
+        logo_url=logo_url,
+        nota_html=nota_html,
+    )
 
 
 @api_view(["POST"])
@@ -260,11 +195,11 @@ def enviar_acceso_visitantes(request):
     quedar con una nueva que nadie recibió."""
     import secrets
 
-    from django.conf import settings
     from django.core.exceptions import ValidationError as DjangoValidationError
     from django.core.validators import validate_email
 
     from camaras_ia.notificaciones import ErrorEnvioCorreo, enviar_correo_brevo
+    from contratistas.portal_usuarios import URL_PORTAL
 
     from .models import PerfilUsuario
 
@@ -295,8 +230,11 @@ def enviar_acceso_visitantes(request):
         )
 
     password_nueva = secrets.token_urlsafe(9)
-    enlace_login = f"{settings.FRONTEND_URL.rstrip('/')}/login"
-    logo_url = f"{settings.FRONTEND_URL.rstrip('/')}/logo-guardia.png"
+    # Se usa el dominio propio fijo (igual que el correo de bienvenida de
+    # contratistas, ver contratistas/portal_usuarios.URL_PORTAL) en vez de
+    # settings.FRONTEND_URL, que en producción cae al dominio de Vercel.
+    enlace_login = f"{URL_PORTAL}/login"
+    logo_url = f"{URL_PORTAL}/logo-guardia.png"
     asunto = "Bienvenido(a) a GuardIA — acceso a la capacitación de seguridad"
     contenido_html = _correo_bienvenida_visitante(
         usuario=visitante.username, password=password_nueva, enlace_login=enlace_login, logo_url=logo_url

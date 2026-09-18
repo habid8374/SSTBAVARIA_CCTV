@@ -1,4 +1,5 @@
 import datetime
+import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -12,6 +13,7 @@ from core.models import Empresa, PerfilUsuario
 from .models import (
     ActividadMetodo,
     AutorizacionIngreso,
+    ConfiguracionCapacitacion,
     DeclaracionMetodo,
     EmpresaContratista,
     FirmaMetodo,
@@ -3584,6 +3586,95 @@ class CapacitacionTests(ApiTestsBase):
             reverse("contratistas:capacitacion_registro_detalle", args=[registro.pk])
         )
         self.assertEqual(response.status_code, 401)
+
+
+@override_settings(BREVO_API_KEY="clave-de-prueba", BREVO_REMITENTE_EMAIL="a@x.com", BREVO_REMITENTE_NOMBRE="Test")
+class CapacitacionEnviarAprobadosTests(ApiTestsBase):
+    """POST capacitacion/exportar/enviar/ — el mismo Excel de aprobados,
+    mandado por correo (ej. a portería) en vez de descargado."""
+
+    def setUp(self):
+        super().setUp()
+        self.contratista.capacitacion_habilitada_manual = True
+        self.contratista.save(update_fields=["capacitacion_habilitada_manual"])
+        RegistroCapacitacion.objects.create(
+            contratista=self.contratista, nombres="Aprobado Uno", estado=RegistroCapacitacion.Estado.APROBADO,
+            calificacion=100,
+        )
+        RegistroCapacitacion.objects.create(
+            contratista=self.contratista, nombres="No Aprobado", estado=RegistroCapacitacion.Estado.NO_APROBADO,
+        )
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_admin_envia_listado_por_correo(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        response = self.client.post(
+            reverse("contratistas:capacitacion_exportar_enviar"),
+            {"correos": ["porteria@planta.com"]},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["enviados"], 1)
+        self.assertEqual(response.data["errores"], [])
+        self.assertEqual(response.data["total_aprobados"], 1)
+        mock_urlopen.assert_called_once()
+        payload = json.loads(mock_urlopen.call_args[0][0].data)
+        self.assertEqual(payload["to"], [{"email": "porteria@planta.com"}])
+        self.assertEqual(payload["attachment"][0]["name"], "capacitacion_aprobados.xlsx")
+
+    def test_correo_invalido_devuelve_400(self):
+        response = self.client.post(
+            reverse("contratistas:capacitacion_exportar_enviar"),
+            {"correos": ["no-es-un-correo"]},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_lista_vacia_devuelve_400(self):
+        response = self.client.post(
+            reverse("contratistas:capacitacion_exportar_enviar"),
+            {"correos": []},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_operador_no_puede_enviar(self):
+        response = self.client.post(
+            reverse("contratistas:capacitacion_exportar_enviar"),
+            {"correos": ["porteria@planta.com"]},
+            content_type="application/json",
+            **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    @patch("camaras_ia.notificaciones.urllib.request.urlopen")
+    def test_envio_guarda_los_correos_para_la_proxima_vez(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.status = 201
+        response = self.client.post(
+            reverse("contratistas:capacitacion_exportar_enviar"),
+            {"correos": ["porteria@planta.com", "seguridad@planta.com"]},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+        config = self.client.get(
+            reverse("contratistas:capacitacion_configuracion"), **self._auth(self.admin)
+        )
+        self.assertEqual(config.data["correos_porteria"], "porteria@planta.com, seguridad@planta.com")
+
+    def test_correos_porteria_no_se_expone_a_quien_no_es_administrador(self):
+        config = ConfiguracionCapacitacion.obtener()
+        config.correos_porteria = "porteria@planta.com"
+        config.save(update_fields=["correos_porteria"])
+        response = self.client.get(
+            reverse("contratistas:capacitacion_configuracion"), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("correos_porteria", response.data)
 
 
 def _construir_excel_trabajadores(filas):

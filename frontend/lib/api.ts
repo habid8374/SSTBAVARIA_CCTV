@@ -1856,6 +1856,8 @@ export type ConfiguracionCapacitacion = {
   titulo_curso: string;
   video_url: string;
   puntaje_minimo_aprobacion: number;
+  /** Solo viene con valor para un Administrador (ver ConfiguracionCapacitacionSerializer). */
+  correos_porteria?: string;
   actualizada_en: string;
 };
 
@@ -1963,4 +1965,22 @@ export function exportarCapacitacionesAprobadasExcel(token: string, contratistaI
     `/api/contratistas/capacitacion/exportar/${query}`,
     "capacitacion_aprobados.xlsx"
   );
+}
+
+export type ResultadoEnvioAprobadosCapacitacion = {
+  enviados: number;
+  errores: { correo: string; detail: string }[];
+  total_aprobados: number;
+};
+
+export function enviarCapacitacionesAprobadasExcel(
+  token: string,
+  correos: string[],
+  contratistaId?: number
+): Promise<ResultadoEnvioAprobadosCapacitacion> {
+  return request<ResultadoEnvioAprobadosCapacitacion>("/api/contratistas/capacitacion/exportar/enviar/", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ correos, ...(contratistaId ? { contratista: contratistaId } : {}) }),
+  });
 }

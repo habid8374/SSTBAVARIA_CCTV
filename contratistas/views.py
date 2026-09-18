@@ -1403,15 +1403,10 @@ def capacitacion_certificado_pdf(request, pk):
     return respuesta
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def capacitacion_exportar_aprobados(request):
-    """Descarga en Excel a todos los que aprobaron la inducción — filtro
-    opcional ?contratista= para personal interno (el portal de contratistas
-    siempre queda scopeado a la suya)."""
-    from django.http import HttpResponse
-    from openpyxl import Workbook
-
+def _queryset_capacitaciones_aprobadas(request):
+    """Aprobados de inducción, más recientes primero — scopeado a la propia
+    empresa para el portal de contratistas, o filtrable por ?contratista=
+    (query params o body, según venga la solicitud) para personal interno."""
     qs = RegistroCapacitacion.objects.select_related("contratista", "trabajador").filter(
         estado=RegistroCapacitacion.Estado.APROBADO
     )
@@ -1419,10 +1414,14 @@ def capacitacion_exportar_aprobados(request):
     if contratista_id is not None:
         qs = qs.filter(contratista_id=contratista_id)
     else:
-        filtro = request.query_params.get("contratista")
+        filtro = request.query_params.get("contratista") or request.data.get("contratista")
         if filtro:
             qs = qs.filter(contratista_id=filtro)
-    qs = qs.order_by("-finalizado_en")
+    return qs.order_by("-finalizado_en")
+
+
+def _construir_libro_aprobados(qs):
+    from openpyxl import Workbook
 
     libro = Workbook()
     hoja = libro.active
@@ -1442,8 +1441,97 @@ def capacitacion_exportar_aprobados(request):
                 timezone.localtime(registro.finalizado_en).strftime("%Y-%m-%d %H:%M") if registro.finalizado_en else "",
             ]
         )
+    return libro
 
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def capacitacion_exportar_aprobados(request):
+    """Descarga en Excel a todos los que aprobaron la inducción — filtro
+    opcional ?contratista= para personal interno (el portal de contratistas
+    siempre queda scopeado a la suya)."""
+    from django.http import HttpResponse
+
+    libro = _construir_libro_aprobados(_queryset_capacitaciones_aprobadas(request))
     respuesta = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     respuesta["Content-Disposition"] = 'attachment; filename="capacitacion_aprobados.xlsx"'
     libro.save(respuesta)
     return respuesta
+
+
+@api_view(["POST"])
+@permission_classes([EsAdministrador])
+def capacitacion_enviar_aprobados(request):
+    """Manda el mismo Excel de capacitacion_exportar_aprobados por correo
+    (vía Brevo) a las direcciones indicadas — para que, por ejemplo,
+    portería reciba el listado de quiénes tienen el acceso aprobado sin que
+    alguien de SST tenga que descargarlo y reenviarlo a mano."""
+    from io import BytesIO
+
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from django.core.validators import validate_email
+
+    from camaras_ia.notificaciones import ErrorEnvioCorreo, enviar_correo_brevo, plantilla_aviso_marca
+    from contratistas.portal_usuarios import URL_PORTAL
+
+    correos_crudos = request.data.get("correos", [])
+    if not isinstance(correos_crudos, list):
+        return Response({"detail": "correos debe ser una lista de direcciones."}, status=status.HTTP_400_BAD_REQUEST)
+
+    correos = []
+    for correo in correos_crudos:
+        correo = (correo or "").strip()
+        if not correo:
+            continue
+        try:
+            validate_email(correo)
+        except DjangoValidationError:
+            return Response({"detail": f"«{correo}» no es un correo válido."}, status=status.HTTP_400_BAD_REQUEST)
+        correos.append(correo)
+    if not correos:
+        return Response({"detail": "Hace falta al menos un correo."}, status=status.HTTP_400_BAD_REQUEST)
+
+    config = ConfiguracionCapacitacion.obtener()
+    config.correos_porteria = ", ".join(correos)
+    config.save(update_fields=["correos_porteria"])
+
+    qs = _queryset_capacitaciones_aprobadas(request)
+    total = qs.count()
+
+    libro = _construir_libro_aprobados(qs)
+    buffer = BytesIO()
+    libro.save(buffer)
+    adjunto_bytes = buffer.getvalue()
+
+    cuerpo_html = f"""
+            <p style="margin:0 0 16px; font-size:14px; line-height:1.6; color:#3a3a3a;">
+              Se adjunta el listado de personas con la capacitación de seguridad aprobada — con acceso
+              habilitado para su visita o auditoría en planta.
+            </p>
+            <p style="margin:0; font-size:14px; line-height:1.6; color:#3a3a3a;">
+              <strong>Total de aprobados:</strong> {total}
+            </p>"""
+    contenido_html = plantilla_aviso_marca(
+        preheader="Listado de acceso aprobado — Capacitación GuardIA.",
+        eyebrow="Control de acceso",
+        titulo="Listado de aprobados",
+        cuerpo_html=cuerpo_html,
+        logo_url=f"{URL_PORTAL}/logo-guardia.png",
+    )
+
+    errores = []
+    enviados = 0
+    for correo in correos:
+        try:
+            enviar_correo_brevo(
+                correo,
+                "Listado de acceso aprobado — Capacitación GuardIA",
+                contenido_html,
+                adjunto_bytes=adjunto_bytes,
+                adjunto_nombre="capacitacion_aprobados.xlsx",
+            )
+            enviados += 1
+        except ErrorEnvioCorreo as err:
+            errores.append({"correo": correo, "detail": str(err)})
+
+    return Response({"enviados": enviados, "errores": errores, "total_aprobados": total})

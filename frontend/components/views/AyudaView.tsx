@@ -757,6 +757,12 @@ const TEMAS: Tema[] = [
             capacitación&quot;) descarga en un solo Excel a todos los que aprobaron — empresa, nombre, correo,
             documento, trabajador vinculado, calificación y fecha de aprobación. El personal interno exporta
             todas las empresas; el portal de contratistas, solo la suya.</li>
+          <li>Botón <strong>&quot;Enviar listado a portería&quot;</strong> (solo Administrador) manda ese mismo
+            Excel por correo — vía Brevo, con el diseño formal de GuardIA — a las direcciones que se
+            escriban, por ejemplo la de portería de la planta, para que sepan quién tiene el acceso
+            aprobado sin tener que descargarlo y reenviarlo a mano. Las direcciones quedan guardadas
+            (en la configuración de Capacitación) y aparecen precargadas la próxima vez, aunque se
+            pueden cambiar en el momento.</li>
         </Ul>
         <Sub>Continuar una evaluación a medias, y eliminar registros</Sub>
         <Ul>
