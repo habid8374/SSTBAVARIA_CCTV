@@ -116,6 +116,7 @@ MIDDLEWARE = [
     "core.middleware.RestringirVisitanteMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.middleware.PermitirIframeAdminMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

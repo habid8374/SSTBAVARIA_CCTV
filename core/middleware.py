@@ -55,3 +55,41 @@ class RestringirVisitanteMiddleware:
                         status=403,
                     )
         return self.get_response(request)
+
+
+class PermitirIframeAdminMiddleware:
+    """Permite insertar /admin/ (Django admin) en un <iframe> — pero solo
+    desde los orígenes del propio dashboard (ver settings.CORS_ALLOWED_ORIGINS),
+    no desde cualquier sitio. Existe para que el link "Admin de Django" del
+    sidebar (solo Administrador) se pueda abrir embebido dentro de la PWA en
+    vez de siempre disparar el navegador del celular (una PWA instalada saca
+    al navegador normal cualquier link a un origen distinto al suyo).
+
+    X-Frame-Options no soporta listar orígenes puntuales (solo DENY,
+    SAMEORIGIN, o el ya retirado ALLOW-FROM) — por eso se marca la
+    respuesta como exenta de XFrameOptionsMiddleware (que si no, pondría
+    X-Frame-Options: DENY encima y bloquearía incluso al propio dashboard) y
+    en su lugar se manda Content-Security-Policy: frame-ancestors, que sí
+    soporta una lista y además tiene prioridad sobre X-Frame-Options en los
+    navegadores modernos.
+
+    El resto del sitio (todo lo que no sea /admin/) sigue con
+    X-Frame-Options: DENY normal — la protección contra clickjacking no se
+    toca fuera del admin. Debe ir DESPUÉS de XFrameOptionsMiddleware en
+    settings.MIDDLEWARE (la fase de respuesta corre en orden inverso a la
+    lista, así que "después" en la lista es "antes" en la respuesta — el
+    exempt tiene que quedar puesto antes de que XFrameOptionsMiddleware lo
+    revise)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if request.path.startswith("/admin/"):
+            from django.conf import settings
+
+            origenes = " ".join(settings.CORS_ALLOWED_ORIGINS)
+            response.xframe_options_exempt = True
+            response["Content-Security-Policy"] = f"frame-ancestors 'self' {origenes};"
+        return response
