@@ -1,8 +1,10 @@
 # SSTBAVARIA_CCTV — Módulo de Videovigilancia con IA
 
 Monorepo del módulo de Cámaras IA: backend Django (raíz del repo) + dashboard
-Next.js (`frontend/`). Se despliegan por separado — el backend en Railway, el
-frontend en Vercel — pero viven en el mismo repositorio.
+Next.js (`frontend/`). Se despliegan por separado — el backend en Coolify
+(VPS propio de Hostinger, ver "Backend en Hostinger con Coolify" más abajo;
+Railway quedó decomisionado), el frontend en Vercel — pero viven en el mismo
+repositorio.
 
 - **Fase 1** (completa): modelo de datos + panel de administración para
   registrar lo levantado en la visita a planta (cámaras, zonas restringidas,
@@ -664,7 +666,12 @@ creado ahí.
   propios — las llamadas a la API del backend nunca se sirven desde cache,
   siempre van a la red.
 
-## Desplegar el backend en Railway
+## Desplegar el backend en Railway (histórico — ya no se usa)
+
+**El backend de producción ya no corre en Railway, se migró a Coolify (ver
+"Backend en Hostinger con Coolify" más abajo) y Railway quedó decomisionado.**
+Esta sección se deja como referencia histórica de cómo estaba montado antes
+de la migración — no aplica para desplegar hoy.
 
 1. Crear un proyecto nuevo en Railway (plan Trial para probar) y conectarlo
    a este repositorio. **Root Directory**: dejar el default (raíz del repo)
