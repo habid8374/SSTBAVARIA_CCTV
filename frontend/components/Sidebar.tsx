@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 
-import { API_URL, type Rol } from "@/lib/api";
+import Link from "next/link";
+
+import type { Rol } from "@/lib/api";
 import {
   IconAlerta,
   IconAutorizacionIngreso,
@@ -165,10 +167,8 @@ export default function Sidebar({
         </div>
 
         {rol === "administrador" && (
-          <a
-            href={`${API_URL}/admin/`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/admin-django"
             title={colapsado ? "Admin de Django" : undefined}
             className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/70 hover:bg-white/10"
           >
@@ -176,7 +176,7 @@ export default function Sidebar({
             <span className={`${TEXTO_COLAPSABLE} ${colapsado ? "max-w-0 opacity-0" : "max-w-[13rem] opacity-100"}`}>
               Admin de Django
             </span>
-          </a>
+          </Link>
         )}
 
         <button

@@ -1327,7 +1327,8 @@ const TEMAS: Tema[] = [
         </P>
         <Sub>¿Dónde está el panel técnico (admin de Django)?</Sub>
         <P>
-          Botón &quot;Admin de Django&quot; abajo del menú (solo Administrador) — abre en una pestaña nueva.
+          Botón &quot;Admin de Django&quot; abajo del menú (solo Administrador) — se abre embebido dentro del
+          propio dashboard (no en una pestaña ni navegador aparte), incluso instalado como app en el celular.
           Es una vista más técnica, pensada para soporte/mantenimiento, no para el uso diario.
         </P>
       </>

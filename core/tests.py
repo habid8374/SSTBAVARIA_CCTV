@@ -6,6 +6,7 @@ import urllib.error
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
@@ -1106,3 +1107,26 @@ class RestringirVisitanteMiddlewareTests(TestCase):
     def test_anonimo_no_lo_toca(self):
         response = self.client.get(reverse("contratistas:trabajadores_lista"))
         self.assertEqual(response.status_code, 401)
+
+
+class PermitirIframeAdminMiddlewareTests(TestCase):
+    """El admin de Django se puede insertar en un <iframe> — pero solo desde
+    los orígenes del propio dashboard, no desde cualquier sitio — para que
+    el link "Admin de Django" del sidebar se abra embebido dentro de la PWA
+    en vez de siempre salir al navegador del celular. Ver core.middleware."""
+
+    def test_admin_manda_frame_ancestors_y_no_x_frame_options(self):
+        # /admin/ sin sesión redirige a /admin/login/ (302) sin necesitar
+        # renderizar ninguna plantilla — evita depender de que collectstatic
+        # haya corrido en el entorno de test.
+        response = self.client.get("/admin/")
+        self.assertIn("Content-Security-Policy", response)
+        self.assertIn("frame-ancestors 'self'", response["Content-Security-Policy"])
+        for origen in settings.CORS_ALLOWED_ORIGINS:
+            self.assertIn(origen, response["Content-Security-Policy"])
+        self.assertNotIn("X-Frame-Options", response)
+
+    def test_el_resto_del_sitio_sigue_con_x_frame_options_deny(self):
+        response = self.client.get(reverse("core:perfil"))
+        self.assertEqual(response.get("X-Frame-Options"), "DENY")
+        self.assertNotIn("Content-Security-Policy", response)
