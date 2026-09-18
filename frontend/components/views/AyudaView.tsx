@@ -735,19 +735,23 @@ const TEMAS: Tema[] = [
             servidor — el navegador nunca recibe cuál es la respuesta correcta, ni antes ni durante la
             evaluación.</li>
           <li><strong>Resultado</strong>: con 80% o más (configurable) queda <strong>Aprobado</strong> y se
-            muestra un certificado imprimible; por debajo, <strong>No aprobado</strong>, con la opción de
-            volver a intentar (cuenta como un registro nuevo).</li>
+            muestra un certificado imprimible, con la fecha en que vence la vigencia; por debajo,
+            <strong>No aprobado</strong>, con la opción de volver a intentar (cuenta como un registro nuevo).</li>
         </Ol>
         <Nota>
-          Si el documento ingresado coincide con un trabajador ya radicado en esa misma empresa (sección
-          Contratistas), al aprobar queda marcado automáticamente el curso &quot;Inducción SST&quot; en su
-          ficha — el mismo que ya se sigue en cursos Safety Academy — sin que nadie tenga que anotarlo a mano.
+          La inducción tiene <strong>vigencia de 6 meses</strong> desde la fecha en que se aprueba (editable
+          desde el catálogo de cursos Safety Academy, clave &quot;induccion_sst&quot;) — pasado ese tiempo hay
+          que volver a tomarla. Si el documento ingresado coincide con un trabajador ya radicado en esa misma
+          empresa (sección Contratistas), al aprobar queda marcado automáticamente el curso &quot;Inducción
+          SST&quot; con esa misma fecha de vencimiento en su ficha — el mismo que ya se sigue en cursos Safety
+          Academy — sin que nadie tenga que anotarlo a mano.
         </Nota>
         <Sub>Reporte</Sub>
         <P>
           La tabla de la sección lista todos los registros hechos, con nombre, documento, trabajador vinculado
-          (si aplica), calificación, estado y fecha. El personal interno ve todas las empresas; el portal de
-          contratistas ve solo los suyos.
+          (si aplica), calificación, estado, fecha y — para los aprobados — la fecha en que vence la vigencia
+          (en rojo si ya pasó). El personal interno ve todas las empresas; el portal de contratistas ve solo
+          los suyos.
         </P>
         <Sub>Descargar certificado y exportar aprobados</Sub>
         <Ul>
@@ -755,8 +759,9 @@ const TEMAS: Tema[] = [
             descargar ese certificado en PDF en cualquier momento — el mismo documento que se ve al aprobar.</li>
           <li>Botón <strong>&quot;Exportar aprobados (Excel)&quot;</strong> (arriba, junto a &quot;+ Nueva
             capacitación&quot;) descarga en un solo Excel a todos los que aprobaron — empresa, nombre, correo,
-            documento, trabajador vinculado, calificación y fecha de aprobación. El personal interno exporta
-            todas las empresas; el portal de contratistas, solo la suya.</li>
+            documento, trabajador vinculado, calificación, fecha de aprobación y fecha de vigencia (&quot;Vigente
+            hasta&quot;). El personal interno exporta todas las empresas; el portal de contratistas, solo la
+            suya.</li>
           <li>Botón <strong>&quot;Enviar listado a portería&quot;</strong> (solo Administrador) manda ese mismo
             Excel por correo — vía Brevo, con el diseño formal de GuardIA — a las direcciones que se
             escriban, por ejemplo la de portería de la planta, para que sepan quién tiene el acceso

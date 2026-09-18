@@ -290,6 +290,7 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
                 <th className="px-4 py-2.5">Calificación</th>
                 <th className="px-4 py-2.5">Estado</th>
                 <th className="px-4 py-2.5">Fecha</th>
+                <th className="px-4 py-2.5">Vigente hasta</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -305,6 +306,15 @@ export default function CapacitacionView({ token, rol }: { token: string; rol: R
                     <EstadoBadge registro={r} />
                   </td>
                   <td className="px-4 py-2.5">{new Date(r.iniciado_en).toLocaleDateString("es-CO")}</td>
+                  <td className="px-4 py-2.5">
+                    {r.fecha_vencimiento ? (
+                      <span className={new Date(r.fecha_vencimiento) < new Date() ? "font-medium text-red-700" : ""}>
+                        {new Date(r.fecha_vencimiento).toLocaleDateString("es-CO")}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 text-right">
                     <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
                       {r.estado === "aprobado" && (
@@ -736,7 +746,12 @@ function PasoResultado({
               Por haber completado y aprobado satisfactoriamente la inducción de:
             </p>
             <p className="text-sm font-semibold text-corp-navy">Seguridad y Salud Ocupacional</p>
-            <p className="mt-3 text-xs text-corp-muted">Fecha de emisión: {fechaHoy}</p>
+            <p className="mt-3 text-xs text-corp-muted">
+              Fecha de emisión: {fechaHoy}
+              {resultado.fecha_vencimiento && (
+                <> &middot; Vigente hasta: {new Date(resultado.fecha_vencimiento).toLocaleDateString("es-CO")}</>
+              )}
+            </p>
           </div>
         ) : null}
 

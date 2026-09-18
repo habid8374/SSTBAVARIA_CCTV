@@ -1060,6 +1060,16 @@ class RegistroCapacitacion(models.Model):
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.EN_CURSO)
     iniciado_en = models.DateTimeField(auto_now_add=True)
     finalizado_en = models.DateTimeField(null=True, blank=True)
+    fecha_vencimiento = models.DateField(
+        "vigente hasta",
+        null=True,
+        blank=True,
+        help_text=(
+            "Se calcula sola al aprobar — finalizado_en + CursoSafetyAcademy('induccion_sst')."
+            "meses_vigencia (6 meses por defecto). Vacía si ese curso no tiene meses de vigencia "
+            "configurados, o si el intento todavía no se aprobó."
+        ),
+    )
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
