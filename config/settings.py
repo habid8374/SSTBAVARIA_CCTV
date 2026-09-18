@@ -194,7 +194,7 @@ USE_TZ = True
 # no rompe el flujo de recibir_evento_camara.
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 BREVO_REMITENTE_EMAIL = os.environ.get("BREVO_REMITENTE_EMAIL", "alertas@sst-cctv.com")
-BREVO_REMITENTE_NOMBRE = os.environ.get("BREVO_REMITENTE_NOMBRE", "SST Bavaria — Cámaras IA")
+BREVO_REMITENTE_NOMBRE = os.environ.get("BREVO_REMITENTE_NOMBRE", "GuardIA")
 
 
 # Clasificación de eventos de cámaras con un modelo de visión (Claude o
