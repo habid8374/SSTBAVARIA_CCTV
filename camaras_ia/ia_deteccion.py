@@ -13,14 +13,17 @@ Brevo (ver notificaciones.py).
 import base64
 import json
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
 
-from .costos_ia import gasto_del_periodo_usd, registrar_consumo
-from .models import ConfiguracionIA, TipoEventoIA
+from .costos_ia import cuota_por_camara_usd, gasto_del_periodo_usd, registrar_consumo
+from .models import ConfiguracionIA, EventoDetectado, TipoEventoIA
 
 logger = logging.getLogger("camaras_ia.ia_deteccion")
+
+VENTANA_SIN_REPETIR_AVISO_IA = timedelta(minutes=10)
 
 MODELOS_POR_DEFECTO = {
     ConfiguracionIA.Proveedor.CLAUDE: "claude-opus-5",
@@ -46,11 +49,12 @@ class ErrorClasificacionIA(Exception):
 
 def clasificar_evento(evento):
     """Corre la clasificación IA sobre `evento` (EventoDetectado ya guardado,
-    con snapshot) contra el catálogo activo de TipoEventoIA de su empresa.
+    con snapshot) contra los TipoEventoIA activos asignados a su cámara.
     Guarda el resultado directamente en el evento — no devuelve nada, se usa
-    por su efecto secundario, igual que disparar_alerta. Si no hay API key
-    configurada o no hay catálogo, no hace nada silenciosamente (funcionalidad
-    opcional)."""
+    por su efecto secundario, igual que disparar_alerta. Si la IA detecta
+    alguno, el evento queda como alerta y se avisa al personal interno. Si no
+    hay API key configurada o la cámara no tiene eventos asignados, no hace
+    nada silenciosamente (funcionalidad opcional)."""
     if not evento.snapshot:
         return
 
@@ -59,7 +63,7 @@ def clasificar_evento(evento):
     if not api_key:
         return
 
-    tipos = list(TipoEventoIA.objects.filter(empresa_id=evento.camara.empresa_id, activo=True))
+    tipos = list(TipoEventoIA.objects.filter(camaras=evento.camara, activo=True))
     if not tipos:
         return
 
@@ -74,9 +78,12 @@ def clasificar_evento(evento):
     if config.proveedor == ConfiguracionIA.Proveedor.CLAUDE:
         gasto = gasto_del_periodo_usd(config)
         if gasto >= config.tope_usd:
-            evento.ia_error = f"Tope de consumo de IA alcanzado (USD {gasto:.2f} de {config.tope_usd:.2f})."
-            evento.ia_analizado_en = timezone.now()
-            evento.save(update_fields=["ia_error", "ia_analizado_en"])
+            _no_clasificar(evento, f"Tope de consumo de IA alcanzado (USD {gasto:.2f} de {config.tope_usd:.2f}).")
+            return
+        cuota = cuota_por_camara_usd(config)
+        gasto_camara = gasto_del_periodo_usd(config, evento.camara)
+        if gasto_camara >= cuota:
+            _no_clasificar(evento, f"Cuota de IA de esta cámara agotada (USD {gasto_camara:.2f} de {cuota:.2f}).")
             return
 
     try:
@@ -91,13 +98,47 @@ def clasificar_evento(evento):
         evento.save(update_fields=["ia_error", "ia_analizado_en"])
         return
 
-    ids_validos = {t.id for t in tipos}
-    ids_detectados = [i for i in resultado.get("eventos", []) if i in ids_validos]
-    evento.tipos_ia.set(ids_detectados)
+    ids_devueltos = set(resultado.get("eventos", []))
+    detectados = [t for t in tipos if t.id in ids_devueltos]
+    evento.tipos_ia.set(detectados)
     evento.descripcion_ia = str(resultado.get("descripcion", ""))[:2000]
     evento.ia_analizado_en = timezone.now()
     evento.ia_error = ""
-    evento.save(update_fields=["descripcion_ia", "ia_analizado_en", "ia_error"])
+    if detectados:
+        # En la respuesta al equipo local: con disparo_alerta graba el clip del evento.
+        evento.disparo_alerta = True
+    evento.save(update_fields=["descripcion_ia", "ia_analizado_en", "ia_error", "disparo_alerta"])
+    if detectados:
+        _notificar_alerta_ia(evento, detectados)
+
+
+def _no_clasificar(evento, motivo):
+    evento.ia_error = motivo
+    evento.ia_analizado_en = timezone.now()
+    evento.save(update_fields=["ia_error", "ia_analizado_en"])
+
+
+def _notificar_alerta_ia(evento, detectados):
+    """Push al personal interno — sin repetir el mismo evento IA de la misma
+    cámara dentro de VENTANA_SIN_REPETIR_AVISO_IA: el equipo local reporta a
+    la misma persona cada minuto mientras siga en la zona."""
+    from core.push import enviar_push_a_personal_interno
+
+    desde = evento.ia_analizado_en - VENTANA_SIN_REPETIR_AVISO_IA
+    nuevos = [
+        tipo
+        for tipo in detectados
+        if not EventoDetectado.objects.filter(camara=evento.camara, tipos_ia=tipo, ia_analizado_en__gte=desde)
+        .exclude(pk=evento.pk)
+        .exists()
+    ]
+    if not nuevos:
+        return
+    detalle = ", ".join(f"{tipo.nombre} ({tipo.get_severidad_display().lower()})" for tipo in nuevos)
+    donde = f" en {evento.zona.nombre}" if evento.zona else ""
+    enviar_push_a_personal_interno(
+        f"Alerta IA — {evento.camara.nombre}", f"{detalle}{donde}.", url="/dashboard?ir=alertas"
+    )
 
 
 def _api_key_por_defecto(proveedor):

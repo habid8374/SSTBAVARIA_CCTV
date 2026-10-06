@@ -12,7 +12,7 @@ from decimal import Decimal
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import ConfiguracionIA, ConsumoIA
+from .models import Camara, ConfiguracionIA, ConsumoIA
 
 logger = logging.getLogger("camaras_ia.costos_ia")
 
@@ -64,17 +64,38 @@ def calcular_costo_usd(modelo, tokens_entrada, tokens_salida, tokens_cache_escri
     return total / UN_MILLON
 
 
-def gasto_del_periodo_usd(config=None):
-    config = config or ConfiguracionIA.obtener()
+def consumos_del_periodo(config):
     consumos = ConsumoIA.objects.all()
     if config.consumo_desde:
         consumos = consumos.filter(creado_en__gte=config.consumo_desde)
+    return consumos
+
+
+def gasto_del_periodo_usd(config=None, camara=None):
+    config = config or ConfiguracionIA.obtener()
+    consumos = consumos_del_periodo(config)
+    if camara is not None:
+        consumos = consumos.filter(camara=camara)
     return consumos.aggregate(total=Sum("costo_usd"))["total"] or Decimal("0")
+
+
+def camaras_con_ia():
+    """Cámaras activas con al menos una alerta de IA activa — las únicas que
+    gastan, así que solo entre ellas se reparte el tope."""
+    return Camara.objects.filter(activa=True, tipos_evento_ia__activo=True).distinct()
+
+
+def cuota_por_camara_usd(config):
+    """El tope repartido por igual: se recalcula solo al agregar o quitar
+    cámaras con alertas de IA."""
+    cantidad = camaras_con_ia().count()
+    return config.tope_usd / cantidad if cantidad else config.tope_usd
 
 
 def registrar_consumo(modelo, usage, evento=None):
     """Guarda una llamada a partir de `respuesta.usage` del SDK de Anthropic
-    y avisa al personal interno al cruzar el 80% y el 100% del tope."""
+    y avisa al personal interno al cruzar el 80% y el 100% del tope, o
+    cuando la cámara agota su cuota."""
     tokens = {
         "tokens_entrada": usage.input_tokens,
         "tokens_salida": usage.output_tokens,
@@ -83,14 +104,18 @@ def registrar_consumo(modelo, usage, evento=None):
         "tokens_cache_lectura": usage.cache_read_input_tokens or 0,
     }
     config = ConfiguracionIA.obtener()
+    camara = evento.camara if evento else None
     gasto_antes = gasto_del_periodo_usd(config)
+    gasto_camara_antes = gasto_del_periodo_usd(config, camara) if camara else None
     consumo = ConsumoIA.objects.create(
         modelo=modelo,
+        camara=camara,
         evento=evento,
         costo_usd=calcular_costo_usd(modelo, **tokens),
         **tokens,
     )
-    _avisar_si_cruza_umbral(config, gasto_antes, gasto_antes + consumo.costo_usd)
+    if not _avisar_si_cruza_umbral(config, gasto_antes, gasto_antes + consumo.costo_usd) and camara:
+        _avisar_si_agota_cuota(config, camara, gasto_camara_antes, gasto_camara_antes + consumo.costo_usd)
     return consumo
 
 
@@ -105,8 +130,21 @@ def _avisar_si_cruza_umbral(config, gasto_antes, gasto_despues):
         titulo = "GuardIA — consumo de IA al 80%"
         cuerpo = f"Se gastaron USD {gasto_despues:.2f} de USD {tope:.2f}."
     else:
-        return
+        return False
     enviar_push_a_personal_interno(titulo, cuerpo, url="/dashboard?ir=sistema")
+    return True
+
+
+def _avisar_si_agota_cuota(config, camara, gasto_antes, gasto_despues):
+    from core.push import enviar_push_a_personal_interno
+
+    cuota = cuota_por_camara_usd(config)
+    if gasto_antes < cuota <= gasto_despues:
+        enviar_push_a_personal_interno(
+            f"GuardIA — {camara.nombre} agotó su cuota de IA",
+            f"Gastó USD {gasto_despues:.2f} de su cuota de USD {cuota:.2f}. Las demás cámaras siguen funcionando.",
+            url="/dashboard?ir=sistema",
+        )
 
 
 def reiniciar_periodo(config=None):

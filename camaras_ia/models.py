@@ -199,6 +199,13 @@ class TipoEventoIA(models.Model):
         help_text="Qué debe buscar la IA en la imagen — en lenguaje natural, con el mayor detalle posible."
     )
     severidad = models.CharField(max_length=10, choices=Severidad.choices, default=Severidad.MEDIA)
+    camaras = models.ManyToManyField(
+        Camara,
+        blank=True,
+        related_name="tipos_evento_ia",
+        verbose_name="cámaras",
+        help_text="Cámaras en las que la IA revisa este evento. Sin cámaras no se revisa en ninguna.",
+    )
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
@@ -449,6 +456,7 @@ class ConsumoIA(models.Model):
 
     creado_en = models.DateTimeField(auto_now_add=True, db_index=True)
     modelo = models.CharField(max_length=100)
+    camara = models.ForeignKey(Camara, null=True, blank=True, on_delete=models.SET_NULL, related_name="consumos_ia")
     evento = models.ForeignKey(
         EventoDetectado, null=True, blank=True, on_delete=models.SET_NULL, related_name="consumos_ia"
     )

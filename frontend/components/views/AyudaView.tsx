@@ -855,8 +855,9 @@ const TEMAS: Tema[] = [
         <P>
           Cada vez que el equipo local reporta una persona en una zona restringida (ver &quot;Alertas
           automáticas&quot; más abajo), el snapshot de ese momento se le manda a un modelo de visión — Claude
-          (Anthropic) o Gemini (Google), a elegir — para que revise si aparece alguno de los eventos del{" "}
-          <strong>catálogo</strong> de más abajo en esa misma pestaña. Es completamente opcional: sin una API
+          (Anthropic) o Gemini (Google), a elegir — para que revise si aparece alguna de las{" "}
+          <strong>alertas de IA asignadas a esa cámara</strong> (más abajo en esa misma pestaña). Es
+          completamente opcional: sin una API
           key configurada (acá o por variable de entorno del servidor), el sistema sigue funcionando exacto
           igual que siempre, solo sin esa capa extra de análisis.
         </P>
@@ -865,25 +866,39 @@ const TEMAS: Tema[] = [
           y su costo estimado en dólares con la tarifa del modelo. La barra compara el gasto contra el{" "}
           <strong>tope</strong> (USD 20 por defecto, editable ahí mismo): al llegar al 80% llega una
           notificación de aviso, y al llegar al tope el sistema <strong>deja de llamar a Claude</strong> (los
-          eventos siguen llegando normal, solo sin clasificación IA) y avisa de nuevo. Al recargar créditos en
+          eventos siguen llegando normal, solo sin clasificación IA) y avisa de nuevo. El tope se{" "}
+          <strong>reparte por igual entre las cámaras con alertas de IA</strong> (ej. USD 20 entre 10 cámaras =
+          USD 2 cada una; se recalcula solo al agregar cámaras): una cámara que agota su cuota deja de usar la IA
+          y avisa, sin afectar a las demás — la tabla &quot;Reparto por cámara&quot; muestra cuánto lleva cada
+          una. Al recargar créditos en
           Anthropic, el botón <strong>&quot;Reiniciar contador&quot;</strong> vuelve a contar desde cero sin
           borrar el historial. Es una estimación: el cobro oficial es el de la consola de Anthropic, donde
           conviene configurar también un límite de gasto como respaldo.
         </P>
         <P>
-          El <strong>catálogo de eventos</strong> es lo que hace útil la clasificación — cada fila es una
-          instrucción en lenguaje natural que se le pasa a la IA junto con la foto (ej. &quot;Persona sin
-          casco de seguridad puesto en la cabeza&quot;, &quot;Persona en el suelo, postura de caída&quot;,
-          &quot;Humo o llamas visibles en la imagen&quot;). Entre más detallada la descripción, mejor
-          detecta. Cada evento tiene una <strong>severidad</strong> (baja/media/alta) que se ve como color del
-          badge en la bandeja de Alertas. Se puede desactivar un evento sin borrarlo (para dejar de buscarlo
-          temporalmente) con el botón &quot;Desactivar&quot;.
+          Las <strong>alertas de IA</strong> se configuran <strong>por cámara</strong>, no son globales: cada
+          alerta es una instrucción en lenguaje natural (ej. &quot;Persona sin casco de seguridad puesto en la
+          cabeza&quot;, &quot;Persona a más de 3 metros del compresor&quot;) y se marcan las cámaras donde
+          aplica — así la cámara 1 puede revisar casco y chaleco, y la cámara 2 la distancia a un equipo.
+          La IA solo revisa en cada foto las alertas de esa cámara; una cámara sin alertas no se le envía a la
+          IA (no gasta). El filtro <strong>&quot;Ver alertas de&quot;</strong> muestra las de una cámara, y{" "}
+          <strong>&quot;Editar&quot;</strong> cambia el texto, la severidad o las cámaras. Entre más detallada
+          la descripción, mejor detecta. Se puede desactivar una alerta sin borrarla con
+          &quot;Desactivar&quot;.
         </P>
         <P>
-          Lo que la IA encuentra queda guardado en el evento y se ve como badges de colores en la columna{" "}
-          <strong>&quot;IA&quot;</strong> de la bandeja de Alertas — pasar el mouse por encima muestra la
-          descripción completa que devolvió el modelo. Si la clasificación falla (API caída, sin créditos,
-          etc.) el evento sigue su curso normal igual — nunca bloquea ni retrasa una alerta real.
+          La IA revisa a las personas que el equipo local reporta <strong>dentro de las zonas</strong>{" "}
+          dibujadas de cada cámara — para revisar casco en un área de trabajo, dibuje la zona sobre esa área.
+          Cuando encuentra una de las alertas de la cámara, el evento queda como <strong>alerta</strong>
+          (aunque la zona no tenga horario restringido en ese momento), llega una notificación al personal de
+          SST y el equipo local graba el clip. La misma alerta en la misma cámara no se vuelve a notificar
+          durante 10 minutos, para no llenar el celular mientras la persona sigue ahí.
+        </P>
+        <P>
+          Lo que la IA encuentra se ve como badges de colores (según la <strong>severidad</strong>) en la
+          columna <strong>&quot;IA&quot;</strong> de la bandeja de Alertas — pasar el mouse por encima muestra
+          la descripción completa que devolvió el modelo. Si la clasificación falla (API caída, sin créditos,
+          etc.) el evento sigue su curso normal igual — nunca bloquea una alerta de zona.
         </P>
         <Sub>Equipo local</Sub>
         <P>

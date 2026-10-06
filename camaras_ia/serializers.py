@@ -376,11 +376,12 @@ class ConsumoIASerializer(serializers.ModelSerializer):
 
 
 class TipoEventoIASerializer(serializers.ModelSerializer):
-    """CRUD del catálogo de eventos que la IA busca en cada snapshot."""
+    """CRUD del catálogo de eventos que la IA busca en cada snapshot, cada
+    uno asignado a las cámaras donde aplica."""
 
     class Meta:
         model = TipoEventoIA
-        fields = ["id", "nombre", "descripcion", "severidad", "activo", "creado_en"]
+        fields = ["id", "nombre", "descripcion", "severidad", "camaras", "activo", "creado_en"]
         read_only_fields = ["id", "creado_en"]
 
 
