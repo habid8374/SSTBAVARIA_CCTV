@@ -20,6 +20,8 @@ from .grabador import GrabadorEventos
 
 logger = logging.getLogger("equipo_local.camara")
 
+INTERVALO_LOG_ERRORES_FRAME_SEGUNDOS = 60
+
 
 class CamaraMonitor:
     def __init__(self, camara_datos, detector, cliente_api, config, fabrica_grabador=GrabadorEventos):
@@ -43,6 +45,7 @@ class CamaraMonitor:
         self._hilo = None
         self._lock_frame = threading.Lock()
         self._ultimo_frame_jpeg = None
+        self._ultimo_error_frame_registrado = float("-inf")
         self._grabador = None
         if getattr(config, "GRABAR_VIDEO", False):
             self._grabador = fabrica_grabador(
@@ -153,12 +156,25 @@ class CamaraMonitor:
                 if not ok:
                     logger.warning("Se perdió la señal de %s — reconectando…", self.nombre)
                     break
-                self._actualizar_ultimo_frame(frame)
-                if self._grabador is not None:
-                    self._grabador.procesar_frame(frame)
-                self._procesar_frame(frame)
+                try:
+                    self._actualizar_ultimo_frame(frame)
+                    if self._grabador is not None:
+                        self._grabador.procesar_frame(frame)
+                    self._procesar_frame(frame)
+                except Exception:
+                    # Sin esto, un solo error mata el hilo de la cámara en silencio
+                    # (la excepción de un hilo va a stderr, que no existe en la
+                    # Tarea Programada) y la cámara deja de detectar para siempre.
+                    self._registrar_error_de_frame()
                 time.sleep(self.config.INTERVALO_DETECCION_SEGUNDOS)
             captura.release()
+
+    def _registrar_error_de_frame(self):
+        ahora = time.monotonic()
+        if ahora - self._ultimo_error_frame_registrado < INTERVALO_LOG_ERRORES_FRAME_SEGUNDOS:
+            return
+        self._ultimo_error_frame_registrado = ahora
+        logger.exception("Error procesando un frame de %s — se sigue con el siguiente.", self.nombre)
 
     def _actualizar_ultimo_frame(self, frame):
         ok, buffer = cv2.imencode(".jpg", frame)

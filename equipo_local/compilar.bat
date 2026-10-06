@@ -10,8 +10,8 @@ REM
 REM  Se corre UNA VEZ en un PC de "armado" (por ejemplo tu PC de
 REM  casa) que ya tenga el entorno de instalar.bat funcionando -
 REM  no en el PC final de la planta. El resultado (equipo_local.exe,
-REM  en esta misma carpeta) se copia junto con instalar_exe.bat y
-REM  el .env al PC final - ver instalar_exe.bat.
+REM  en esta misma carpeta) viaja al PC final junto con TODA la
+REM  carpeta (instalar_exe.bat, .env y la subcarpeta windows\).
 REM
 REM  Requisito: haber corrido antes instalar.bat en este PC (para
 REM  tener el entorno "venv" con las dependencias ya instaladas).
@@ -35,13 +35,29 @@ if not exist "venv\Scripts\python.exe" (
     exit /b 1
 )
 
-echo [1/2] Instalando PyInstaller en el entorno...
-".\venv\Scripts\pip.exe" install -r requirements-build.txt
+echo [1/2] Sincronizando dependencias e instalando PyInstaller...
+".\venv\Scripts\pip.exe" install -r requirements.txt -r requirements-build.txt
 if errorlevel 1 (
     echo.
-    echo ERROR instalando PyInstaller - revisa el mensaje de arriba.
+    echo ERROR instalando dependencias - revisa el mensaje de arriba.
     pause
     exit /b 1
+)
+REM La version vieja de requirements.txt dejaba dos OpenCV instalados a la vez
+REM (headless + el que exige ultralytics) mezclando archivos en la misma carpeta
+REM cv2. Desinstalar uno borra archivos compartidos, por eso despues se
+REM reinstala opencv-python (misma version que requirements.txt).
+".\venv\Scripts\pip.exe" show opencv-python-headless >nul 2>&1
+if not errorlevel 1 (
+    echo Quitando opencv-python-headless duplicado...
+    ".\venv\Scripts\pip.exe" uninstall -y opencv-python-headless
+    ".\venv\Scripts\pip.exe" install --force-reinstall --no-deps opencv-python==4.10.0.84
+    if errorlevel 1 (
+        echo.
+        echo ERROR reinstalando opencv-python - revisa el mensaje de arriba.
+        pause
+        exit /b 1
+    )
 )
 
 echo [2/2] Compilando - la primera vez puede tardar varios minutos,
@@ -68,10 +84,10 @@ echo.
 echo ================================================================
 echo  LISTO. Se genero equipo_local.exe en esta carpeta.
 echo.
-echo  Para instalar en el PC final de la planta: copia a ese PC
-echo  equipo_local.exe, instalar_exe.bat y el archivo .env (los tres
-echo  juntos en una carpeta), y corre instalar_exe.bat ahi - ese PC
-echo  final NO necesita tener Python instalado.
+echo  Para instalar en el PC final de la planta: copia a ese PC esta
+echo  carpeta COMPLETA (con equipo_local.exe, instalar_exe.bat, el .env
+echo  y la subcarpeta "windows" adentro - instalar_exe.bat la necesita),
+echo  y corre instalar_exe.bat ahi. Ese PC final NO necesita Python.
 echo ================================================================
 echo.
 pause

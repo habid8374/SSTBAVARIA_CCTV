@@ -11,6 +11,7 @@ import logging
 import signal
 import sys
 import time
+from logging.handlers import RotatingFileHandler
 
 from .rutas import carpeta_base
 
@@ -25,7 +26,13 @@ def _configurar_logging(nivel="INFO"):
     siquiera un error temprano al importar una dependencia (ej. cv2) se
     pierda sin dejar rastro."""
     directorio = carpeta_base()
-    handlers = [logging.FileHandler(directorio / "equipo_local.log", encoding="utf-8")]
+    # Rotado (máx. ~20 MB en total): una cámara caída por días escribe un
+    # aviso de reconexión cada 10 s y el archivo crecería sin límite.
+    handlers = [
+        RotatingFileHandler(
+            directorio / "equipo_local.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+        )
+    ]
     if sys.stderr is not None:
         handlers.append(logging.StreamHandler())
     logging.basicConfig(level=nivel, format="%(asctime)s %(levelname)s %(name)s: %(message)s", handlers=handlers)
