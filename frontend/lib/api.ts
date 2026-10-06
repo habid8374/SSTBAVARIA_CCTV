@@ -558,6 +558,8 @@ export type ConfiguracionIA = {
   proveedor: ProveedorIA;
   api_key_configurada: boolean;
   modelo: string;
+  tope_usd: string;
+  consumo_desde: string | null;
   actualizada_en: string;
 };
 
@@ -565,7 +567,46 @@ export type CambiosConfiguracionIA = {
   proveedor?: ProveedorIA;
   api_key?: string;
   modelo?: string;
+  tope_usd?: string;
 };
+
+export type LlamadaIA = {
+  id: number;
+  creado_en: string;
+  modelo: string;
+  evento: number | null;
+  tokens_entrada: number;
+  tokens_salida: number;
+  tokens_cache_escritura: number;
+  tokens_cache_lectura: number;
+  costo_usd: string;
+};
+
+export type ConsumoIA = {
+  tope_usd: number;
+  gastado_usd: number;
+  restante_usd: number;
+  porcentaje: number;
+  tope_alcanzado: boolean;
+  consumo_desde: string | null;
+  llamadas: number;
+  tokens_entrada: number;
+  tokens_salida: number;
+  costo_promedio_usd: number | null;
+  llamadas_restantes_estimadas: number | null;
+  ultimas: LlamadaIA[];
+};
+
+export function obtenerConsumoIA(token: string): Promise<ConsumoIA> {
+  return request<ConsumoIA>("/api/camaras-ia/dashboard/consumo-ia/", { headers: authHeaders(token) });
+}
+
+export function reiniciarConsumoIA(token: string): Promise<{ consumo_desde: string }> {
+  return request<{ consumo_desde: string }>("/api/camaras-ia/dashboard/consumo-ia/reiniciar/", {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+}
 
 export function obtenerConfiguracionIA(token: string): Promise<ConfiguracionIA> {
   return request<ConfiguracionIA>("/api/camaras-ia/dashboard/configuracion-ia/", {

@@ -861,6 +861,16 @@ const TEMAS: Tema[] = [
           igual que siempre, solo sin esa capa extra de análisis.
         </P>
         <P>
+          Con Claude, el panel <strong>Consumo de Claude</strong> lleva la cuenta de cada llamada: tokens usados
+          y su costo estimado en dólares con la tarifa del modelo. La barra compara el gasto contra el{" "}
+          <strong>tope</strong> (USD 20 por defecto, editable ahí mismo): al llegar al 80% llega una
+          notificación de aviso, y al llegar al tope el sistema <strong>deja de llamar a Claude</strong> (los
+          eventos siguen llegando normal, solo sin clasificación IA) y avisa de nuevo. Al recargar créditos en
+          Anthropic, el botón <strong>&quot;Reiniciar contador&quot;</strong> vuelve a contar desde cero sin
+          borrar el historial. Es una estimación: el cobro oficial es el de la consola de Anthropic, donde
+          conviene configurar también un límite de gasto como respaldo.
+        </P>
+        <P>
           El <strong>catálogo de eventos</strong> es lo que hace útil la clasificación — cada fila es una
           instrucción en lenguaje natural que se le pasa a la IA junto con la foto (ej. &quot;Persona sin
           casco de seguridad puesto en la cabeza&quot;, &quot;Persona en el suelo, postura de caída&quot;,
