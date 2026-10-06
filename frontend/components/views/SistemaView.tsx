@@ -19,7 +19,10 @@ import {
   listarTiposEventoIA,
   obtenerConfiguracionIA,
   obtenerConfiguracionNotificaciones,
+  obtenerConsumoIA,
+  reiniciarConsumoIA,
   type ConfiguracionIA,
+  type ConsumoIA,
   type ConfiguracionNotificaciones,
   type EquipoLocal,
   type NuevoTipoEventoIA,
@@ -271,6 +274,10 @@ function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
         )}
       </div>
 
+      {config?.proveedor === "claude" && (
+        <ConsumoClaude key={config.tope_usd} token={token} tope={config.tope_usd} onTopeGuardado={setConfig} />
+      )}
+
       <form onSubmit={guardar} className="mt-6 max-w-md space-y-4 rounded-xl border border-corp-border bg-white p-5">
         <Campo label="Proveedor">
           <select
@@ -330,6 +337,212 @@ function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
         </p>
         <CatalogoEventosIA token={token} />
       </div>
+    </div>
+  );
+}
+
+// Colores de estado reservados (ver skill de visualización): siempre van con
+// ícono + texto, nunca solos.
+const ESTADO_CONSUMO = {
+  normal: { color: "#0ca30c", icono: "●", texto: "Consumo normal" },
+  aviso: { color: "#fab219", icono: "▲", texto: "Cerca del tope (80% o más)" },
+  tope: { color: "#d03b3b", icono: "■", texto: "Tope alcanzado — la clasificación con IA está pausada" },
+} as const;
+
+function usd(valor: number, decimales = 2) {
+  return `USD ${valor.toLocaleString("es-CO", { minimumFractionDigits: decimales, maximumFractionDigits: decimales })}`;
+}
+
+function ConsumoClaude({
+  token,
+  tope,
+  onTopeGuardado,
+}: {
+  token: string;
+  tope: string | null;
+  onTopeGuardado: (config: ConfiguracionIA) => void;
+}) {
+  const [consumo, setConsumo] = useState<ConsumoIA | null>(null);
+  const [nuevoTope, setNuevoTope] = useState(tope ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const { confirmar } = useDialog();
+
+  function cargar() {
+    obtenerConsumoIA(token)
+      .then(setConsumo)
+      .catch(() => setError("No se pudo cargar el consumo de IA."));
+  }
+
+  useEffect(cargar, [token]);
+
+  async function guardarTope(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setGuardando(true);
+    try {
+      onTopeGuardado(await actualizarConfiguracionIA(token, { tope_usd: nuevoTope.trim() }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar el tope.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function reiniciar() {
+    const ok = await confirmar({
+      titulo: "Reiniciar el contador de consumo",
+      mensaje:
+        "El gasto vuelve a contar desde cero a partir de ahora (por ejemplo, después de recargar créditos en Anthropic). " +
+        "El historial de llamadas no se borra.",
+      textoConfirmar: "Reiniciar",
+    });
+    if (!ok) return;
+    try {
+      await reiniciarConsumoIA(token);
+      cargar();
+    } catch {
+      setError("No se pudo reiniciar el contador.");
+    }
+  }
+
+  if (!consumo) {
+    return error ? (
+      <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+    ) : null;
+  }
+
+  const estado = consumo.tope_alcanzado ? ESTADO_CONSUMO.tope : consumo.porcentaje >= 80 ? ESTADO_CONSUMO.aviso : ESTADO_CONSUMO.normal;
+  const relleno = Math.min(consumo.porcentaje, 100);
+
+  return (
+    <section className="mt-6 rounded-xl border border-corp-border bg-white p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-corp-navy">Consumo de Claude</h3>
+          <p className="mt-0.5 text-xs text-corp-muted">
+            {consumo.consumo_desde
+              ? `Contando desde el ${new Date(consumo.consumo_desde).toLocaleString("es-CO")}`
+              : "Contando desde la primera llamada"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={reiniciar}
+          className="self-start rounded-lg border border-corp-border px-3 py-1.5 text-xs font-medium text-corp-navy transition hover:bg-slate-50"
+        >
+          Reiniciar contador
+        </button>
+      </div>
+
+      <p className="mt-4 text-2xl font-semibold text-corp-navy">
+        {usd(consumo.gastado_usd)} <span className="text-base font-normal text-corp-muted">de {usd(consumo.tope_usd)}</span>
+      </p>
+      <div
+        role="meter"
+        aria-label="Gasto de IA frente al tope"
+        aria-valuemin={0}
+        aria-valuemax={consumo.tope_usd}
+        aria-valuenow={consumo.gastado_usd}
+        title={`${usd(consumo.gastado_usd, 4)} de ${usd(consumo.tope_usd)} (${consumo.porcentaje.toFixed(1)}%)`}
+        className="relative mt-2 h-3 w-full rounded bg-slate-100"
+      >
+        <div className="h-full rounded" style={{ width: `${relleno}%`, backgroundColor: estado.color }} />
+        <div className="absolute inset-y-0 w-0.5 bg-slate-400" style={{ left: "80%" }} aria-hidden />
+      </div>
+      <div className="mt-1.5 flex items-center justify-between text-xs">
+        <span className="font-medium text-corp-navy">
+          <span style={{ color: estado.color }} aria-hidden>
+            {estado.icono}
+          </span>{" "}
+          {estado.texto}
+        </span>
+        <span className="text-corp-muted">{consumo.porcentaje.toFixed(1)}% · marca en 80%</span>
+      </div>
+
+      <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Cifra etiqueta="Restante" valor={usd(consumo.restante_usd)} />
+        <Cifra etiqueta="Llamadas" valor={consumo.llamadas.toLocaleString("es-CO")} />
+        <Cifra
+          etiqueta="Costo promedio"
+          valor={consumo.costo_promedio_usd === null ? "—" : usd(consumo.costo_promedio_usd, 4)}
+        />
+        <Cifra
+          etiqueta="Clasificaciones restantes (aprox.)"
+          valor={consumo.llamadas_restantes_estimadas === null ? "—" : consumo.llamadas_restantes_estimadas.toLocaleString("es-CO")}
+        />
+      </dl>
+      <p className="mt-2 text-xs text-corp-muted">
+        Tokens del periodo: {consumo.tokens_entrada.toLocaleString("es-CO")} de entrada ·{" "}
+        {consumo.tokens_salida.toLocaleString("es-CO")} de salida.
+      </p>
+
+      <form onSubmit={guardarTope} className="mt-5 flex flex-wrap items-end gap-2">
+        <Campo label="Tope de gasto (USD)">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={nuevoTope}
+            onChange={(event) => setNuevoTope(event.target.value)}
+            className="block w-36 rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          />
+        </Campo>
+        <button
+          type="submit"
+          disabled={guardando || nuevoTope.trim() === "" || nuevoTope === tope}
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
+        >
+          {guardando ? "Guardando…" : "Guardar tope"}
+        </button>
+      </form>
+      {error && (
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+      )}
+      <p className="mt-3 text-xs text-corp-muted">
+        Al llegar al tope el sistema deja de llamar a Claude y avisa con una notificación (también al 80%). Es una
+        estimación con la tarifa pública de cada modelo: configure además un límite de gasto en la consola de
+        Anthropic como respaldo.
+      </p>
+
+      {consumo.ultimas.length > 0 && (
+        <div className="mt-5 overflow-x-auto">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-corp-muted">Últimas llamadas</h4>
+          <table className="mt-2 w-full text-left text-sm">
+            <thead className="text-xs text-corp-muted">
+              <tr className="border-b border-corp-border">
+                <th className="py-2 pr-4 font-medium">Fecha</th>
+                <th className="py-2 pr-4 font-medium">Modelo</th>
+                <th className="py-2 pr-4 text-right font-medium">Tokens entrada</th>
+                <th className="py-2 pr-4 text-right font-medium">Tokens salida</th>
+                <th className="py-2 text-right font-medium">Costo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {consumo.ultimas.map((llamada) => (
+                <tr key={llamada.id} className="border-b border-corp-border/60 last:border-0">
+                  <td className="whitespace-nowrap py-2 pr-4 text-corp-navy">
+                    {new Date(llamada.creado_en).toLocaleString("es-CO")}
+                  </td>
+                  <td className="py-2 pr-4 text-corp-muted">{llamada.modelo}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums">{llamada.tokens_entrada.toLocaleString("es-CO")}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums">{llamada.tokens_salida.toLocaleString("es-CO")}</td>
+                  <td className="py-2 text-right tabular-nums">{usd(Number(llamada.costo_usd), 4)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Cifra({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
+      <dt className="text-xs text-corp-muted">{etiqueta}</dt>
+      <dd className="mt-0.5 text-sm font-semibold text-corp-navy tabular-nums">{valor}</dd>
     </div>
   );
 }

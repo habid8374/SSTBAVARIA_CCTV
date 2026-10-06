@@ -5,7 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -23,11 +23,13 @@ from core.permissions import (
     EsPersonalInternoParaLeerYAdministradorParaEscribir,
 )
 
+from .costos_ia import gasto_del_periodo_usd, reiniciar_periodo
 from .ia_deteccion import clasificar_evento
 from .models import (
     Camara,
     ConfiguracionIA,
     ConfiguracionNotificaciones,
+    ConsumoIA,
     EquipoLocal,
     EventoDetectado,
     InstruccionSeguridad,
@@ -41,6 +43,7 @@ from .serializers import (
     CamaraCrearSerializer,
     CamaraDashboardSerializer,
     ConfiguracionIASerializer,
+    ConsumoIASerializer,
     ConfiguracionNotificacionesSerializer,
     EquipoLocalSerializer,
     EventoDashboardSerializer,
@@ -509,6 +512,50 @@ class ConfiguracionIADetalle(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return ConfiguracionIA.obtener()
+
+
+@api_view(["GET"])
+@permission_classes([EsAdministradorOSoloLectura])
+def consumo_ia(request):
+    """Gasto estimado de Claude en el periodo actual frente al tope, con las
+    últimas llamadas — alimenta el panel de consumo en Sistema."""
+    config = ConfiguracionIA.obtener()
+    consumos = ConsumoIA.objects.all()
+    if config.consumo_desde:
+        consumos = consumos.filter(creado_en__gte=config.consumo_desde)
+    totales = consumos.aggregate(
+        llamadas=Count("id"), tokens_entrada=Sum("tokens_entrada"), tokens_salida=Sum("tokens_salida")
+    )
+    gastado = gasto_del_periodo_usd(config)
+    tope = config.tope_usd
+    llamadas = totales["llamadas"]
+    costo_promedio = gastado / llamadas if llamadas else None
+    restante = max(tope - gastado, 0)
+    return Response(
+        {
+            "tope_usd": float(tope),
+            "gastado_usd": float(gastado),
+            "restante_usd": float(restante),
+            "porcentaje": float(gastado / tope * 100) if tope else 100.0,
+            "tope_alcanzado": gastado >= tope,
+            "consumo_desde": config.consumo_desde,
+            "llamadas": llamadas,
+            "tokens_entrada": totales["tokens_entrada"] or 0,
+            "tokens_salida": totales["tokens_salida"] or 0,
+            "costo_promedio_usd": float(costo_promedio) if costo_promedio is not None else None,
+            "llamadas_restantes_estimadas": int(restante / costo_promedio) if costo_promedio else None,
+            "ultimas": ConsumoIASerializer(consumos[:20], many=True).data,
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([EsAdministrador])
+def reiniciar_consumo_ia(request):
+    """Empieza un periodo nuevo (ej. al recargar créditos): el gasto vuelve a
+    contar desde ahora. El historial de llamadas no se borra."""
+    config = reiniciar_periodo()
+    return Response({"consumo_desde": config.consumo_desde})
 
 
 class TipoEventoIAListaCrear(generics.ListCreateAPIView):

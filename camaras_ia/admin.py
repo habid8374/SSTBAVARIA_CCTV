@@ -4,6 +4,7 @@ from .models import (
     Camara,
     ConfiguracionIA,
     ConfiguracionNotificaciones,
+    ConsumoIA,
     EquipoLocal,
     EventoDetectado,
     InstruccionSeguridad,
@@ -79,7 +80,24 @@ class EventoDetectadoAdmin(admin.ModelAdmin):
 
 @admin.register(ConfiguracionIA)
 class ConfiguracionIAAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "modelo", "actualizada_en")
+    list_display = ("__str__", "modelo", "tope_usd", "consumo_desde", "actualizada_en")
+
+
+@admin.register(ConsumoIA)
+class ConsumoIAAdmin(admin.ModelAdmin):
+    list_display = ("creado_en", "modelo", "tokens_entrada", "tokens_salida", "costo_usd", "evento")
+    list_filter = ("modelo",)
+    date_hierarchy = "creado_en"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    # Borrar registros bajaría el gasto medido y dejaría pasar el tope.
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(TipoEventoIA)

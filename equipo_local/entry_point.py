@@ -15,7 +15,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from equipo_local.main import main  # noqa: E402
+from equipo_local.main import logger, main  # noqa: E402
 
 if __name__ == "__main__":
-    main()
+    # Igual que el bloque final de main.py: corriendo como Tarea Programada
+    # sin ventana, un error fatal sin este except no queda en equipo_local.log.
+    try:
+        main()
+    except Exception:
+        logger.exception("Error fatal no manejado — el programa se detiene.")
+        sys.exit(1)

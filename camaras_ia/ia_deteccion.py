@@ -17,6 +17,7 @@ import logging
 from django.conf import settings
 from django.utils import timezone
 
+from .costos_ia import gasto_del_periodo_usd, registrar_consumo
 from .models import ConfiguracionIA, TipoEventoIA
 
 logger = logging.getLogger("camaras_ia.ia_deteccion")
@@ -70,11 +71,19 @@ def clasificar_evento(evento):
 
     modelo = config.modelo or MODELOS_POR_DEFECTO[config.proveedor]
 
+    if config.proveedor == ConfiguracionIA.Proveedor.CLAUDE:
+        gasto = gasto_del_periodo_usd(config)
+        if gasto >= config.tope_usd:
+            evento.ia_error = f"Tope de consumo de IA alcanzado (USD {gasto:.2f} de {config.tope_usd:.2f})."
+            evento.ia_analizado_en = timezone.now()
+            evento.save(update_fields=["ia_error", "ia_analizado_en"])
+            return
+
     try:
         if config.proveedor == ConfiguracionIA.Proveedor.GEMINI:
             resultado = _clasificar_con_gemini(api_key, modelo, imagen_bytes, tipos)
         else:
-            resultado = _clasificar_con_claude(api_key, modelo, imagen_bytes, tipos)
+            resultado = _clasificar_con_claude(api_key, modelo, imagen_bytes, tipos, evento)
     except Exception as err:
         logger.exception("No se pudo clasificar con IA el evento_id=%s", evento.pk)
         evento.ia_error = str(err)[:255]
@@ -101,7 +110,7 @@ def _catalogo_texto(tipos):
     return "\n".join(f"- id={t.id}: {t.nombre} — {t.descripcion}" for t in tipos)
 
 
-def _clasificar_con_claude(api_key, modelo, imagen_bytes, tipos):
+def _clasificar_con_claude(api_key, modelo, imagen_bytes, tipos, evento):
     import anthropic  # noqa: PLC0415 (import perezoso — ver docstring de equipo_local/deteccion.py)
 
     cliente = anthropic.Anthropic(api_key=api_key)
@@ -122,6 +131,7 @@ def _clasificar_con_claude(api_key, modelo, imagen_bytes, tipos):
     except anthropic.APIError as err:
         raise ErrorClasificacionIA(f"Claude respondió con error: {err}") from err
 
+    registrar_consumo(respuesta.model, respuesta.usage, evento)
     texto = next((bloque.text for bloque in respuesta.content if bloque.type == "text"), "{}")
     return _parsear_json(texto)
 

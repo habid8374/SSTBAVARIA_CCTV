@@ -2,6 +2,8 @@ import datetime
 import io
 import urllib.error
 import zipfile
+from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -12,11 +14,13 @@ from django.utils import timezone
 
 from core.models import Empresa, PerfilUsuario
 
+from .costos_ia import calcular_costo_usd, precio_modelo, reiniciar_periodo
 from .ia_deteccion import _parsear_json, clasificar_evento
 from .models import (
     Camara,
     ConfiguracionIA,
     ConfiguracionNotificaciones,
+    ConsumoIA,
     EquipoLocal,
     EventoDetectado,
     InstruccionSeguridad,
@@ -1280,6 +1284,20 @@ class ParsearJsonTests(TestCase):
         self.assertEqual(_parsear_json("[1, 2, 3]"), {"eventos": [], "descripcion": ""})
 
 
+def _respuesta_claude(texto, tokens_entrada=1000, tokens_salida=200, modelo="claude-opus-5"):
+    """Respuesta de messages.create con la forma del SDK: content + usage + model."""
+    return SimpleNamespace(
+        content=[SimpleNamespace(type="text", text=texto)],
+        usage=SimpleNamespace(
+            input_tokens=tokens_entrada,
+            output_tokens=tokens_salida,
+            cache_creation_input_tokens=None,
+            cache_read_input_tokens=None,
+        ),
+        model=modelo,
+    )
+
+
 class ClasificarEventoTests(TestCase):
     def setUp(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -1322,9 +1340,9 @@ class ClasificarEventoTests(TestCase):
     @override_settings(ANTHROPIC_API_KEY="desde-settings")
     @patch("anthropic.Anthropic")
     def test_clasifica_con_claude_y_guarda_resultado(self, mock_anthropic_cls):
-        bloque_texto = type("Bloque", (), {"type": "text", "text": '{"eventos": [%d], "descripcion": "sin casco"}' % self.tipo_casco.id})()
-        mock_respuesta = type("Respuesta", (), {"content": [bloque_texto]})()
-        mock_anthropic_cls.return_value.messages.create.return_value = mock_respuesta
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude(
+            '{"eventos": [%d], "descripcion": "sin casco"}' % self.tipo_casco.id
+        )
 
         clasificar_evento(self.evento)
 
@@ -1363,8 +1381,9 @@ class ClasificarEventoTests(TestCase):
         config = ConfiguracionIA.obtener()
         config.api_key = "desde-la-bd"
         config.save()
-        bloque_texto = type("Bloque", (), {"type": "text", "text": '{"eventos": [], "descripcion": ""}'})()
-        mock_anthropic_cls.return_value.messages.create.return_value = type("R", (), {"content": [bloque_texto]})()
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude(
+            '{"eventos": [], "descripcion": ""}'
+        )
 
         clasificar_evento(self.evento)
 
@@ -1386,10 +1405,9 @@ class ClasificarEventoTests(TestCase):
     @patch("anthropic.Anthropic")
     def test_ids_no_validos_se_ignoran(self, mock_anthropic_cls):
         id_inexistente = self.tipo_casco.id + self.tipo_caida.id + 999
-        bloque_texto = type(
-            "Bloque", (), {"type": "text", "text": '{"eventos": [%d, %d], "descripcion": "x"}' % (self.tipo_casco.id, id_inexistente)}
-        )()
-        mock_anthropic_cls.return_value.messages.create.return_value = type("R", (), {"content": [bloque_texto]})()
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude(
+            '{"eventos": [%d, %d], "descripcion": "x"}' % (self.tipo_casco.id, id_inexistente)
+        )
 
         clasificar_evento(self.evento)
 
@@ -1474,3 +1492,170 @@ class ConfiguracionIAYTipoEventoIAEndpointsTests(TestCase):
         )
         self.assertEqual(response.status_code, 204)
         self.assertEqual(TipoEventoIA.objects.count(), 0)
+
+
+class CostosIATests(TestCase):
+    def test_usa_la_tarifa_del_prefijo_mas_largo(self):
+        self.assertEqual(precio_modelo("claude-opus-5-5")[0], Decimal("4"))
+        self.assertEqual(precio_modelo("claude-opus-5")[0], Decimal("5"))
+        self.assertEqual(precio_modelo("claude-haiku-4-5-20251001")[0], Decimal("1"))
+
+    def test_modelo_desconocido_se_estima_con_la_tarifa_mas_alta(self):
+        self.assertEqual(precio_modelo("claude-modelo-nuevo")[:2], (Decimal("10"), Decimal("50")))
+
+    def test_costo_incluye_cache(self):
+        # opus-5: entrada 5, salida 25, escritura caché 5*1.25, lectura caché 0.50 (USD por millón)
+        costo = calcular_costo_usd("claude-opus-5", 1_000_000, 100_000, 200_000, 400_000)
+        self.assertEqual(costo, Decimal("5") + Decimal("2.5") + Decimal("1.25") + Decimal("0.2"))
+
+
+@override_settings(ANTHROPIC_API_KEY="desde-settings")
+class ConsumoIAClasificacionTests(TestCase):
+    def setUp(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        empresa = Empresa.objects.create(nombre="Cliente Planta")
+        camara = Camara.objects.create(empresa=empresa, nombre="Cam 1", ip="10.0.0.1")
+        zona = ZonaRestringida.objects.create(camara=camara, nombre="Bodega", poligono=CUADRADO)
+        self.evento = EventoDetectado.objects.create(
+            camara=camara, zona=zona, punto_x=1, punto_y=1,
+            snapshot=SimpleUploadedFile("evento.jpg", b"contenido-jpeg-falso"),
+        )
+        TipoEventoIA.objects.create(empresa=empresa, nombre="Sin casco", descripcion="Persona sin casco")
+
+    def _gastar(self, usd, hace=None):
+        consumo = ConsumoIA.objects.create(modelo="claude-opus-5", costo_usd=Decimal(usd))
+        if hace is not None:
+            ConsumoIA.objects.filter(pk=consumo.pk).update(creado_en=timezone.now() - hace)
+
+    @patch("anthropic.Anthropic")
+    def test_registra_tokens_y_costo_de_cada_llamada(self, mock_anthropic_cls):
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude(
+            '{"eventos": [], "descripcion": ""}', tokens_entrada=1000, tokens_salida=200
+        )
+
+        clasificar_evento(self.evento)
+
+        consumo = ConsumoIA.objects.get()
+        self.assertEqual((consumo.tokens_entrada, consumo.tokens_salida), (1000, 200))
+        self.assertEqual(consumo.costo_usd, Decimal("0.01"))  # (1000*5 + 200*25) / 1e6
+        self.assertEqual(consumo.evento, self.evento)
+
+    @patch("anthropic.Anthropic")
+    def test_respuesta_que_no_es_json_igual_cuenta_el_consumo(self, mock_anthropic_cls):
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude("no es json")
+
+        clasificar_evento(self.evento)
+
+        self.assertEqual(ConsumoIA.objects.count(), 1)
+
+    @patch("anthropic.Anthropic")
+    def test_con_el_tope_alcanzado_no_llama_a_claude(self, mock_anthropic_cls):
+        self._gastar("20.00")
+
+        clasificar_evento(self.evento)
+
+        mock_anthropic_cls.return_value.messages.create.assert_not_called()
+        self.evento.refresh_from_db()
+        self.assertIn("Tope de consumo de IA alcanzado", self.evento.ia_error)
+
+    @patch("anthropic.Anthropic")
+    def test_reiniciar_el_periodo_vuelve_a_permitir_llamadas(self, mock_anthropic_cls):
+        self._gastar("20.00", hace=datetime.timedelta(days=1))
+        reiniciar_periodo()
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude('{"eventos": []}')
+
+        clasificar_evento(self.evento)
+
+        mock_anthropic_cls.return_value.messages.create.assert_called_once()
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_avisa_al_cruzar_el_80_por_ciento(self, mock_anthropic_cls, mock_push):
+        self._gastar("15.995")
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude('{"eventos": []}')
+
+        clasificar_evento(self.evento)  # +0.01 -> 16.005, cruza 16 (80% de 20)
+
+        titulo = mock_push.call_args[0][0]
+        self.assertIn("80%", titulo)
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_avisa_al_llegar_al_tope(self, mock_anthropic_cls, mock_push):
+        self._gastar("19.995")
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude('{"eventos": []}')
+
+        clasificar_evento(self.evento)
+
+        self.assertIn("tope de IA alcanzado", mock_push.call_args[0][0])
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_sin_cruzar_umbral_no_avisa(self, mock_anthropic_cls, mock_push):
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude('{"eventos": []}')
+
+        clasificar_evento(self.evento)
+
+        mock_push.assert_not_called()
+
+
+class ConsumoIAEndpointsTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+
+    def _auth(self, user):
+        response = self.client.post(
+            reverse("core:login"),
+            {"username": user.username, "password": "clave12345"},
+            content_type="application/json",
+        )
+        return {"HTTP_AUTHORIZATION": f"Token {response.data['token']}"}
+
+    def test_resumen_del_consumo(self):
+        ConsumoIA.objects.create(modelo="claude-opus-5", tokens_entrada=1000, tokens_salida=200, costo_usd=Decimal("2"))
+        ConsumoIA.objects.create(modelo="claude-opus-5", tokens_entrada=3000, tokens_salida=400, costo_usd=Decimal("3"))
+
+        response = self.client.get(reverse("camaras_ia:consumo_ia"), **self._auth(self.operador))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["tope_usd"], 20.0)
+        self.assertEqual(response.data["gastado_usd"], 5.0)
+        self.assertEqual(response.data["restante_usd"], 15.0)
+        self.assertEqual(response.data["porcentaje"], 25.0)
+        self.assertEqual(response.data["llamadas"], 2)
+        self.assertEqual(response.data["tokens_entrada"], 4000)
+        self.assertEqual(response.data["llamadas_restantes_estimadas"], 6)  # 15 / 2.5
+        self.assertEqual(len(response.data["ultimas"]), 2)
+
+    def test_solo_el_admin_reinicia_el_periodo(self):
+        url = reverse("camaras_ia:consumo_ia_reiniciar")
+        self.assertEqual(self.client.post(url, **self._auth(self.operador)).status_code, 403)
+
+        response = self.client.post(url, **self._auth(self.admin))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(ConfiguracionIA.obtener().consumo_desde)
+
+    def test_admin_cambia_el_tope(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_ia"),
+            {"tope_usd": "35.50"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(ConfiguracionIA.obtener().tope_usd, Decimal("35.50"))
+
+    def test_tope_negativo_se_rechaza(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_ia"),
+            {"tope_usd": "-1"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+
+        self.assertEqual(response.status_code, 400)

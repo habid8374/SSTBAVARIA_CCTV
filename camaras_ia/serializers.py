@@ -10,6 +10,7 @@ from core.validators import validar_tamano_archivo
 from .models import (
     Camara,
     ConfiguracionIA,
+    ConsumoIA,
     ConfiguracionNotificaciones,
     EquipoLocal,
     EventoDetectado,
@@ -341,13 +342,37 @@ class ConfiguracionIASerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConfiguracionIA
-        fields = ["proveedor", "api_key", "api_key_configurada", "modelo", "actualizada_en"]
-        read_only_fields = ["actualizada_en"]
+        fields = [
+            "proveedor",
+            "api_key",
+            "api_key_configurada",
+            "modelo",
+            "tope_usd",
+            "consumo_desde",
+            "actualizada_en",
+        ]
+        read_only_fields = ["consumo_desde", "actualizada_en"]
 
     def get_api_key_configurada(self, obj):
         from .ia_deteccion import _api_key_por_defecto
 
         return bool(obj.api_key or _api_key_por_defecto(obj.proveedor))
+
+
+class ConsumoIASerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConsumoIA
+        fields = [
+            "id",
+            "creado_en",
+            "modelo",
+            "evento",
+            "tokens_entrada",
+            "tokens_salida",
+            "tokens_cache_escritura",
+            "tokens_cache_lectura",
+            "costo_usd",
+        ]
 
 
 class TipoEventoIASerializer(serializers.ModelSerializer):

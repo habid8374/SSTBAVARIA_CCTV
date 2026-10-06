@@ -56,6 +56,8 @@ urlpatterns = [
         views.ConfiguracionIADetalle.as_view(),
         name="configuracion_ia",
     ),
+    path("dashboard/consumo-ia/", views.consumo_ia, name="consumo_ia"),
+    path("dashboard/consumo-ia/reiniciar/", views.reiniciar_consumo_ia, name="consumo_ia_reiniciar"),
     path("dashboard/tipos-evento-ia/", views.TipoEventoIAListaCrear.as_view(), name="tipos_evento_ia_lista"),
     path("dashboard/tipos-evento-ia/<int:pk>/", views.TipoEventoIADetalle.as_view(), name="tipos_evento_ia_detalle"),
     path("dashboard/equipos-locales/", views.EquipoLocalListaCrear.as_view(), name="equipos_locales_lista"),

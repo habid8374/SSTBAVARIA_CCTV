@@ -1,5 +1,7 @@
 import secrets
+from decimal import Decimal
 
+from django.core.validators import MinValueValidator
 from django.db import models
 
 from core.models import Empresa
@@ -148,6 +150,21 @@ class ConfiguracionIA(models.Model):
         blank=True,
         help_text="ID del modelo a usar, ej. claude-opus-5 o gemini-flash-latest. "
         "Vacío = valor por defecto según el proveedor (ver ia_deteccion.MODELOS_POR_DEFECTO).",
+    )
+    tope_usd = models.DecimalField(
+        "tope de consumo (USD)",
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("20.00"),
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text="Al llegar a este gasto estimado (desde consumo_desde) se dejan de hacer llamadas a Claude.",
+    )
+    consumo_desde = models.DateTimeField(
+        "contar consumo desde",
+        null=True,
+        blank=True,
+        help_text="Inicio del periodo que se compara contra el tope — se reinicia al recargar créditos. "
+        "Vacío = desde siempre.",
     )
     actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
 
@@ -422,3 +439,29 @@ class EventoDetectado(models.Model):
 
     def __str__(self):
         return f"{self.camara.nombre} — {self.timestamp:%Y-%m-%d %H:%M}"
+
+
+class ConsumoIA(models.Model):
+    """Una llamada facturable a la API de Claude: tokens usados y su costo
+    estimado en USD con la tarifa del modelo (ver costos_ia.py). La suma de
+    costo_usd desde ConfiguracionIA.consumo_desde es lo que se compara contra
+    el tope."""
+
+    creado_en = models.DateTimeField(auto_now_add=True, db_index=True)
+    modelo = models.CharField(max_length=100)
+    evento = models.ForeignKey(
+        EventoDetectado, null=True, blank=True, on_delete=models.SET_NULL, related_name="consumos_ia"
+    )
+    tokens_entrada = models.PositiveIntegerField(default=0)
+    tokens_salida = models.PositiveIntegerField(default=0)
+    tokens_cache_escritura = models.PositiveIntegerField(default=0)
+    tokens_cache_lectura = models.PositiveIntegerField(default=0)
+    costo_usd = models.DecimalField("costo estimado (USD)", max_digits=12, decimal_places=6)
+
+    class Meta:
+        verbose_name = "consumo de IA"
+        verbose_name_plural = "consumo de IA"
+        ordering = ["-creado_en"]
+
+    def __str__(self):
+        return f"{self.modelo} — USD {self.costo_usd:.4f} ({self.creado_en:%Y-%m-%d %H:%M})"

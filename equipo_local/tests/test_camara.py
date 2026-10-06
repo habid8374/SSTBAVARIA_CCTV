@@ -360,3 +360,55 @@ class UltimoFrameYGrabacionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _CapturaDePrueba:
+    """Doble de cv2.VideoCapture: entrega `frames` frames y después corta,
+    deteniendo al monitor para que _loop_captura termine."""
+
+    def __init__(self, monitor, frames):
+        self._monitor = monitor
+        self._restantes = frames
+
+    def isOpened(self):
+        return True
+
+    def read(self):
+        if self._restantes == 0:
+            self._monitor._detener.set()
+            return False, None
+        self._restantes -= 1
+        return True, np.zeros((100, 100, 3), dtype=np.uint8)
+
+    def release(self):
+        pass
+
+
+class LoopCapturaTests(unittest.TestCase):
+    def test_un_error_procesando_un_frame_no_mata_el_hilo_de_la_camara(self):
+        detector = MagicMock()
+        detector.detectar.side_effect = [RuntimeError("falla puntual del modelo"), [], []]
+        monitor = CamaraMonitor(
+            _camara_datos(), detector, MagicMock(), _config(INTERVALO_DETECCION_SEGUNDOS=0, GRABAR_VIDEO=False)
+        )
+
+        with patch("equipo_local.camara.cv2.VideoCapture", return_value=_CapturaDePrueba(monitor, frames=3)):
+            with self.assertLogs("equipo_local.camara", level="ERROR") as logs:
+                monitor._loop_captura()
+
+        self.assertEqual(detector.detectar.call_count, 3)
+        self.assertIn("falla puntual del modelo", "\n".join(logs.output))
+
+    def test_errores_seguidos_se_registran_una_sola_vez_por_minuto(self):
+        detector = MagicMock()
+        detector.detectar.side_effect = RuntimeError("modelo roto")
+        monitor = CamaraMonitor(
+            _camara_datos(), detector, MagicMock(), _config(INTERVALO_DETECCION_SEGUNDOS=0, GRABAR_VIDEO=False)
+        )
+
+        with patch("equipo_local.camara.cv2.VideoCapture", return_value=_CapturaDePrueba(monitor, frames=5)):
+            with self.assertLogs("equipo_local.camara", level="ERROR") as logs:
+                monitor._loop_captura()
+
+        self.assertEqual(detector.detectar.call_count, 5)
+        self.assertEqual(len(logs.records), 1)
