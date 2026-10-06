@@ -28,7 +28,7 @@ def _crear_notificacion_interna(tipo, mensaje, instancia):
         objeto_id=instancia.pk,
     )
     seccion = "contratistas" if tipo == NotificacionInterna.Tipo.RADICACION_PENDIENTE else "declaracion-metodo"
-    enviar_push_a_personal_interno("SST Bavaria — pendiente por revisar", mensaje, url=f"/dashboard?ir={seccion}")
+    enviar_push_a_personal_interno("GuardIA — pendiente por revisar", mensaje, url=f"/dashboard?ir={seccion}")
 
 
 def notificar_decision_radicacion(radicacion):

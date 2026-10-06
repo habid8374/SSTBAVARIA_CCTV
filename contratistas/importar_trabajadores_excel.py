@@ -69,7 +69,7 @@ HOJA_LISTAS = "Listas (no borrar)"
 # validación y contra desocultar "Listas (no borrar)" — no es una medida de
 # seguridad real (la protección de Excel se quita sin la contraseña con
 # herramientas de terceros), solo evita que alguien la rompa sin querer.
-CONTRASENA_PLANTILLA = "SSTBavaria2026"
+CONTRASENA_PLANTILLA = "SSTGuardIA2026"
 
 ESTADO_VALIDACION_OPCIONES = "OutSafety,Drive,NA,No validado"
 

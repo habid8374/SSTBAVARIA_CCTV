@@ -64,8 +64,8 @@ repositorio.
       Catálogo de Peligros y Evaluación según Kinney (ambas hojas de
       referencia estática, tomadas tal cual del formato real del cliente
       vía `contratistas/catalogo_peligros.py`) y Control del Documento
-      (footer con los metadatos propios de SST Bavaria — deliberadamente
-      sin replicar el código de control documental interno de AB InBev,
+      (footer con los metadatos propios de GuardIA — deliberadamente
+      sin replicar el código de control documental interno del cliente,
       para no dar a entender que el archivo es un documento emitido
       oficialmente por ellos).
   - **Importar Declaración de Método desde Excel** (botón "Importar desde
@@ -304,7 +304,7 @@ repositorio.
     exclusiones con motivo, y las líneas de firma en blanco de la empresa
     contratista y del interventor) — replicado a partir del formato Excel
     real "AUTORIZACION DE INGRESO PERSONAL CONTRATISTA — INCLUSIONES/
-    EXCLUSIONES" de Bavaria.
+    EXCLUSIONES" del cliente.
   - **Capacitación previa a ingreso** (sección "Capacitación" en el sidebar;
     `contratistas.ConfiguracionCapacitacion`/`PreguntaCapacitacion`/
     `RegistroCapacitacion`): reimplementación dentro del portal del "FDT
@@ -357,10 +357,10 @@ repositorio.
     `perform_update` de `DeclaracionMetodoListaDashboard`/`Detalle`), no
     puede elegir otra empresa contratista (se fuerza server-side a la suya),
     y al firmar solo puede hacerlo como "Supervisor de Seguridad del
-    Contratista" — las demás firmas quedan reservadas al personal interno de
-    Bavaria (`firmar_declaracion`). **Pendiente, fuera de este alcance**: el
-    cruce automático de la declaración contra las políticas de seguridad de
-    Bavaria — el cliente todavía no ha enviado ese documento/esas reglas.
+    Contratista" — las demás firmas quedan reservadas al personal interno
+    del cliente (`firmar_declaracion`). **Pendiente, fuera de este alcance**: el
+    cruce automático de la declaración contra las políticas de seguridad
+    del cliente — todavía no ha enviado ese documento/esas reglas.
 - **Política de privacidad / Habeas Data** (borrador): el registro de un
   trabajador exige marcar la autorización de tratamiento de sus datos
   personales (Ley 1581 de 2012), con fecha registrada
@@ -692,7 +692,7 @@ de la migración — no aplica para desplegar hoy.
    | `DATABASE_URL` | la inyecta Railway automáticamente al agregar Postgres |
    | `BREVO_API_KEY` | API key de [Brevo](https://app.brevo.com) (Settings → SMTP & API → API Keys) — opcional: también se puede digitar desde el dashboard (Sistema → Brevo), que tiene prioridad sobre esta variable; sin ninguna de las dos, las alertas por correo quedan registradas como error pero no rompen nada |
    | `BREVO_REMITENTE_EMAIL` | correo remitente verificado en Brevo (Settings → Senders) — también configurable desde el dashboard |
-   | `BREVO_REMITENTE_NOMBRE` | nombre que aparece como remitente, ej. `SST Bavaria — Cámaras IA` — también configurable desde el dashboard |
+   | `BREVO_REMITENTE_NOMBRE` | nombre que aparece como remitente, ej. `GuardIA` — también configurable desde el dashboard |
    | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL` | Cloudflare R2 para que los archivos subidos (`media/`) sobrevivan a los despliegues — ver la sección "Almacenamiento de archivos (`media/`) en Cloudflare R2" más abajo. Sin estas 4 variables, cae a disco local (se pierde en cada deploy) |
    | `SENTRY_DSN` | opcional — monitoreo de errores con [Sentry](https://sentry.io). DSN del proyecto (Settings → Projects → tu proyecto → Client Keys (DSN)). Sin esta variable, Sentry simplemente no se activa |
    | `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` | opcional — clasificación de eventos de cámaras con IA (ver "Clasificación de eventos con IA" más abajo). También configurable desde el dashboard (Sistema → Inteligencia Artificial), que tiene prioridad sobre estas variables |
@@ -772,7 +772,7 @@ automáticos (Let's Encrypt) — los necesitas para los dos pasos siguientes.
 
 ### 2. Base de datos: crear el Postgres en Coolify
 
-**+ New → Database → PostgreSQL** en un proyecto nuevo (ej. "SST Bavaria
+**+ New → Database → PostgreSQL** en un proyecto nuevo (ej. "GuardIA
 CCTV"). Coolify genera las credenciales solas — cópialas, las necesitas en
 el paso 3 (`DATABASE_URL`) y en el paso 5 (migrar los datos).
 

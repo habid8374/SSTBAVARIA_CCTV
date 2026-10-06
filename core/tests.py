@@ -411,7 +411,7 @@ class UsuarioContratistaTests(TestCase):
     def setUp(self):
         cache.clear()
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
-        empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.contratista = EmpresaContratista.objects.create(empresa=empresa, nombre="SCEPSA")
         self.lista_url = reverse("core:usuarios_lista")
 
@@ -1021,7 +1021,7 @@ class PushHelperTests(TestCase):
     @patch("pywebpush.webpush")
     def test_a_personal_interno_omite_al_portal_de_contratistas(self, mock_webpush):
         contratista_empresa = EmpresaContratista.objects.create(
-            empresa=Empresa.objects.create(nombre="Bavaria"), nombre="SCEPSA"
+            empresa=Empresa.objects.create(nombre="Cliente"), nombre="SCEPSA"
         )
         portal_user = Usuario.objects.create_user("portal1", "portal@x.com", "clave12345")
         portal_user.perfil.rol = PerfilUsuario.Rol.CONTRATISTA

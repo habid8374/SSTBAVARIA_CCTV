@@ -65,7 +65,7 @@ class ActividadMetodoCalculoTests(TestCase):
 
 class RadicacionVencimientoTests(TestCase):
     def setUp(self):
-        empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        empresa = Empresa.objects.create(nombre="Cliente Planta")
         contratista = EmpresaContratista.objects.create(empresa=empresa, nombre="SCEPSA")
         self.trabajador = Trabajador.objects.create(
             contratista=contratista, nombres="Ana", apellidos="Ríos", documento="123"
@@ -102,7 +102,7 @@ class ApiTestsBase(TestCase):
         # El throttle de login cuenta por IP y el test client siempre usa la
         # misma — sin esto, los _token() de tests anteriores se acumularían.
         cache.clear()
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
         self.contratista = EmpresaContratista.objects.create(
