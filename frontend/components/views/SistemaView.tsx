@@ -481,6 +481,68 @@ function ConsumoClaude({
         {consumo.tokens_salida.toLocaleString("es-CO")} de salida.
       </p>
 
+      <div className="mt-5">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-corp-muted">Reparto por cámara</h4>
+        <p className="mt-1 text-xs text-corp-muted">
+          {consumo.camaras_con_ia === 0
+            ? "Ninguna cámara tiene alertas de IA todavía — el tope se reparte entre las que las tengan."
+            : `El tope se reparte por igual entre las ${consumo.camaras_con_ia} cámaras con alertas de IA: ${usd(consumo.cuota_por_camara_usd)} cada una. Una cámara que agota su cuota deja de usar la IA; las demás siguen. Se recalcula sola al agregar cámaras.`}
+        </p>
+        {consumo.por_camara.length > 0 && (
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead className="text-xs text-corp-muted">
+                <tr className="border-b border-corp-border">
+                  <th className="py-2 pr-4 font-medium">Cámara</th>
+                  <th className="w-1/3 py-2 pr-4 font-medium">Gasto frente a su cuota</th>
+                  <th className="py-2 pr-4 text-right font-medium">Gastado</th>
+                  <th className="py-2 font-medium">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {consumo.por_camara.map((fila) => {
+                  const estadoCamara = fila.agotada
+                    ? { ...ESTADO_CONSUMO.tope, texto: "Cuota agotada" }
+                    : fila.porcentaje >= 80
+                      ? { ...ESTADO_CONSUMO.aviso, texto: "Cerca de la cuota" }
+                      : ESTADO_CONSUMO.normal;
+                  return (
+                    <tr key={fila.camara} className="border-b border-corp-border/60 last:border-0">
+                      <td className="py-2 pr-4 text-corp-navy">{fila.nombre}</td>
+                      <td className="py-2 pr-4">
+                        <div
+                          role="meter"
+                          aria-label={`Gasto de IA de ${fila.nombre} frente a su cuota`}
+                          aria-valuemin={0}
+                          aria-valuemax={fila.cuota_usd}
+                          aria-valuenow={fila.gastado_usd}
+                          title={`${usd(fila.gastado_usd, 4)} de ${usd(fila.cuota_usd)} (${fila.porcentaje.toFixed(1)}%) · ${fila.llamadas} llamadas`}
+                          className="h-2 w-full rounded bg-slate-100"
+                        >
+                          <div
+                            className="h-full rounded"
+                            style={{ width: `${Math.min(fila.porcentaje, 100)}%`, backgroundColor: estadoCamara.color }}
+                          />
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-corp-navy">
+                        {usd(fila.gastado_usd)} <span className="text-corp-muted">de {usd(fila.cuota_usd)}</span>
+                      </td>
+                      <td className="whitespace-nowrap py-2 text-xs text-corp-navy">
+                        <span style={{ color: estadoCamara.color }} aria-hidden>
+                          {estadoCamara.icono}
+                        </span>{" "}
+                        {estadoCamara.texto}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <form onSubmit={guardarTope} className="mt-5 flex flex-wrap items-end gap-2">
         <Campo label="Tope de gasto (USD)">
           <input

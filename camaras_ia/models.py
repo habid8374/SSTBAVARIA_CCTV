@@ -456,6 +456,7 @@ class ConsumoIA(models.Model):
 
     creado_en = models.DateTimeField(auto_now_add=True, db_index=True)
     modelo = models.CharField(max_length=100)
+    camara = models.ForeignKey(Camara, null=True, blank=True, on_delete=models.SET_NULL, related_name="consumos_ia")
     evento = models.ForeignKey(
         EventoDetectado, null=True, blank=True, on_delete=models.SET_NULL, related_name="consumos_ia"
     )

@@ -594,7 +594,20 @@ export type ConsumoIA = {
   tokens_salida: number;
   costo_promedio_usd: number | null;
   llamadas_restantes_estimadas: number | null;
+  cuota_por_camara_usd: number;
+  camaras_con_ia: number;
+  por_camara: ConsumoCamaraIA[];
   ultimas: LlamadaIA[];
+};
+
+export type ConsumoCamaraIA = {
+  camara: number;
+  nombre: string;
+  gastado_usd: number;
+  cuota_usd: number;
+  porcentaje: number;
+  agotada: boolean;
+  llamadas: number;
 };
 
 export function obtenerConsumoIA(token: string): Promise<ConsumoIA> {

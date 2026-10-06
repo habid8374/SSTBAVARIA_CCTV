@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from core.models import Empresa, PerfilUsuario
 
-from .costos_ia import calcular_costo_usd, precio_modelo, reiniciar_periodo
+from .costos_ia import calcular_costo_usd, cuota_por_camara_usd, precio_modelo, reiniciar_periodo
 from .ia_deteccion import _parsear_json, clasificar_evento
 from .models import (
     Camara,
@@ -1807,3 +1807,82 @@ class TiposEventoIACamarasEndpointTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["camaras"], [self.camara.pk])
         self.assertEqual(list(TipoEventoIA.objects.get().camaras.all()), [self.camara])
+
+
+@override_settings(ANTHROPIC_API_KEY="desde-settings")
+class CuotaIAPorCamaraTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
+        self.casco = TipoEventoIA.objects.create(empresa=self.empresa, nombre="Sin casco", descripcion="Sin casco")
+        self.camaras = [self._camara_con_ia(f"Cam {n}") for n in range(1, 11)]
+
+    def _camara_con_ia(self, nombre, **extra):
+        camara = Camara.objects.create(empresa=self.empresa, nombre=nombre, ip="10.0.0.1", **extra)
+        self.casco.camaras.add(camara)
+        return camara
+
+    def _evento(self, camara):
+        return EventoDetectado.objects.create(camara=camara, punto_x=1, punto_y=1, snapshot=_jpeg_de_prueba())
+
+    def test_el_tope_se_reparte_entre_las_camaras_con_alertas_activas(self):
+        Camara.objects.create(empresa=self.empresa, nombre="Sin alertas", ip="10.0.0.1")
+        self._camara_con_ia("Apagada", activa=False)
+        solo_inactiva = Camara.objects.create(empresa=self.empresa, nombre="Alerta inactiva", ip="10.0.0.1")
+        TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Caída", descripcion="Caída", activo=False
+        ).camaras.add(solo_inactiva)
+
+        self.assertEqual(cuota_por_camara_usd(ConfiguracionIA.obtener()), Decimal("2"))  # 20 / 10
+
+    def test_agregar_camaras_recalcula_la_cuota(self):
+        for n in range(11, 21):
+            self._camara_con_ia(f"Cam {n}")
+
+        self.assertEqual(cuota_por_camara_usd(ConfiguracionIA.obtener()), Decimal("1"))  # 20 / 20
+
+    @patch("anthropic.Anthropic")
+    def test_camara_sin_cuota_no_llama_a_claude_y_las_demas_siguen(self, mock_anthropic_cls):
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude('{"eventos": []}')
+        ConsumoIA.objects.create(modelo="claude-opus-5", camara=self.camaras[0], costo_usd=Decimal("2.00"))
+
+        agotada = self._evento(self.camaras[0])
+        clasificar_evento(agotada)
+        clasificar_evento(self._evento(self.camaras[1]))
+
+        self.assertEqual(mock_anthropic_cls.return_value.messages.create.call_count, 1)
+        agotada.refresh_from_db()
+        self.assertIn("Cuota de IA de esta cámara agotada (USD 2.00 de 2.00)", agotada.ia_error)
+
+    @patch("anthropic.Anthropic")
+    def test_cada_llamada_queda_a_nombre_de_su_camara(self, mock_anthropic_cls):
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude('{"eventos": []}')
+
+        clasificar_evento(self._evento(self.camaras[3]))
+
+        self.assertEqual(ConsumoIA.objects.get().camara, self.camaras[3])
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_avisa_cuando_una_camara_agota_su_cuota(self, mock_anthropic_cls, mock_push):
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude('{"eventos": []}')
+        ConsumoIA.objects.create(modelo="claude-opus-5", camara=self.camaras[0], costo_usd=Decimal("1.995"))
+
+        clasificar_evento(self._evento(self.camaras[0]))  # +0.01 -> 2.005, pasa la cuota de 2
+
+        self.assertEqual(mock_push.call_args[0][0], "GuardIA — Cam 1 agotó su cuota de IA")
+
+    def test_resumen_muestra_el_gasto_de_cada_camara_contra_su_cuota(self):
+        admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        token = self.client.post(
+            reverse("core:login"), {"username": "admin", "password": "clave12345"}, content_type="application/json"
+        ).data["token"]
+        ConsumoIA.objects.create(modelo="claude-opus-5", camara=self.camaras[0], costo_usd=Decimal("1.5"))
+
+        response = self.client.get(reverse("camaras_ia:consumo_ia"), HTTP_AUTHORIZATION=f"Token {token}")
+
+        self.assertEqual(response.data["camaras_con_ia"], 10)
+        self.assertEqual(response.data["cuota_por_camara_usd"], 2.0)
+        fila = next(f for f in response.data["por_camara"] if f["nombre"] == "Cam 1")
+        self.assertEqual((fila["gastado_usd"], fila["porcentaje"], fila["agotada"]), (1.5, 75.0, False))
+        self.assertEqual(len(response.data["por_camara"]), 10)

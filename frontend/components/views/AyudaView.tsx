@@ -866,7 +866,11 @@ const TEMAS: Tema[] = [
           y su costo estimado en dólares con la tarifa del modelo. La barra compara el gasto contra el{" "}
           <strong>tope</strong> (USD 20 por defecto, editable ahí mismo): al llegar al 80% llega una
           notificación de aviso, y al llegar al tope el sistema <strong>deja de llamar a Claude</strong> (los
-          eventos siguen llegando normal, solo sin clasificación IA) y avisa de nuevo. Al recargar créditos en
+          eventos siguen llegando normal, solo sin clasificación IA) y avisa de nuevo. El tope se{" "}
+          <strong>reparte por igual entre las cámaras con alertas de IA</strong> (ej. USD 20 entre 10 cámaras =
+          USD 2 cada una; se recalcula solo al agregar cámaras): una cámara que agota su cuota deja de usar la IA
+          y avisa, sin afectar a las demás — la tabla &quot;Reparto por cámara&quot; muestra cuánto lleva cada
+          una. Al recargar créditos en
           Anthropic, el botón <strong>&quot;Reiniciar contador&quot;</strong> vuelve a contar desde cero sin
           borrar el historial. Es una estimación: el cobro oficial es el de la consola de Anthropic, donde
           conviene configurar también un límite de gasto como respaldo.

@@ -2,10 +2,11 @@ import io
 import time
 import zipfile
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -23,13 +24,18 @@ from core.permissions import (
     EsPersonalInternoParaLeerYAdministradorParaEscribir,
 )
 
-from .costos_ia import gasto_del_periodo_usd, reiniciar_periodo
+from .costos_ia import (
+    camaras_con_ia,
+    consumos_del_periodo,
+    cuota_por_camara_usd,
+    gasto_del_periodo_usd,
+    reiniciar_periodo,
+)
 from .ia_deteccion import clasificar_evento
 from .models import (
     Camara,
     ConfiguracionIA,
     ConfiguracionNotificaciones,
-    ConsumoIA,
     EquipoLocal,
     EventoDetectado,
     InstruccionSeguridad,
@@ -520,9 +526,7 @@ def consumo_ia(request):
     """Gasto estimado de Claude en el periodo actual frente al tope, con las
     últimas llamadas — alimenta el panel de consumo en Sistema."""
     config = ConfiguracionIA.obtener()
-    consumos = ConsumoIA.objects.all()
-    if config.consumo_desde:
-        consumos = consumos.filter(creado_en__gte=config.consumo_desde)
+    consumos = consumos_del_periodo(config)
     totales = consumos.aggregate(
         llamadas=Count("id"), tokens_entrada=Sum("tokens_entrada"), tokens_salida=Sum("tokens_salida")
     )
@@ -544,9 +548,40 @@ def consumo_ia(request):
             "tokens_salida": totales["tokens_salida"] or 0,
             "costo_promedio_usd": float(costo_promedio) if costo_promedio is not None else None,
             "llamadas_restantes_estimadas": int(restante / costo_promedio) if costo_promedio else None,
+            "cuota_por_camara_usd": float(cuota_por_camara_usd(config)),
+            "camaras_con_ia": camaras_con_ia().count(),
+            "por_camara": _consumo_por_camara(config, consumos),
             "ultimas": ConsumoIASerializer(consumos[:20], many=True).data,
         }
     )
+
+
+def _consumo_por_camara(config, consumos):
+    """Cada cámara con alertas de IA, más cualquiera que haya gastado en el
+    periodo aunque ya no tenga alertas."""
+    cuota = cuota_por_camara_usd(config)
+    gasto = {
+        fila["camara"]: fila
+        for fila in consumos.filter(camara__isnull=False).values("camara").annotate(
+            gastado=Sum("costo_usd"), llamadas=Count("id")
+        )
+    }
+    camaras = Camara.objects.filter(Q(pk__in=camaras_con_ia()) | Q(pk__in=gasto.keys())).order_by("nombre")
+    filas = []
+    for camara in camaras:
+        gastado = gasto.get(camara.pk, {}).get("gastado") or Decimal("0")
+        filas.append(
+            {
+                "camara": camara.pk,
+                "nombre": camara.nombre,
+                "gastado_usd": float(gastado),
+                "cuota_usd": float(cuota),
+                "porcentaje": float(gastado / cuota * 100) if cuota else 100.0,
+                "agotada": gastado >= cuota,
+                "llamadas": gasto.get(camara.pk, {}).get("llamadas", 0),
+            }
+        )
+    return filas
 
 
 @api_view(["POST"])

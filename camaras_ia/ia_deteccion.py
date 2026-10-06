@@ -18,7 +18,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from .costos_ia import gasto_del_periodo_usd, registrar_consumo
+from .costos_ia import cuota_por_camara_usd, gasto_del_periodo_usd, registrar_consumo
 from .models import ConfiguracionIA, EventoDetectado, TipoEventoIA
 
 logger = logging.getLogger("camaras_ia.ia_deteccion")
@@ -78,9 +78,12 @@ def clasificar_evento(evento):
     if config.proveedor == ConfiguracionIA.Proveedor.CLAUDE:
         gasto = gasto_del_periodo_usd(config)
         if gasto >= config.tope_usd:
-            evento.ia_error = f"Tope de consumo de IA alcanzado (USD {gasto:.2f} de {config.tope_usd:.2f})."
-            evento.ia_analizado_en = timezone.now()
-            evento.save(update_fields=["ia_error", "ia_analizado_en"])
+            _no_clasificar(evento, f"Tope de consumo de IA alcanzado (USD {gasto:.2f} de {config.tope_usd:.2f}).")
+            return
+        cuota = cuota_por_camara_usd(config)
+        gasto_camara = gasto_del_periodo_usd(config, evento.camara)
+        if gasto_camara >= cuota:
+            _no_clasificar(evento, f"Cuota de IA de esta cámara agotada (USD {gasto_camara:.2f} de {cuota:.2f}).")
             return
 
     try:
@@ -107,6 +110,12 @@ def clasificar_evento(evento):
     evento.save(update_fields=["descripcion_ia", "ia_analizado_en", "ia_error", "disparo_alerta"])
     if detectados:
         _notificar_alerta_ia(evento, detectados)
+
+
+def _no_clasificar(evento, motivo):
+    evento.ia_error = motivo
+    evento.ia_analizado_en = timezone.now()
+    evento.save(update_fields=["ia_error", "ia_analizado_en"])
 
 
 def _notificar_alerta_ia(evento, detectados):
