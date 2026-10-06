@@ -646,7 +646,7 @@ const TEMAS: Tema[] = [
           elegir la empresa contratista al crear o editar: siempre queda fijada a la suya. Al firmar, el
           portal de contratistas solo puede hacerlo como &quot;Supervisor de Seguridad del Contratista&quot;
           — las demás firmas (Delegado, Seguridad de Planta, Líder de Área, Dueño de Territorio) son del
-          personal interno de Bavaria.
+          personal interno del cliente.
         </Nota>
       </>
     ),

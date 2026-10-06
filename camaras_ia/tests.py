@@ -33,7 +33,7 @@ CUADRADO = [[0, 0], [10, 0], [10, 10], [0, 10]]
 
 class RtspUrlEfectivaTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
 
     def test_usa_rtsp_url_explicita_si_esta_configurada(self):
         camara = Camara.objects.create(
@@ -81,7 +81,7 @@ class PuntoEnCirculoTests(TestCase):
 
 class PuntoEnZonaTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
 
     def test_tipo_poligono(self):
@@ -116,7 +116,7 @@ class PuntoEnZonaTests(TestCase):
 
 class PxPorMetroTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
 
     def test_sin_calibrar_devuelve_none(self):
         camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
@@ -190,7 +190,7 @@ class ReglaVigenteTests(TestCase):
 
 class EvaluarZonaHorarioTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
         self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
         self.regla = ReglaAlerta.objects.create(
@@ -228,7 +228,7 @@ class EvaluarZonaHorarioTests(TestCase):
 
 class EvaluarZonaHorarioPuntoRadioTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.camara_calibrada = Camara.objects.create(
             empresa=self.empresa,
             nombre="Cam calibrada",
@@ -283,7 +283,7 @@ class EvaluarZonaHorarioPuntoRadioTests(TestCase):
 @override_settings(BREVO_API_KEY="clave-de-prueba", BREVO_REMITENTE_EMAIL="a@x.com", BREVO_REMITENTE_NOMBRE="Test")
 class DispararAlertaCorreoTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
         self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
         self.regla_correo = ReglaAlerta.objects.create(
@@ -292,7 +292,7 @@ class DispararAlertaCorreoTests(TestCase):
             hora_fin=datetime.time(23, 59, 59),
             dias_semana=[0, 1, 2, 3, 4, 5, 6],
             canal_notificacion=ReglaAlerta.Canal.CORREO,
-            destinatario="seguridad@bavaria.com",
+            destinatario="seguridad@cliente.com",
         )
         self.regla_whatsapp = ReglaAlerta.objects.create(
             zona=self.zona,
@@ -311,7 +311,7 @@ class DispararAlertaCorreoTests(TestCase):
         self.evento.refresh_from_db()
         self.assertTrue(self.evento.notificacion_enviada)
         self.assertEqual(self.evento.canal_notificacion, "correo")
-        self.assertIn("seguridad@bavaria.com", self.evento.notificacion_detalle)
+        self.assertIn("seguridad@cliente.com", self.evento.notificacion_detalle)
         mock_urlopen.assert_called_once()
 
     @patch("camaras_ia.notificaciones.urllib.request.urlopen")
@@ -371,7 +371,7 @@ class DispararAlertaCorreoTests(TestCase):
 
 class RecibirEventoCamaraViewTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.otra_empresa = Empresa.objects.create(nombre="Otra Empresa")
         self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
@@ -422,7 +422,7 @@ class RecibirEventoCamaraViewTests(TestCase):
 
 class ObtenerReglasActivasViewTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
         self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
@@ -472,7 +472,7 @@ class ObtenerReglasActivasViewTests(TestCase):
 
 class SincronizarZonasEquipoLocalViewTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.otra_empresa = Empresa.objects.create(nombre="Otra Empresa")
         self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
@@ -574,7 +574,7 @@ class SincronizarZonasEquipoLocalViewTests(TestCase):
 
 class SincronizarReglasEquipoLocalViewTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.otra_empresa = Empresa.objects.create(nombre="Otra Empresa")
         self.equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
@@ -661,7 +661,7 @@ class DashboardEndpointsTests(TestCase):
         # El throttle de login cuenta por IP y el test client siempre usa la
         # misma — sin esto, los _token() de tests anteriores se acumularían.
         cache.clear()
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
         self.contratista_user = Usuario.objects.create_user("contratista1", "contratista@x.com", "clave12345")
@@ -783,7 +783,7 @@ class DashboardEndpointsTests(TestCase):
                 "hora_inicio": "22:00",
                 "hora_fin": "06:00",
                 "dias_semana": [4, 5],
-                "destinatario": "seguridad@bavaria.com",
+                "destinatario": "seguridad@cliente.com",
             },
             content_type="application/json",
             **self._auth(self.admin),
@@ -883,7 +883,7 @@ class DashboardEndpointsTests(TestCase):
                 "hora_fin": "06:00",
                 "dias_semana": [4, 5],
                 "canal_notificacion": "correo",
-                "destinatario": "seguridad@bavaria.com",
+                "destinatario": "seguridad@cliente.com",
             },
             content_type="application/json",
             **self._auth(self.admin),
@@ -1055,15 +1055,15 @@ class DashboardEndpointsTests(TestCase):
             reverse("camaras_ia:configuracion_notificaciones"),
             {
                 "brevo_api_key": "xkeysib-nueva",
-                "brevo_remitente_email": "alertas@bavaria.com",
-                "brevo_remitente_nombre": "Bavaria SST",
+                "brevo_remitente_email": "alertas@cliente.com",
+                "brevo_remitente_nombre": "Cliente SST",
             },
             content_type="application/json",
             **self._auth(self.admin),
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertTrue(response.data["brevo_api_key_configurada"])
-        self.assertEqual(response.data["brevo_remitente_email"], "alertas@bavaria.com")
+        self.assertEqual(response.data["brevo_remitente_email"], "alertas@cliente.com")
 
         config = ConfiguracionNotificaciones.obtener()
         self.assertEqual(config.brevo_api_key, "xkeysib-nueva")
@@ -1284,7 +1284,7 @@ class ClasificarEventoTests(TestCase):
     def setUp(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
         self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Bodega", poligono=CUADRADO)
         self.evento = EventoDetectado.objects.create(
@@ -1400,7 +1400,7 @@ class ClasificarEventoTests(TestCase):
 class ConfiguracionIAYTipoEventoIAEndpointsTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.empresa = Empresa.objects.create(nombre="Bavaria Planta")
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
         self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
 

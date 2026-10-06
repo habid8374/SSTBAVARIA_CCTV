@@ -297,7 +297,7 @@ def _hoja_control_documento(hoja, declaracion):
     _etiqueta_valor(hoja, 4, 1, "Estado:", declaracion.get_estado_display())
     _etiqueta_valor(hoja, 5, 1, "Fecha de elaboración:", declaracion.fecha_elaboracion.isoformat())
     _etiqueta_valor(hoja, 6, 1, "Generado el:", timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M"))
-    _etiqueta_valor(hoja, 7, 1, "Generado por:", "SST Bavaria — Cámaras IA")
+    _etiqueta_valor(hoja, 7, 1, "Generado por:", "GuardIA")
     hoja.column_dimensions["A"].width = 22
     hoja.column_dimensions["B"].width = 40
 
