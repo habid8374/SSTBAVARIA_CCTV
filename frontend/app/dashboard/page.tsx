@@ -19,7 +19,7 @@ import SistemaView from "@/components/views/SistemaView";
 import TableroView from "@/components/views/TableroView";
 import UsuariosView from "@/components/views/UsuariosView";
 import ZonasView from "@/components/views/ZonasView";
-import { logout as apiLogout, obtenerPerfil, type Usuario } from "@/lib/api";
+import { ApiError, logout as apiLogout, obtenerPerfil, type Usuario } from "@/lib/api";
 import { borrarSesion, guardarSesion, leerSesion } from "@/lib/auth";
 
 const TITULOS: Record<SeccionId, string> = {
@@ -53,6 +53,7 @@ function DashboardContent() {
   const [token, setToken] = useState<string | null>(null);
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [seccion, setSeccion] = useState<SeccionId>("tablero");
+  const [errorCarga, setErrorCarga] = useState(false);
 
   // "?ir=<seccion>" — a dónde abrir al tocar una notificación push (con la
   // app cerrada), igual que hace clic en la campanita adentro de la app.
@@ -81,9 +82,17 @@ function DashboardContent() {
           setSeccion("declaracion-metodo");
         }
       })
-      .catch(() => {
-        borrarSesion();
-        router.replace("/login");
+      .catch((err) => {
+        // Solo un token rechazado cierra la sesión. Un fallo de red (incluida
+        // la petición que cancela el navegador al recargar) no debe sacar al
+        // usuario: antes borraba la sesión y cada recarga rápida o reinicio
+        // del backend dejaba a todos en el login.
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          borrarSesion();
+          router.replace("/login");
+        } else {
+          setErrorCarga(true);
+        }
       });
   }, [router, irInicial]);
 
@@ -94,6 +103,21 @@ function DashboardContent() {
     borrarSesion();
     router.replace("/login");
   }, [token, router]);
+
+  if (errorCarga) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-4 text-center">
+        <p className="text-sm text-corp-navy">No se pudo conectar con el servidor.</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   if (!token || !usuario) {
     return null;
