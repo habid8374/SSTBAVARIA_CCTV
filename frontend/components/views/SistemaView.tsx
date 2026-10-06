@@ -15,12 +15,14 @@ import {
   eliminarEquipoLocal,
   eliminarTipoEventoIA,
   enviarAccesoVisitantes,
+  listarCamarasDashboard,
   listarEquiposLocales,
   listarTiposEventoIA,
   obtenerConfiguracionIA,
   obtenerConfiguracionNotificaciones,
   obtenerConsumoIA,
   reiniciarConsumoIA,
+  type CamaraDashboard,
   type ConfiguracionIA,
   type ConsumoIA,
   type ConfiguracionNotificaciones,
@@ -330,10 +332,12 @@ function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
       </form>
 
       <div className="mt-8">
-        <h3 className="text-sm font-semibold text-corp-navy">Catálogo de eventos a detectar</h3>
+        <h3 className="text-sm font-semibold text-corp-navy">Alertas de IA por cámara</h3>
         <p className="mt-1 text-sm text-corp-muted">
-          Cada fila es una instrucción en lenguaje natural — entre más detallada, mejor detecta la IA. Ej.
-          &quot;Persona sin casco de seguridad puesto en la cabeza&quot;.
+          Cada alerta es una instrucción en lenguaje natural que la IA revisa solo en las cámaras elegidas — ej.
+          cámara 1: &quot;Persona sin casco de seguridad puesto en la cabeza&quot;; cámara 2: &quot;Persona a más
+          de 3 metros del compresor&quot;. Entre más detallada, mejor detecta. Cuando la IA encuentra una, el
+          evento queda como alerta y llega una notificación.
         </p>
         <CatalogoEventosIA token={token} />
       </div>
@@ -549,31 +553,38 @@ function Cifra({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 
 function CatalogoEventosIA({ token }: { token: string }) {
   const [tipos, setTipos] = useState<TipoEventoIA[] | null>(null);
+  const [camaras, setCamaras] = useState<CamaraDashboard[]>([]);
+  const [filtroCamara, setFiltroCamara] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [formulario, setFormulario] = useState<{ tipo: TipoEventoIA | null } | null>(null);
   const { confirmar } = useDialog();
 
   function cargar() {
     listarTiposEventoIA(token)
       .then(setTipos)
-      .catch(() => setError("No se pudo cargar el catálogo de eventos."));
+      .catch(() => setError("No se pudo cargar el catálogo de alertas."));
   }
 
   useEffect(cargar, [token]);
+  useEffect(() => {
+    listarCamarasDashboard(token)
+      .then(setCamaras)
+      .catch(() => setError("No se pudo cargar la lista de cámaras."));
+  }, [token]);
 
   async function alternarActivo(tipo: TipoEventoIA) {
     try {
       await actualizarTipoEventoIA(token, tipo.id, { activo: !tipo.activo });
       cargar();
     } catch {
-      setError("No se pudo actualizar el evento.");
+      setError("No se pudo actualizar la alerta.");
     }
   }
 
   async function eliminar(tipo: TipoEventoIA) {
     const ok = await confirmar({
-      titulo: "Eliminar tipo de evento",
-      mensaje: `¿Eliminar "${tipo.nombre}"? La IA dejará de buscarlo en los snapshots.`,
+      titulo: "Eliminar alerta",
+      mensaje: `¿Eliminar "${tipo.nombre}"? La IA dejará de buscarla en todas sus cámaras.`,
       textoConfirmar: "Eliminar",
       peligroso: true,
     });
@@ -582,7 +593,7 @@ function CatalogoEventosIA({ token }: { token: string }) {
       await eliminarTipoEventoIA(token, tipo.id);
       cargar();
     } catch {
-      setError("No se pudo eliminar el evento.");
+      setError("No se pudo eliminar la alerta.");
     }
   }
 
@@ -591,16 +602,33 @@ function CatalogoEventosIA({ token }: { token: string }) {
     media: "bg-amber-100 text-amber-700",
     baja: "bg-zinc-100 text-zinc-600",
   };
+  const nombreCamara = new Map(camaras.map((camara) => [camara.id, camara.nombre]));
+  const visibles = tipos?.filter((tipo) => filtroCamara === null || tipo.camaras.includes(filtroCamara));
 
   return (
     <div>
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium text-corp-navy">Ver alertas de</span>
+          <select
+            value={filtroCamara ?? ""}
+            onChange={(event) => setFiltroCamara(event.target.value ? Number(event.target.value) : null)}
+            className="block rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          >
+            <option value="">Todas las cámaras</option>
+            {camaras.map((camara) => (
+              <option key={camara.id} value={camara.id}>
+                {camara.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
-          onClick={() => setMostrarFormulario(true)}
+          onClick={() => setFormulario({ tipo: null })}
           className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white"
         >
-          + Nuevo evento
+          + Nueva alerta
         </button>
       </div>
 
@@ -611,21 +639,38 @@ function CatalogoEventosIA({ token }: { token: string }) {
       )}
 
       <div className="mt-4 overflow-x-auto rounded-xl border border-corp-border bg-white">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="border-b border-corp-border bg-corp-blue-light text-xs uppercase text-corp-muted">
             <tr>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Descripción</th>
+              <th className="px-4 py-3">Alerta</th>
+              <th className="px-4 py-3">Qué revisa la IA</th>
+              <th className="px-4 py-3">Cámaras</th>
               <th className="px-4 py-3">Severidad</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {tipos?.map((tipo) => (
+            {visibles?.map((tipo) => (
               <tr key={tipo.id} className="border-b border-corp-border last:border-0">
                 <td className="px-4 py-3 font-medium text-corp-navy">{tipo.nombre}</td>
                 <td className="max-w-xs px-4 py-3 text-corp-muted">{tipo.descripcion}</td>
+                <td className="px-4 py-3">
+                  {tipo.camaras.length === 0 ? (
+                    <span className="text-xs font-medium text-amber-700">Ninguna — no se revisa</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {tipo.camaras.map((id) => (
+                        <span
+                          key={id}
+                          className="whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-corp-navy"
+                        >
+                          {nombreCamara.get(id) ?? `Cámara ${id}`}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colorSeveridad[tipo.severidad]}`}>
                     {tipo.severidad}
@@ -637,11 +682,18 @@ function CatalogoEventosIA({ token }: { token: string }) {
                       tipo.activo ? "bg-green-100 text-green-700" : "bg-zinc-100 text-zinc-500"
                     }`}
                   >
-                    {tipo.activo ? "Activo" : "Inactivo"}
+                    {tipo.activo ? "Activa" : "Inactiva"}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormulario({ tipo })}
+                      className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy hover:border-corp-blue"
+                    >
+                      Editar
+                    </button>
                     <button
                       type="button"
                       onClick={() => alternarActivo(tipo)}
@@ -662,19 +714,24 @@ function CatalogoEventosIA({ token }: { token: string }) {
             ))}
           </tbody>
         </table>
-        {tipos?.length === 0 && (
+        {visibles?.length === 0 && (
           <p className="px-4 py-6 text-center text-sm text-corp-muted">
-            Todavía no hay eventos configurados en el catálogo.
+            {filtroCamara === null
+              ? "Todavía no hay alertas configuradas."
+              : "Esta cámara no tiene alertas de IA — no se le envía nada a la IA."}
           </p>
         )}
       </div>
 
-      {mostrarFormulario && (
-        <FormularioNuevoTipoEvento
+      {formulario && (
+        <FormularioTipoEvento
           token={token}
-          onCerrar={() => setMostrarFormulario(false)}
-          onCreado={() => {
-            setMostrarFormulario(false);
+          tipo={formulario.tipo}
+          camaras={camaras}
+          camaraInicial={filtroCamara}
+          onCerrar={() => setFormulario(null)}
+          onGuardado={() => {
+            setFormulario(null);
             cargar();
           }}
         />
@@ -683,28 +740,49 @@ function CatalogoEventosIA({ token }: { token: string }) {
   );
 }
 
-function FormularioNuevoTipoEvento({
+function FormularioTipoEvento({
   token,
+  tipo,
+  camaras,
+  camaraInicial,
   onCerrar,
-  onCreado,
+  onGuardado,
 }: {
   token: string;
+  tipo: TipoEventoIA | null;
+  camaras: CamaraDashboard[];
+  camaraInicial: number | null;
   onCerrar: () => void;
-  onCreado: () => void;
+  onGuardado: () => void;
 }) {
-  const [datos, setDatos] = useState<NuevoTipoEventoIA>({ nombre: "", descripcion: "", severidad: "media" });
+  const [datos, setDatos] = useState<NuevoTipoEventoIA>(
+    tipo
+      ? { nombre: tipo.nombre, descripcion: tipo.descripcion, severidad: tipo.severidad, camaras: tipo.camaras }
+      : { nombre: "", descripcion: "", severidad: "media", camaras: camaraInicial === null ? [] : [camaraInicial] }
+  );
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+
+  function alternarCamara(id: number) {
+    setDatos({
+      ...datos,
+      camaras: datos.camaras.includes(id) ? datos.camaras.filter((c) => c !== id) : [...datos.camaras, id],
+    });
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setEnviando(true);
     try {
-      await crearTipoEventoIA(token, datos);
-      onCreado();
+      if (tipo) {
+        await actualizarTipoEventoIA(token, tipo.id, datos);
+      } else {
+        await crearTipoEventoIA(token, datos);
+      }
+      onGuardado();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo crear el evento.");
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar la alerta.");
     } finally {
       setEnviando(false);
     }
@@ -712,8 +790,8 @@ function FormularioNuevoTipoEvento({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <h2 className="text-lg font-semibold text-corp-navy">Nuevo evento a detectar</h2>
+      <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 className="text-lg font-semibold text-corp-navy">{tipo ? "Editar alerta" : "Nueva alerta de IA"}</h2>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <Campo label="Nombre">
             <input
@@ -725,7 +803,7 @@ function FormularioNuevoTipoEvento({
               className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
             />
           </Campo>
-          <Campo label="Descripción (qué debe buscar la IA)">
+          <Campo label="Qué debe revisar la IA">
             <textarea
               required
               rows={3}
@@ -735,6 +813,26 @@ function FormularioNuevoTipoEvento({
               className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
             />
           </Campo>
+          <fieldset className="space-y-1.5">
+            <legend className="text-sm font-medium text-corp-navy">Cámaras donde aplica</legend>
+            {camaras.length === 0 ? (
+              <p className="text-sm text-amber-700">Primero registra una cámara en la sección Cámaras.</p>
+            ) : (
+              <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-corp-border p-2">
+                {camaras.map((camara) => (
+                  <label key={camara.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-zinc-50">
+                    <input
+                      type="checkbox"
+                      checked={datos.camaras.includes(camara.id)}
+                      onChange={() => alternarCamara(camara.id)}
+                      className="h-4 w-4 accent-corp-navy"
+                    />
+                    {camara.nombre}
+                  </label>
+                ))}
+              </div>
+            )}
+          </fieldset>
           <Campo label="Severidad">
             <select
               value={datos.severidad}
@@ -766,10 +864,11 @@ function FormularioNuevoTipoEvento({
             </button>
             <button
               type="submit"
-              disabled={enviando}
+              disabled={enviando || datos.camaras.length === 0}
+              title={datos.camaras.length === 0 ? "Elige al menos una cámara" : undefined}
               className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
             >
-              {enviando ? "Creando…" : "Crear evento"}
+              {enviando ? "Guardando…" : tipo ? "Guardar cambios" : "Crear alerta"}
             </button>
           </div>
         </form>

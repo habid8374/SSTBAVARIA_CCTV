@@ -632,6 +632,7 @@ export type TipoEventoIA = {
   nombre: string;
   descripcion: string;
   severidad: Severidad;
+  camaras: number[];
   activo: boolean;
   creado_en: string;
 };
@@ -640,6 +641,7 @@ export type NuevoTipoEventoIA = {
   nombre: string;
   descripcion: string;
   severidad?: Severidad;
+  camaras: number[];
 };
 
 export function listarTiposEventoIA(token: string): Promise<TipoEventoIA[]> {

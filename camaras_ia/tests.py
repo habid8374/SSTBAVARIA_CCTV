@@ -1318,6 +1318,8 @@ class ClasificarEventoTests(TestCase):
         self.tipo_caida = TipoEventoIA.objects.create(
             empresa=self.empresa, nombre="Caída", descripcion="Persona en el suelo"
         )
+        self.tipo_casco.camaras.add(self.camara)
+        self.tipo_caida.camaras.add(self.camara)
 
     def test_sin_snapshot_no_hace_nada(self):
         evento_sin_foto = EventoDetectado.objects.create(camara=self.camara, zona=self.zona, punto_x=1, punto_y=1)
@@ -1521,7 +1523,9 @@ class ConsumoIAClasificacionTests(TestCase):
             camara=camara, zona=zona, punto_x=1, punto_y=1,
             snapshot=SimpleUploadedFile("evento.jpg", b"contenido-jpeg-falso"),
         )
-        TipoEventoIA.objects.create(empresa=empresa, nombre="Sin casco", descripcion="Persona sin casco")
+        TipoEventoIA.objects.create(empresa=empresa, nombre="Sin casco", descripcion="Persona sin casco").camaras.add(
+            camara
+        )
 
     def _gastar(self, usd, hace=None):
         consumo = ConsumoIA.objects.create(modelo="claude-opus-5", costo_usd=Decimal(usd))
@@ -1659,3 +1663,147 @@ class ConsumoIAEndpointsTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+
+def _jpeg_de_prueba():
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(buffer, format="JPEG")
+    return SimpleUploadedFile("evento.jpg", buffer.getvalue(), content_type="image/jpeg")
+
+
+@override_settings(ANTHROPIC_API_KEY="desde-settings")
+class AlertasIAPorCamaraTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
+        self.camara1 = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.camara2 = Camara.objects.create(empresa=self.empresa, nombre="Cam 2", ip="10.0.0.2")
+        self.zona1 = ZonaRestringida.objects.create(camara=self.camara1, nombre="Patio", poligono=CUADRADO)
+        self.casco = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Sin casco", descripcion="Persona sin casco", severidad="alta"
+        )
+        self.distancia = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Lejos del equipo", descripcion="Persona a más de 3 m del compresor"
+        )
+        self.casco.camaras.add(self.camara1)
+        self.distancia.camaras.add(self.camara2)
+
+    def _evento(self, camara, zona=None):
+        return EventoDetectado.objects.create(camara=camara, zona=zona, punto_x=1, punto_y=1, snapshot=_jpeg_de_prueba())
+
+    def _detecta(self, mock_anthropic_cls, *tipos):
+        mock_anthropic_cls.return_value.messages.create.return_value = _respuesta_claude(
+            '{"eventos": [%s], "descripcion": "x"}' % ", ".join(str(t.id) for t in tipos)
+        )
+
+    @patch("anthropic.Anthropic")
+    def test_solo_se_le_pide_a_la_ia_lo_asignado_a_la_camara(self, mock_anthropic_cls):
+        self._detecta(mock_anthropic_cls)
+
+        clasificar_evento(self._evento(self.camara2))
+
+        _, kwargs = mock_anthropic_cls.return_value.messages.create.call_args
+        pedido = kwargs["messages"][0]["content"][1]["text"]
+        self.assertIn("Lejos del equipo", pedido)
+        self.assertNotIn("Sin casco", pedido)
+
+    @patch("anthropic.Anthropic")
+    def test_camara_sin_eventos_asignados_no_llama_a_la_ia(self, mock_anthropic_cls):
+        camara3 = Camara.objects.create(empresa=self.empresa, nombre="Cam 3", ip="10.0.0.3")
+
+        clasificar_evento(self._evento(camara3))
+
+        mock_anthropic_cls.return_value.messages.create.assert_not_called()
+
+    @patch("anthropic.Anthropic")
+    def test_un_evento_de_otra_camara_que_la_ia_devuelva_se_ignora(self, mock_anthropic_cls):
+        self._detecta(mock_anthropic_cls, self.distancia)
+        evento = self._evento(self.camara1)
+
+        clasificar_evento(evento)
+
+        self.assertEqual(evento.tipos_ia.count(), 0)
+        self.assertFalse(evento.disparo_alerta)
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_deteccion_marca_alerta_y_notifica(self, mock_anthropic_cls, mock_push):
+        self._detecta(mock_anthropic_cls, self.casco)
+        evento = self._evento(self.camara1, self.zona1)
+
+        clasificar_evento(evento)
+
+        evento.refresh_from_db()
+        self.assertTrue(evento.disparo_alerta)
+        titulo, cuerpo = mock_push.call_args[0][:2]
+        self.assertEqual(titulo, "Alerta IA — Cam 1")
+        self.assertEqual(cuerpo, "Sin casco (alta) en Patio.")
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_sin_deteccion_no_hay_alerta_ni_aviso(self, mock_anthropic_cls, mock_push):
+        self._detecta(mock_anthropic_cls)
+        evento = self._evento(self.camara1)
+
+        clasificar_evento(evento)
+
+        evento.refresh_from_db()
+        self.assertFalse(evento.disparo_alerta)
+        mock_push.assert_not_called()
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_no_repite_el_aviso_del_mismo_evento_ia_dentro_de_10_minutos(self, mock_anthropic_cls, mock_push):
+        self._detecta(mock_anthropic_cls, self.casco)
+        clasificar_evento(self._evento(self.camara1))
+        clasificar_evento(self._evento(self.camara1))
+
+        self.assertEqual(mock_push.call_count, 1)
+
+        EventoDetectado.objects.update(ia_analizado_en=timezone.now() - datetime.timedelta(minutes=11))
+        clasificar_evento(self._evento(self.camara1))
+
+        self.assertEqual(mock_push.call_count, 2)
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_el_equipo_local_recibe_disparo_alerta_por_la_ia(self, mock_anthropic_cls, mock_push):
+        """Sin regla de horario vigente la zona no alerta, pero la IA sí — y
+        el equipo local se entera para grabar el clip."""
+        equipo = EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo 1")
+        self._detecta(mock_anthropic_cls, self.casco)
+
+        response = self.client.post(
+            reverse("camaras_ia:recibir_evento_camara"),
+            {"camara": self.camara1.pk, "punto_x": 5, "punto_y": 5, "snapshot": _jpeg_de_prueba()},
+            HTTP_X_API_KEY=equipo.api_key,
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(response.data["disparo_alerta"])
+
+
+class TiposEventoIACamarasEndpointTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam 1", ip="10.0.0.1")
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        response = self.client.post(
+            reverse("core:login"), {"username": "admin", "password": "clave12345"}, content_type="application/json"
+        )
+        self.auth = {"HTTP_AUTHORIZATION": f"Token {response.data['token']}"}
+
+    def test_crea_un_evento_ia_asignado_a_una_camara(self):
+        response = self.client.post(
+            reverse("camaras_ia:tipos_evento_ia_lista"),
+            {"nombre": "Sin casco", "descripcion": "Persona sin casco", "camaras": [self.camara.pk]},
+            content_type="application/json",
+            **self.auth,
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["camaras"], [self.camara.pk])
+        self.assertEqual(list(TipoEventoIA.objects.get().camaras.all()), [self.camara])
