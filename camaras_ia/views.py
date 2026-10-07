@@ -1,4 +1,6 @@
+import base64
 import io
+import os
 import time
 import zipfile
 from datetime import timedelta
@@ -738,4 +740,37 @@ def descargar_equipo_local_zip(request):
 
     respuesta = HttpResponse(buffer.getvalue(), content_type="application/zip")
     respuesta["Content-Disposition"] = 'attachment; filename="equipo_local.zip"'
+    return respuesta
+
+
+# Paquete con el programa ya compilado (equipo_local.exe + modelo + scripts de
+# instalación): lo publica .github/workflows/compilar-equipo-local.yml en el
+# release fijo "equipo-local" del repositorio cada vez que cambia el código.
+# Pesa ~300 MB, por eso no pasa por este backend (gunicorn corta a los 30 s):
+# lo descarga directo el instalador en el PC de la planta.
+URL_PAQUETE_EQUIPO_LOCAL = os.environ.get(
+    "EQUIPO_LOCAL_URL_PAQUETE",
+    "https://github.com/habid8374/SSTBAVARIA_CCTV/releases/download/equipo-local/equipo_local-windows.zip",
+)
+_PLANTILLA_INSTALADOR_EQUIPO_LOCAL = Path(__file__).resolve().parent / "plantillas" / "instalar_equipo_local.bat"
+
+
+@api_view(["GET"])
+@permission_classes([EsPersonalInternoParaLeerYAdministradorParaEscribir])
+def descargar_equipo_local_instalador(request, pk):
+    """Instalador de un clic para Windows de ESTE equipo: un .bat que ya trae
+    adentro su .env (en base64, para no tener que escapar nada para cmd),
+    descarga el .exe compilado, lo deja en C:\\GuardIA\\equipo_local y lo
+    registra como Tarea Programada — ver la plantilla en plantillas/."""
+    equipo = get_object_or_404(EquipoLocal, pk=pk)
+    env_base64 = base64.b64encode(_env_real_para_equipo(request, equipo).encode("utf-8")).decode("ascii")
+    contenido = (
+        _PLANTILLA_INSTALADOR_EQUIPO_LOCAL.read_text(encoding="ascii")
+        .replace("__URL_PAQUETE__", URL_PAQUETE_EQUIPO_LOCAL)
+        .replace("__ENV_BASE64__", env_base64)
+    )
+    # cmd.exe necesita fin de línea CRLF para leer bien un .bat.
+    contenido = contenido.replace("\r\n", "\n").replace("\n", "\r\n")
+    respuesta = HttpResponse(contenido.encode("ascii"), content_type="application/octet-stream")
+    respuesta["Content-Disposition"] = 'attachment; filename="instalar_guardia.bat"'
     return respuesta

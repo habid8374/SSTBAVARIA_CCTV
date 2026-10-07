@@ -741,6 +741,21 @@ export function descargarEquipoLocalZip(token: string, equipoId: number): Promis
   );
 }
 
+// Paquete con equipo_local.exe ya compilado: lo publica el workflow
+// "compilar-equipo-local" en el release fijo "equipo-local". Lo descarga solo
+// el instalador de cada equipo; este enlace es para instalar sin internet
+// hacia GitHub (dejar el .zip junto al instalador).
+export const URL_PAQUETE_EQUIPO_LOCAL =
+  "https://github.com/habid8374/SSTBAVARIA_CCTV/releases/download/equipo-local/equipo_local-windows.zip";
+
+export function descargarEquipoLocalInstalador(token: string, equipoId: number): Promise<void> {
+  return descargarArchivo(
+    token,
+    `/api/camaras-ia/dashboard/equipos-locales/${equipoId}/instalador/`,
+    "instalar_guardia.bat"
+  );
+}
+
 export type ResultadoEnvioAccesoVisitantes = {
   enviados: number;
   errores: { correo: string; detail: string }[];

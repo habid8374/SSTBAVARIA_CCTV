@@ -908,7 +908,9 @@ const TEMAS: Tema[] = [
           con un <Mono>.env</Mono> ya completo adentro (URL del backend + <Mono>api_key</Mono> de ese equipo
           en particular) — no hay que editar ni pegar nada a mano. Con eso, más doble clic en el instalador
           de un clic (<Mono>instalar.bat</Mono> en Windows, <Mono>instalar.sh</Mono> en Linux/Mac), queda
-          todo instalado y corriendo solo, sin necesidad de saber de líneas de comando. El botón{" "}
+          todo instalado y corriendo solo, sin necesidad de saber de líneas de comando. En Windows, más
+          simple todavía: botón <strong>&quot;Instalador Windows (.exe)&quot;</strong> — un solo archivo que
+          descarga el programa ya compilado (sin Python), lo configura y lo deja corriendo. El botón{" "}
           <strong>&quot;Copiar&quot;</strong> junto al API key sigue disponible por si se prefiere el modo
           manual. El badge <strong>Conectado</strong> se pone verde cuando ese equipo sincronizó hace menos
           de 5 minutos. Ver el tema <strong>&quot;El equipo local&quot;</strong> más abajo para el flujo
@@ -1104,6 +1106,32 @@ const TEMAS: Tema[] = [
         <P>
           Pensado para que lo pueda hacer alguien <strong>sin conocimientos técnicos</strong>, siguiendo estos
           pasos en orden, en el PC dedicado que va a quedar prendido en la planta.
+        </P>
+        <Sub>Windows: instalador de un clic (recomendado)</Sub>
+        <P>
+          No hace falta instalar Python ni compilar nada — el programa ya viene compilado
+          (<Mono>equipo_local.exe</Mono>):
+        </P>
+        <Ol>
+          <li>Con un usuario Administrador, ir a <strong>Sistema → Equipo local</strong> →{" "}
+            <strong>&quot;+ Nuevo equipo&quot;</strong> (si aún no existe) → en su fila, botón{" "}
+            <strong>&quot;Instalador Windows (.exe)&quot;</strong>. Se descarga{" "}
+            <Mono>instalar_guardia.bat</Mono>, que ya trae la configuración de ese equipo adentro. Si el
+            navegador pregunta, elegir <strong>&quot;Conservar&quot;</strong>.</li>
+          <li>Llevar ese archivo al PC de la planta y darle doble clic. Si Windows muestra &quot;Windows
+            protegió su PC&quot;: <strong>&quot;Más información&quot; → &quot;Ejecutar de todas
+            formas&quot;</strong>; después <strong>&quot;Sí&quot;</strong> al permiso de Administrador.</li>
+          <li>Esperar a que diga <strong>&quot;LISTO&quot;</strong> (descarga unos 300 MB, puede tardar
+            varios minutos). Queda instalado en <Mono>C:\GuardIA\equipo_local</Mono>, corriendo y
+            arrancando solo con el PC (Tarea Programada <Mono>GuardIA-EquipoLocalCamaras</Mono>), con el
+            Firewall de Windows ya abierto para el visor web.</li>
+        </Ol>
+        <P>
+          Luego seguir con el Paso 4 (verificar) y el Paso 5 (cámaras y zonas) de abajo. Para actualizar el
+          programa, se vuelve a correr el mismo instalador: conserva grabaciones y zonas. Si ese PC no puede
+          entrar a GitHub, se descarga aparte el &quot;programa por separado&quot; (enlace en Sistema →
+          Equipo local) y se deja el <Mono>.zip</Mono>, sin descomprimir, junto al instalador. Los Pasos 1 a
+          3 de abajo son para instalar desde el código fuente (con Python).
         </P>
         <Sub>Paso 1 — Instalar Python (una sola vez en ese PC)</Sub>
         <P>Solo hace falta hacerlo la primera vez. Si ese PC ya tiene Python, se puede saltar este paso.</P>

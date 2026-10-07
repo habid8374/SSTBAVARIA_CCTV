@@ -36,7 +36,11 @@ $disparador = New-ScheduledTaskTrigger -AtStartup
 # se hace explicito el "matar antes de arrancar": cada vez que este script
 # se corre (instalar.bat), se detiene cualquier instancia vieja de la tarea
 # antes de que instalar.bat la vuelva a iniciar.
-$configuracion = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable -MultipleInstances IgnoreNew
+# ExecutionTimeLimit 0 = sin limite: por defecto Windows corta la tarea a
+# las 72 horas (y no la vuelve a arrancar hasta reiniciar el PC). Tampoco
+# se detiene por estar con bateria (mini-PC/portatil con bateria).
+$configuracion = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit (New-TimeSpan -Seconds 0) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
 Register-ScheduledTask `

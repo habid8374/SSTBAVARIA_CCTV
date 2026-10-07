@@ -29,7 +29,11 @@ $disparador = New-ScheduledTaskTrigger -AtStartup
 # correr dos veces el programa a la vez. Para que "Ejecutar" nunca quede
 # sin hacer nada porque Windows cree que ya hay una instancia corriendo, se
 # detiene explicitamente cualquier instancia vieja despues de registrar.
-$configuracion = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable -MultipleInstances IgnoreNew
+# ExecutionTimeLimit 0 = sin limite: por defecto Windows corta la tarea a
+# las 72 horas (y no la vuelve a arrancar hasta reiniciar el PC). Tampoco
+# se detiene por estar con bateria (mini-PC/portatil con bateria).
+$configuracion = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit (New-TimeSpan -Seconds 0) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
 Register-ScheduledTask `
@@ -42,6 +46,14 @@ Register-ScheduledTask `
     -Force
 
 Stop-ScheduledTask -TaskName "GuardIA-EquipoLocalCamaras" -ErrorAction SilentlyContinue
+
+# Deja entrar desde la red de la planta al visor web (puerto 8090) y a las
+# consultas del nombre guardia-camaras.local: el programa corre como SYSTEM
+# en segundo plano, asi que Windows nunca muestra el aviso de "permitir
+# acceso" y lo bloquearia sin avisar. La regla es por programa, no abre
+# ningun otro puerto del PC.
+Get-NetFirewallRule -DisplayName "GuardIA equipo local" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+New-NetFirewallRule -DisplayName "GuardIA equipo local" -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null
 
 # Activa el historial de tareas de Windows (viene deshabilitado por
 # defecto) — asi la pestana "Historial" del Programador de tareas muestra

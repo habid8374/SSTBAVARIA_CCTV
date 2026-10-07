@@ -67,4 +67,9 @@ urlpatterns = [
         views.descargar_equipo_local_zip,
         name="equipos_locales_descargar_zip",
     ),
+    path(
+        "dashboard/equipos-locales/<int:pk>/instalador/",
+        views.descargar_equipo_local_instalador,
+        name="equipos_locales_instalador",
+    ),
 ]

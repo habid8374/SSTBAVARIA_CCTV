@@ -1,15 +1,22 @@
 name: Compilar equipo_local.exe
 
 # Compila el .exe del equipo local en un servidor Windows de GitHub, con las
-# mismas opciones que equipo_local/compilar.bat, y lo deja para descargar en
-# la pestaña Actions (sección "Artifacts" de la ejecución).
+# mismas opciones que equipo_local/compilar.bat, prueba el instalador de un
+# clic del dashboard de punta a punta (Tarea Programada real) y publica el
+# paquete en el release fijo "equipo-local": de ahí lo descarga el
+# instalador que baja el botón "Instalador Windows (.exe)" de
+# Sistema -> Equipo local.
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - "equipo_local/**"
+      - "camaras_ia/plantillas/**"
       - ".github/workflows/compilar-equipo-local.yml"
+
+permissions:
+  contents: write
 
 jobs:
   compilar:
@@ -71,10 +78,85 @@ jobs:
           Remove-Item dist\grabaciones -Recurse -ErrorAction SilentlyContinue
           exit 0
 
+      # Mismo contenido que necesita instalar_exe.bat (instalación manual) y
+      # el instalador de un clic: todo dentro de una carpeta equipo_local/.
+      - name: Armar el paquete
+        run: |
+          $codigo = @'
+          import zipfile
+          archivos = {
+              "dist/equipo_local.exe": "equipo_local/equipo_local.exe",
+              "dist/yolov8n.pt": "equipo_local/yolov8n.pt",
+              "instalar_exe.bat": "equipo_local/instalar_exe.bat",
+              "windows/instalar_tarea_programada_exe.ps1": "equipo_local/windows/instalar_tarea_programada_exe.ps1",
+          }
+          with zipfile.ZipFile("equipo_local-windows.zip", "w", zipfile.ZIP_DEFLATED) as paquete:
+              for origen, destino in archivos.items():
+                  paquete.write(origen, destino)
+          '@
+          $codigo | python -
+          Get-Item equipo_local-windows.zip | Select-Object Name, Length
+
+      # Corre el mismo instalador que baja el dashboard (con el paquete recién
+      # armado al lado, sin descargar nada): registra la Tarea Programada como
+      # SYSTEM, la inicia y espera "Equipo local iniciado". Así se prueba la
+      # instalación real, no solo el .exe suelto.
+      - name: Probar el instalador de un clic
+        working-directory: .
+        run: |
+          New-Item -ItemType Directory -Force prueba-instalador | Out-Null
+          Copy-Item equipo_local\equipo_local-windows.zip prueba-instalador\
+          $env_texto = "API_BASE_URL=http://127.0.0.1:9`nAPI_KEY=prueba-ci`n"
+          $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env_texto))
+          $bat = (Get-Content camaras_ia\plantillas\instalar_equipo_local.bat -Raw).Replace('__URL_PAQUETE__', 'http://127.0.0.1:9/no-se-usa.zip').Replace('__ENV_BASE64__', $b64)
+          $bat = $bat -replace "`r?`n", "`r`n"
+          [IO.File]::WriteAllText("$PWD\prueba-instalador\instalar_guardia.bat", $bat, [Text.Encoding]::ASCII)
+
+          cmd /c "prueba-instalador\instalar_guardia.bat < NUL"
+          $codigo = $LASTEXITCODE
+          $log = 'C:\GuardIA\equipo_local\equipo_local.log'
+          if (Test-Path $log) { Get-Content $log }
+          if ($codigo -ne 0) { Write-Error "El instalador terminó con código $codigo"; exit 1 }
+
+          $tarea = Get-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras
+          if ($tarea.Settings.ExecutionTimeLimit -ne 'PT0S') { Write-Error "La tarea quedó con límite de tiempo: $($tarea.Settings.ExecutionTimeLimit)"; exit 1 }
+          if ($tarea.Principal.UserId -ne 'SYSTEM') { Write-Error "La tarea no corre como SYSTEM"; exit 1 }
+          if (-not (Get-NetFirewallRule -DisplayName 'GuardIA equipo local' -ErrorAction SilentlyContinue)) { Write-Error "Falta la regla del Firewall"; exit 1 }
+
+          # El visor web local debe contestar (corriendo como SYSTEM).
+          $visor = $false
+          for ($i = 0; $i -lt 12; $i++) {
+            try {
+              Invoke-WebRequest -Uri http://127.0.0.1:8090/ -UseBasicParsing -SkipHttpErrorCheck -TimeoutSec 5 | Out-Null
+              $visor = $true; break
+            } catch { Start-Sleep -Seconds 5 }
+          }
+          if (Test-Path $log) { Get-Content $log -Tail 15 }
+          if (-not $visor) { Write-Error "El visor web (puerto 8090) no contestó"; exit 1 }
+          if (Select-String -Path $log -Pattern "Error fatal|Error importando" -Quiet) { Write-Error "El programa registró un error fatal"; exit 1 }
+
+          Stop-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras
+          Unregister-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras -Confirm:$false
+          Get-Process -Name equipo_local -ErrorAction SilentlyContinue | Stop-Process -Force
+          exit 0
+
+      - name: Publicar en el release equipo-local
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view equipo-local *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create equipo-local --target $env:GITHUB_SHA --title "Equipo local GuardIA (Windows)" --notes "Programa compilado del equipo local."
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+          gh release upload equipo-local equipo_local-windows.zip --clobber
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          gh release edit equipo-local --notes "Programa compilado del equipo local (Windows), desde el commit $env:GITHUB_SHA. Se instala con el botón 'Instalador Windows (.exe)' de Sistema -> Equipo local en el dashboard."
+
       - uses: actions/upload-artifact@v4
+        if: github.ref != 'refs/heads/main'
         with:
           name: equipo_local-windows
-          path: |
-            equipo_local/dist/equipo_local.exe
-            equipo_local/dist/yolov8n.pt
-          retention-days: 30
+          path: equipo_local/equipo_local-windows.zip
+          retention-days: 7

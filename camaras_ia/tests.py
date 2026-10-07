@@ -1,11 +1,14 @@
+import base64
 import datetime
 import io
 import urllib.error
 import zipfile
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase, override_settings
@@ -14,6 +17,7 @@ from django.utils import timezone
 
 from core.models import Empresa, PerfilUsuario
 
+from . import views
 from .costos_ia import calcular_costo_usd, cuota_por_camara_usd, precio_modelo, reiniciar_periodo
 from .ia_deteccion import _parsear_json, clasificar_evento
 from .models import (
@@ -1258,6 +1262,61 @@ class DashboardEndpointsTests(TestCase):
         )
         self.assertEqual(response.status_code, 401)
 
+    def _instalador(self, usuario):
+        return self.client.get(
+            reverse("camaras_ia:equipos_locales_instalador", args=[self.equipo.pk]), **self._auth(usuario)
+        )
+
+    def test_instalador_windows_trae_el_env_del_equipo_y_la_url_del_programa(self):
+        self.equipo.visor_usuario = "admin"
+        self.equipo.visor_password = "cl@ve&rara%"
+        self.equipo.save(update_fields=["visor_usuario", "visor_password"])
+        response = self._instalador(self.operador)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('filename="instalar_guardia.bat"', response["Content-Disposition"])
+        bat = response.content.decode("ascii")
+        self.assertNotIn("__ENV_BASE64__", bat)
+        self.assertNotIn("__URL_PAQUETE__", bat)
+        self.assertIn(f'set "GUARDIA_URL={views.URL_PAQUETE_EQUIPO_LOCAL}"', bat)
+        # Todas las líneas en CRLF (cmd.exe lee mal un .bat con LF solo).
+        self.assertNotIn("\n", bat.replace("\r\n", ""))
+        linea_env = next(linea for linea in bat.split("\r\n") if linea.startswith('set "GUARDIA_ENV='))
+        env = base64.b64decode(linea_env[len('set "GUARDIA_ENV='):-1]).decode("utf-8")
+        self.assertIn(f"API_KEY={self.equipo.api_key}", env)
+        self.assertIn("API_BASE_URL=http://testserver", env)
+        self.assertIn("VISOR_WEB_PASSWORD=cl@ve&rara%", env)
+
+    def test_instalador_windows_corre_el_script_powershell_embebido(self):
+        bat = self._instalador(self.admin).content.decode("ascii")
+        script = bat[bat.rindex("##PS"):]
+        self.assertIn("instalar_tarea_programada_exe.ps1", script)
+        self.assertIn("Start-ScheduledTask", script)
+        # La marca solo aparece una vez como línea propia: la línea de cmd
+        # que la busca la arma partida ('#' + '#PS') para no encontrarse a sí misma.
+        self.assertEqual(bat.count("\r\n##PS\r\n"), 1)
+
+    def test_contratista_no_puede_descargar_el_instalador(self):
+        self.assertEqual(self._instalador(self.contratista_user).status_code, 403)
+
+    def test_instalador_de_equipo_inexistente_falla(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_instalador", args=[99999]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_la_imagen_del_backend_incluye_el_codigo_del_equipo_local(self):
+        """El zip y el instalador se arman desde la carpeta del backend
+        desplegado: si .dockerignore excluye equipo_local/ o la plantilla, en
+        Coolify el zip sale vacío (solo con el .env)."""
+        raiz = Path(settings.BASE_DIR)
+        ignorados = {
+            linea.strip().strip("/")
+            for linea in (raiz / ".dockerignore").read_text().splitlines()
+            if linea.strip() and not linea.startswith("#")
+        }
+        self.assertNotIn("equipo_local", ignorados)
+        self.assertNotIn("camaras_ia", ignorados)
+
     def test_zip_de_equipo_local_conserva_el_bit_ejecutable_de_instalar_sh(self):
         response = self.client.get(
             reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
@@ -1873,7 +1932,7 @@ class CuotaIAPorCamaraTests(TestCase):
         self.assertEqual(mock_push.call_args[0][0], "GuardIA — Cam 1 agotó su cuota de IA")
 
     def test_resumen_muestra_el_gasto_de_cada_camara_contra_su_cuota(self):
-        admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
         token = self.client.post(
             reverse("core:login"), {"username": "admin", "password": "clave12345"}, content_type="application/json"
         ).data["token"]
