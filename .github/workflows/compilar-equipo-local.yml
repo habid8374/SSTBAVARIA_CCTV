@@ -1,0 +1,80 @@
+name: Compilar equipo_local.exe
+
+# Compila el .exe del equipo local en un servidor Windows de GitHub, con las
+# mismas opciones que equipo_local/compilar.bat, y lo deja para descargar en
+# la pestaña Actions (sección "Artifacts" de la ejecución).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "equipo_local/**"
+      - ".github/workflows/compilar-equipo-local.yml"
+
+jobs:
+  compilar:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: equipo_local
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-build.txt pytest
+
+      - name: Pruebas del equipo local
+        working-directory: .
+        run: python -m pytest equipo_local/tests -q -p no:cacheprovider
+
+      - name: Compilar (mismas opciones que compilar.bat)
+        run: >
+          pyinstaller --noconfirm --onefile --console
+          --name equipo_local
+          --paths ".."
+          --collect-all ultralytics
+          --collect-all torch
+          --collect-all torchvision
+          --collect-all cv2
+          --hidden-import zeroconf
+          entry_point.py
+
+      - name: Descargar el modelo de detección (yolov8n.pt)
+        run: Invoke-WebRequest -Uri https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt -OutFile dist\yolov8n.pt
+
+      # Arranca el .exe de verdad (con un backend inexistente): carga el
+      # modelo, levanta el ciclo principal y debe quedar en el log sin error
+      # fatal. Así se detecta un .exe que compila pero no arranca.
+      - name: Prueba de arranque del .exe
+        run: |
+          Set-Content -Path dist\.env -Value "API_BASE_URL=http://127.0.0.1:9`nAPI_KEY=prueba-ci`nVISOR_WEB_ACTIVO=false`nVISOR_WEB_MDNS_ACTIVO=false"
+          $proceso = Start-Process -FilePath dist\equipo_local.exe -WorkingDirectory dist -PassThru
+          $listo = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Seconds 5
+            if ((Test-Path dist\equipo_local.log) -and (Select-String -Path dist\equipo_local.log -Pattern "Equipo local iniciado" -Quiet)) { $listo = $true; break }
+            if ($proceso.HasExited) { break }
+          }
+          if (-not $proceso.HasExited) { Stop-Process -Id $proceso.Id -Force }
+          if (Test-Path dist\equipo_local.log) { Get-Content dist\equipo_local.log }
+          if (-not $listo) { Write-Error "El .exe no llegó a 'Equipo local iniciado'"; exit 1 }
+          if (Select-String -Path dist\equipo_local.log -Pattern "Error fatal|Error importando" -Quiet) { Write-Error "El .exe registró un error fatal"; exit 1 }
+          Remove-Item dist\.env, dist\equipo_local.log -ErrorAction SilentlyContinue
+          Remove-Item dist\configuracion_local.sqlite3 -ErrorAction SilentlyContinue
+          Remove-Item dist\grabaciones -Recurse -ErrorAction SilentlyContinue
+          exit 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: equipo_local-windows
+          path: |
+            equipo_local/dist/equipo_local.exe
+            equipo_local/dist/yolov8n.pt
+          retention-days: 30
