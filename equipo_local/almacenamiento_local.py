@@ -24,11 +24,25 @@ Cada fila de zona/regla tiene:
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+import threading
+from datetime import datetime, timedelta, timezone
+
+_lock_reloj = threading.Lock()
+_ultima_marca = None
 
 
 def _ahora_iso():
-    return datetime.now(timezone.utc).isoformat()
+    """Marca de tiempo estrictamente creciente en el proceso: en Windows el
+    reloj puede devolver el mismo valor dos veces seguidas, y entonces un
+    cambio hecho justo después de sincronizar no se veía como pendiente
+    (actualizada_en > sincronizada_en)."""
+    global _ultima_marca
+    with _lock_reloj:
+        ahora = datetime.now(timezone.utc)
+        if _ultima_marca is not None and ahora <= _ultima_marca:
+            ahora = _ultima_marca + timedelta(microseconds=1)
+        _ultima_marca = ahora
+        return ahora.isoformat(timespec="microseconds")
 
 
 class AlmacenamientoLocal:
@@ -159,16 +173,18 @@ class AlmacenamientoLocal:
             """SELECT * FROM zonas WHERE eliminada = 0
                AND (sincronizada_en IS NULL OR actualizada_en > sincronizada_en)"""
         ).fetchall()
-        return [self._zona_a_dict(fila) for fila in filas]
+        return [{**self._zona_a_dict(fila), "actualizada_en": fila["actualizada_en"]} for fila in filas]
 
     def zonas_pendientes_de_eliminar(self):
         filas = self._conn.execute("SELECT * FROM zonas WHERE eliminada = 1 AND cloud_id IS NOT NULL").fetchall()
         return [self._zona_a_dict(fila) for fila in filas]
 
-    def marcar_zona_sincronizada(self, zona_id, cloud_id):
-        ahora = _ahora_iso()
+    def marcar_zona_sincronizada(self, zona_id, cloud_id, version_subida=None):
+        """`version_subida` = el actualizada_en de la zona tal como se subió:
+        si alguien la editó mientras se subía, sigue quedando pendiente."""
+        sincronizada_en = version_subida or _ahora_iso()
         self._conn.execute(
-            "UPDATE zonas SET cloud_id = ?, sincronizada_en = ? WHERE id = ?", (cloud_id, ahora, zona_id)
+            "UPDATE zonas SET cloud_id = ?, sincronizada_en = ? WHERE id = ?", (cloud_id, sincronizada_en, zona_id)
         )
         self._conn.commit()
 
@@ -285,16 +301,16 @@ class AlmacenamientoLocal:
             """SELECT * FROM reglas WHERE eliminada = 0
                AND (sincronizada_en IS NULL OR actualizada_en > sincronizada_en)"""
         ).fetchall()
-        return [self._regla_a_dict(fila) for fila in filas]
+        return [{**self._regla_a_dict(fila), "actualizada_en": fila["actualizada_en"]} for fila in filas]
 
     def reglas_pendientes_de_eliminar(self):
         filas = self._conn.execute("SELECT * FROM reglas WHERE eliminada = 1 AND cloud_id IS NOT NULL").fetchall()
         return [self._regla_a_dict(fila) for fila in filas]
 
-    def marcar_regla_sincronizada(self, regla_id, cloud_id):
-        ahora = _ahora_iso()
+    def marcar_regla_sincronizada(self, regla_id, cloud_id, version_subida=None):
+        sincronizada_en = version_subida or _ahora_iso()
         self._conn.execute(
-            "UPDATE reglas SET cloud_id = ?, sincronizada_en = ? WHERE id = ?", (cloud_id, ahora, regla_id)
+            "UPDATE reglas SET cloud_id = ?, sincronizada_en = ? WHERE id = ?", (cloud_id, sincronizada_en, regla_id)
         )
         self._conn.commit()
 

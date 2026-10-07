@@ -1,4 +1,6 @@
 import unittest
+from datetime import datetime, timezone
+from unittest.mock import patch
 
 from equipo_local.almacenamiento_local import AlmacenamientoLocal
 
@@ -72,6 +74,17 @@ class AlmacenamientoLocalTests(unittest.TestCase):
         self.db.actualizar_zona(zona_id, nombre="Cambiada")
         pendientes = self.db.zonas_pendientes_de_sincronizar()
         self.assertEqual([z["id"] for z in pendientes], [zona_id])
+
+    def test_editar_zona_con_el_reloj_detenido_igual_queda_pendiente(self):
+        """En Windows el reloj puede repetir el mismo valor entre llamadas
+        seguidas: aun así, el cambio tiene que quedar pendiente."""
+        instante = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
+        with patch("equipo_local.almacenamiento_local.datetime") as reloj:
+            reloj.now.return_value = instante
+            zona_id = self.db.crear_zona(1, "Z", poligono=[[0, 0], [1, 0], [1, 1]])
+            self.db.marcar_zona_sincronizada(zona_id, cloud_id=7)
+            self.db.actualizar_zona(zona_id, nombre="Cambiada")
+        self.assertEqual([z["id"] for z in self.db.zonas_pendientes_de_sincronizar()], [zona_id])
 
     def test_importar_zona_desde_cloud_no_queda_pendiente(self):
         zona_id = self.db.importar_zona_desde_cloud(

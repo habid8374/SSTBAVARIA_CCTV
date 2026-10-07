@@ -34,6 +34,35 @@ class SincronizarConfiguracionLocalTests(unittest.TestCase):
         self.assertEqual(zona["cloud_id"], 42)
         self.assertEqual(self.db.zonas_pendientes_de_sincronizar(), [])
 
+    def test_zona_editada_mientras_se_subia_sigue_pendiente(self):
+        zona_id = self.db.crear_zona(1, "Bodega", poligono=CUADRADO)
+
+        def subir(payload, eliminar):
+            self.db.actualizar_zona(zona_id, nombre="Bodega norte")  # edición desde el visor durante la subida
+            return {"ids": [{"cliente_id": str(zona_id), "cloud_id": 42}], "errores": []}
+
+        self.cliente_api.sincronizar_zonas.side_effect = subir
+        sincronizar_configuracion_local(self.db, self.cliente_api)
+
+        pendientes = self.db.zonas_pendientes_de_sincronizar()
+        self.assertEqual([(z["id"], z["nombre"]) for z in pendientes], [(zona_id, "Bodega norte")])
+        self.assertEqual(self.db.obtener_zona(zona_id)["cloud_id"], 42)
+
+    def test_regla_editada_mientras_se_subia_sigue_pendiente(self):
+        zona_id = self.db.crear_zona(1, "Bodega", poligono=CUADRADO)
+        self.db.marcar_zona_sincronizada(zona_id, cloud_id=42)
+        regla_id = self.db.crear_regla(zona_id, "08:00", "17:00", [0, 1, 2], "correo", "a@x.com")
+
+        def subir(payload, eliminar):
+            self.db.actualizar_regla(regla_id, hora_fin="18:00")
+            return {"ids": [{"cliente_id": str(regla_id), "cloud_id": 9}], "errores": []}
+
+        self.cliente_api.sincronizar_zonas.return_value = {"ids": [], "errores": []}
+        self.cliente_api.sincronizar_reglas.side_effect = subir
+        sincronizar_configuracion_local(self.db, self.cliente_api)
+
+        self.assertEqual([r["id"] for r in self.db.reglas_pendientes_de_sincronizar()], [regla_id])
+
     def test_zona_eliminada_se_reporta_y_se_borra_localmente_al_confirmar(self):
         zona_id = self.db.crear_zona(1, "Bodega", poligono=CUADRADO)
         self.db.marcar_zona_sincronizada(zona_id, cloud_id=42)
