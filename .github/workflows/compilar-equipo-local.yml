@@ -116,7 +116,28 @@ jobs:
           $codigo = $LASTEXITCODE
           $log = 'C:\GuardIA\equipo_local\equipo_local.log'
           if (Test-Path $log) { Get-Content $log }
-          if ($codigo -ne 0) { Write-Error "El instalador terminó con código $codigo"; exit 1 }
+          if ($codigo -ne 0) {
+            Write-Host '--- Procesos equipo_local (id, padre, linea de comando) ---'
+            Get-CimInstance Win32_Process -Filter "Name='equipo_local.exe'" | Select-Object ProcessId, ParentProcessId, CommandLine | Format-Table -AutoSize -Wrap | Out-String -Width 400 | Write-Host
+            Write-Host '--- Errores de aplicacion en el visor de eventos ---'
+            Get-WinEvent -FilterHashtable @{LogName='Application'; Level=2} -MaxEvents 5 -ErrorAction SilentlyContinue | Format-List TimeCreated, ProviderName, Message | Out-String -Width 400 | Write-Host
+            if (Test-Path C:\GuardIA\equipo_local\equipo_local_fallos.log) { Write-Host '--- equipo_local_fallos.log ---'; Get-Content C:\GuardIA\equipo_local\equipo_local_fallos.log -Tail 80 }
+            Stop-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras -ErrorAction SilentlyContinue
+            Get-Process -Name equipo_local -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep -Seconds 3
+            # Misma corrida como SYSTEM pero guardando la salida de consola.
+            $accion = New-ScheduledTaskAction -Execute cmd.exe -Argument '/c set GUARDIA_DIAGNOSTICO=1&& C:\GuardIA\equipo_local\equipo_local.exe > C:\GuardIA\salida.txt 2>&1' -WorkingDirectory C:\GuardIA\equipo_local
+            Register-ScheduledTask -TaskName GuardIA-Diagnostico -Action $accion -Principal (New-ScheduledTaskPrincipal -UserId SYSTEM -LogonType ServiceAccount -RunLevel Highest) -Force | Out-Null
+            Start-ScheduledTask -TaskName GuardIA-Diagnostico
+            Start-Sleep -Seconds 90
+            Write-Host '--- Procesos tras 90 s (diagnostico) ---'
+            Get-CimInstance Win32_Process -Filter "Name='equipo_local.exe'" | Select-Object ProcessId, ParentProcessId, CommandLine | Format-Table -AutoSize -Wrap | Out-String -Width 400 | Write-Host
+            Write-Host '--- Salida de consola corriendo como SYSTEM ---'
+            if (Test-Path C:\GuardIA\salida.txt) { Get-Content C:\GuardIA\salida.txt -Tail 120 }
+            Write-Host '--- Variables TEMP/APPDATA de SYSTEM ---'
+            Get-ChildItem C:\Windows\SystemTemp -ErrorAction SilentlyContinue | Select-Object -First 10 | Out-String | Write-Host
+            Write-Error "El instalador terminó con código $codigo"; exit 1
+          }
 
           $tarea = Get-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras
           if ($tarea.Settings.ExecutionTimeLimit -ne 'PT0S') { Write-Error "La tarea quedó con límite de tiempo: $($tarea.Settings.ExecutionTimeLimit)"; exit 1 }
