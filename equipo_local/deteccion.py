@@ -6,6 +6,7 @@ probar sin tener el modelo (~500MB con dependencias) instalado.
 """
 
 import logging
+import threading
 
 logger = logging.getLogger("equipo_local.deteccion")
 
@@ -19,6 +20,12 @@ class DetectorPersonas:
         logger.info("Cargando modelo %s…", modelo_path)
         self.modelo = YOLO(modelo_path)
         self.confianza_minima = confianza_minima
+        # Un solo modelo para todas las cámaras (cargar uno por cámara
+        # multiplicaría la RAM), pero cada cámara corre en su propio hilo y
+        # un modelo de ultralytics no admite predicciones simultáneas desde
+        # varios hilos (comparten el estado interno del predictor): se
+        # turnan con este lock.
+        self._lock = threading.Lock()
 
     def detectar(self, frame):
         """Devuelve una lista de (x, y, confianza) por cada persona detectada
@@ -26,7 +33,8 @@ class DetectorPersonas:
         estimado — centro-inferior del cuadro detectado, es decir la
         posición de los pies, más preciso que el centro del cuadro para
         decidir si alguien está parado dentro de una zona en el piso."""
-        resultados = self.modelo(frame, classes=[CLASE_PERSONA], conf=self.confianza_minima, verbose=False)
+        with self._lock:
+            resultados = self.modelo(frame, classes=[CLASE_PERSONA], conf=self.confianza_minima, verbose=False)
         detecciones = []
         for resultado in resultados:
             for caja in resultado.boxes:

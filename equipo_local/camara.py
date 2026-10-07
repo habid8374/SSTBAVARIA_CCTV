@@ -166,8 +166,25 @@ class CamaraMonitor:
                     # (la excepción de un hilo va a stderr, que no existe en la
                     # Tarea Programada) y la cámara deja de detectar para siempre.
                     self._registrar_error_de_frame()
-                time.sleep(self.config.INTERVALO_DETECCION_SEGUNDOS)
+                if not self._descartar_frames_atrasados(captura, self.config.INTERVALO_DETECCION_SEGUNDOS):
+                    logger.warning("Se perdió la señal de %s — reconectando…", self.nombre)
+                    break
             captura.release()
+
+    def _descartar_frames_atrasados(self, captura, segundos):
+        """Espera `segundos` hasta el próximo análisis, pero sin dejar de
+        consumir el stream: la cámara manda ~25 imágenes por segundo y acá
+        se analizan ~2-3, así que si solo se durmiera, las demás quedarían
+        en cola y cada análisis vería una imagen cada vez más vieja (con
+        minutos de retraso al rato). grab() saca la imagen de la cola sin
+        convertirla — si hay atraso acumulado (por ejemplo mientras esta
+        cámara esperaba su turno con el modelo) lo vacía de una, y si no,
+        espera a la siguiente. Devuelve False si se cortó la señal."""
+        fin = time.monotonic() + segundos
+        while time.monotonic() < fin and not self._detener.is_set():
+            if not captura.grab():
+                return False
+        return True
 
     def _registrar_error_de_frame(self):
         ahora = time.monotonic()
