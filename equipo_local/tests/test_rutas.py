@@ -14,4 +14,4 @@ class CarpetaBaseTests(unittest.TestCase):
         with patch.object(sys, "frozen", True, create=True), patch.object(
             sys, "executable", "/ruta/al/exe/equipo_local.exe"
         ):
-            self.assertEqual(carpeta_base(), Path("/ruta/al/exe"))
+            self.assertEqual(carpeta_base(), Path("/ruta/al/exe/equipo_local.exe").resolve().parent)

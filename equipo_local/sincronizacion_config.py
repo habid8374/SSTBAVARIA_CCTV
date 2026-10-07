@@ -42,8 +42,11 @@ def _sincronizar_zonas(almacenamiento, cliente_api):
 
     respuesta = cliente_api.sincronizar_zonas(payload, eliminar=eliminar)
 
+    version_subida = {str(zona["id"]): zona["actualizada_en"] for zona in pendientes}
     for asignado in respuesta.get("ids", []):
-        almacenamiento.marcar_zona_sincronizada(int(asignado["cliente_id"]), asignado["cloud_id"])
+        almacenamiento.marcar_zona_sincronizada(
+            int(asignado["cliente_id"]), asignado["cloud_id"], version_subida.get(str(asignado["cliente_id"]))
+        )
     # confirmar_eliminacion_zona espera el id LOCAL, no el cloud_id — se
     # vuelve a consultar la lista de pendientes para tener ambos.
     for zona in almacenamiento.zonas_pendientes_de_eliminar():
@@ -77,8 +80,11 @@ def _sincronizar_reglas(almacenamiento, cliente_api):
 
     respuesta = cliente_api.sincronizar_reglas(payload, eliminar=eliminar)
 
+    version_subida = {str(regla["id"]): regla["actualizada_en"] for regla in pendientes}
     for asignado in respuesta.get("ids", []):
-        almacenamiento.marcar_regla_sincronizada(int(asignado["cliente_id"]), asignado["cloud_id"])
+        almacenamiento.marcar_regla_sincronizada(
+            int(asignado["cliente_id"]), asignado["cloud_id"], version_subida.get(str(asignado["cliente_id"]))
+        )
     for regla in almacenamiento.reglas_pendientes_de_eliminar():
         if regla["cloud_id"] in eliminar:
             almacenamiento.confirmar_eliminacion_regla(regla["id"])
