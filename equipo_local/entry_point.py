@@ -11,6 +11,7 @@ equipo_local/, se agrega esa carpeta padre a mano antes de importar.
 """
 
 import faulthandler
+import multiprocessing
 import os
 import sys
 from pathlib import Path
@@ -20,6 +21,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from equipo_local.main import logger, main  # noqa: E402
 
 if __name__ == "__main__":
+    # Obligatorio en un .exe de PyInstaller que use multiprocessing (lo usan
+    # dependencias como torch/ultralytics): sin esto, cada proceso auxiliar
+    # vuelve a correr el programa entero, que lanza otro auxiliar, y así en
+    # cadena — el programa nunca pasaba de "Cargando modelo" como Tarea
+    # Programada. Debe ir antes que cualquier otra cosa.
+    multiprocessing.freeze_support()
+
     # Un cierre a nivel nativo (DLL de torch/OpenCV) no pasa por el except
     # de abajo ni deja nada en equipo_local.log: faulthandler deja la pila de
     # Python en este archivo, junto al .exe.

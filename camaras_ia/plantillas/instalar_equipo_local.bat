@@ -105,15 +105,26 @@ try {
 
     Write-Host '[4/4] Iniciando y esperando a que arranque (hasta 5 minutos)...'
     $log = Join-Path $carpeta 'equipo_local.log'
-    $previo = 0
-    if (Test-Path -LiteralPath $log) { $previo = ([string](Get-Content -LiteralPath $log -Raw)).Length }
+    # Lee el log aunque el programa lo tenga abierto escribiendo; si no se
+    # puede leer en ese instante, devuelve vacio y se reintenta en 5 s.
+    function Leer-Log {
+        try {
+            $flujo = [IO.File]::Open($log, 'Open', 'Read', 'ReadWrite, Delete')
+            $lector = New-Object IO.StreamReader($flujo)
+            $contenido = $lector.ReadToEnd()
+            $lector.Close()
+            return [string]$contenido
+        } catch {
+            return ''
+        }
+    }
+    $previo = (Leer-Log).Length
     Start-ScheduledTask -TaskName $tarea
     $iniciado = $false
     for ($i = 0; $i -lt 60; $i++) {
         Start-Sleep -Seconds 5
-        if (-not (Test-Path -LiteralPath $log)) { continue }
-        $texto = [string](Get-Content -LiteralPath $log -Raw)
-        if ($texto.Length -lt $previo) { $previo = 0 }  # el log roto (rotado)
+        $texto = Leer-Log
+        if ($texto.Length -lt $previo) { $previo = 0 }  # el log se roto
         $nuevo = $texto.Substring($previo)
         if ($nuevo -match 'Error fatal|Error importando') { break }
         if ($nuevo -match 'Equipo local iniciado') { $iniciado = $true; break }
