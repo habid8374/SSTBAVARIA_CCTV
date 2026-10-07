@@ -12,6 +12,8 @@ import {
   crearEquipoLocal,
   crearTipoEventoIA,
   descargarEquipoLocalZip,
+  descargarEquipoLocalInstalador,
+  URL_PAQUETE_EQUIPO_LOCAL,
   eliminarEquipoLocal,
   eliminarTipoEventoIA,
   enviarAccesoVisitantes,
@@ -945,6 +947,7 @@ function EquiposLocales({ token }: { token: string }) {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
   const [descargandoZipId, setDescargandoZipId] = useState<number | null>(null);
+  const [descargandoInstaladorId, setDescargandoInstaladorId] = useState<number | null>(null);
   const [equipoVisorEditando, setEquipoVisorEditando] = useState<EquipoLocal | null>(null);
   const { confirmar } = useDialog();
 
@@ -991,6 +994,17 @@ function EquiposLocales({ token }: { token: string }) {
     }
   }
 
+  async function descargarInstalador(equipo: EquipoLocal) {
+    setDescargandoInstaladorId(equipo.id);
+    try {
+      await descargarEquipoLocalInstalador(token, equipo.id);
+    } catch {
+      setError("No se pudo descargar el instalador de Windows.");
+    } finally {
+      setDescargandoInstaladorId(null);
+    }
+  }
+
   async function descargarZip(equipo: EquipoLocal) {
     setDescargandoZipId(equipo.id);
     try {
@@ -1006,13 +1020,19 @@ function EquiposLocales({ token }: { token: string }) {
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
-          Cada PC dedicado en sitio que corre <code>equipo_local</code> necesita un registro acá. Lo más
-          simple: botón <strong>&quot;+ Nuevo equipo&quot;</strong> → en su fila, botón{" "}
-          <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> (ya trae el <code>.env</code> completo,
-          con la conexión al backend y el <code>api_key</code> de ese equipo — no hay que editar nada) →
-          descomprimirlo en el PC de la planta → doble clic en <code>instalar.bat</code> (Windows) o correr{" "}
-          <code>./instalar.sh</code> (Linux/Mac) — ese instalador deja todo corriendo solo, sin necesidad de
-          saber de líneas de comando.
+          Cada PC dedicado en sitio que corre <code>equipo_local</code> necesita un registro acá
+          (<strong>&quot;+ Nuevo equipo&quot;</strong>). Para instalarlo en un PC con Windows, sin instalar
+          Python ni nada más: en su fila, botón <strong>&quot;Instalador Windows (.exe)&quot;</strong> →
+          llevar <code>instalar_guardia.bat</code> al PC de la planta → doble clic. Descarga el programa, lo
+          deja en <code>C:\GuardIA\equipo_local</code> con su configuración y queda corriendo solo con el PC
+          (Tarea Programada). Volver a correrlo actualiza el programa. Si ese PC no puede entrar a GitHub,
+          dejar el{" "}
+          <a href={URL_PAQUETE_EQUIPO_LOCAL} className="font-medium text-corp-gold hover:underline">
+            programa por separado
+          </a>{" "}
+          (<code>equipo_local-windows.zip</code>, sin descomprimir) junto al instalador.{" "}
+          <strong>&quot;Descargar equipo_local (.zip)&quot;</strong> sigue siendo la versión con código
+          fuente (<code>instalar.bat</code> / <code>instalar.sh</code>, necesita Python).
         </p>
         <div className="flex shrink-0 gap-2">
           <button
@@ -1116,6 +1136,15 @@ function EquiposLocales({ token }: { token: string }) {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => descargarInstalador(equipo)}
+                      disabled={descargandoInstaladorId === equipo.id}
+                      title="Instalador de un clic para Windows: descarga equipo_local.exe, lo configura y lo deja arrancando solo con el PC"
+                      className="rounded-md bg-corp-blue px-2.5 py-1 text-xs font-semibold text-black hover:bg-corp-navy hover:text-white disabled:opacity-60"
+                    >
+                      {descargandoInstaladorId === equipo.id ? "Descargando…" : "Instalador Windows (.exe)"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => descargarZip(equipo)}
