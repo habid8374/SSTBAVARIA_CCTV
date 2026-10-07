@@ -412,3 +412,55 @@ class LoopCapturaTests(unittest.TestCase):
 
         self.assertEqual(detector.detectar.call_count, 5)
         self.assertEqual(len(logs.records), 1)
+
+
+class _CapturaConCola:
+    """Doble de cv2.VideoCapture con `en_cola` imágenes ya acumuladas: grab()
+    las saca una por una; vacía, devuelve False si `cortar_al_vaciar`."""
+
+    def __init__(self, en_cola, cortar_al_vaciar=False):
+        self.en_cola = en_cola
+        self.grabs = 0
+        self._cortar = cortar_al_vaciar
+
+    def grab(self):
+        if self.en_cola == 0:
+            return not self._cortar
+        self.en_cola -= 1
+        self.grabs += 1
+        return True
+
+
+class DescartarFramesAtrasadosTests(unittest.TestCase):
+    def _monitor(self):
+        return CamaraMonitor(_camara_datos(), MagicMock(), MagicMock(), _config(GRABAR_VIDEO=False))
+
+    def test_vacia_la_cola_acumulada_antes_del_siguiente_analisis(self):
+        monitor = self._monitor()
+        captura = _CapturaConCola(en_cola=40)
+        # Sacar una imagen ya acumulada es casi instantáneo (1 ms en este reloj).
+        reloj = iter([0.001 * i for i in range(1000)])
+
+        with patch("equipo_local.camara.time.monotonic", side_effect=lambda: next(reloj)):
+            self.assertTrue(monitor._descartar_frames_atrasados(captura, 0.4))
+
+        self.assertEqual(captura.en_cola, 0)
+
+    def test_sin_intervalo_no_descarta_nada(self):
+        monitor = self._monitor()
+        captura = _CapturaConCola(en_cola=5)
+        self.assertTrue(monitor._descartar_frames_atrasados(captura, 0))
+        self.assertEqual(captura.grabs, 0)
+
+    def test_si_se_corta_la_senal_avisa_para_reconectar(self):
+        monitor = self._monitor()
+        captura = _CapturaConCola(en_cola=2, cortar_al_vaciar=True)
+        self.assertFalse(monitor._descartar_frames_atrasados(captura, 5))
+
+    def test_al_detener_el_monitor_no_sigue_esperando(self):
+        monitor = self._monitor()
+        monitor._detener.set()
+        captura = _CapturaConCola(en_cola=5)
+        self.assertTrue(monitor._descartar_frames_atrasados(captura, 5))
+        self.assertEqual(captura.grabs, 0)
+
