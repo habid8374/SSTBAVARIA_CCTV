@@ -141,8 +141,8 @@ comprobar("Cam 8", "Claude lento (13 s): el evento igual queda con alerta y revi
           len(ev8) >= 1 and all(e.disparo_alerta for e in ev8)
           and any(e.tipos_ia.filter(pk=ids["tipos_ia"]["8"]).exists() for e in ev8),
           f"{len(ev8)} eventos")
-comprobar("Cam 8", "El equipo local no se queda esperando a Claude", timeouts_8 == 0,
-          f"{timeouts_8} reportes cortados por tiempo", obligatorio=False)
+comprobar("Cam 8", "El equipo local no se queda esperando a Claude (la IA termina en segundo plano)",
+          timeouts_8 == 0, f"{timeouts_8} reportes cortados por tiempo")
 
 # --- Cámara 9: retraso de la detección -----------------------------------------
 aparicion = carpeta / "aparecio.txt"

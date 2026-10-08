@@ -13,9 +13,11 @@ Brevo (ver notificaciones.py).
 import base64
 import json
 import logging
+import threading
 from datetime import timedelta
 
 from django.conf import settings
+from django.db import connection
 from django.utils import timezone
 
 from .costos_ia import cuota_por_camara_usd, gasto_del_periodo_usd, registrar_consumo
@@ -24,6 +26,11 @@ from .models import ConfiguracionIA, EventoDetectado, TipoEventoIA
 logger = logging.getLogger("camaras_ia.ia_deteccion")
 
 VENTANA_SIN_REPETIR_AVISO_IA = timedelta(minutes=10)
+
+# Lo máximo que la respuesta al equipo local espera a la IA. Si la IA tarda
+# más, la revisión sigue en segundo plano: el equipo local corta a los 10 s
+# (y mientras espera esa cámara no detecta), y gunicorn corta a los 30 s.
+ESPERA_MAXIMA_IA_SEGUNDOS = 6
 
 MODELOS_POR_DEFECTO = {
     ConfiguracionIA.Proveedor.CLAUDE: "claude-opus-5",
@@ -45,6 +52,38 @@ PROMPT_SISTEMA = (
 class ErrorClasificacionIA(Exception):
     """La clasificación no se pudo completar — falta configuración, la API
     respondió con error, o la respuesta no se pudo interpretar."""
+
+
+def clasificar_evento_sin_bloquear(evento, espera_segundos=ESPERA_MAXIMA_IA_SEGUNDOS):
+    """clasificar_evento() en un hilo aparte, esperando su resultado como
+    mucho `espera_segundos`: si la IA responde a tiempo, `evento` queda
+    actualizado (disparo_alerta incluido, que el equipo local usa para
+    grabar el clip); si no, la revisión termina en segundo plano y queda en
+    el evento igual (dashboard, aviso push).
+
+    Dentro de una transacción (las pruebas) corre directo: otro hilo usa
+    otra conexión y no vería el evento todavía sin confirmar."""
+    if connection.in_atomic_block:
+        clasificar_evento(evento)
+        return
+    hilo = threading.Thread(
+        target=_clasificar_en_hilo, args=(evento.pk,), name=f"ia-evento-{evento.pk}", daemon=True
+    )
+    hilo.start()
+    hilo.join(espera_segundos)
+    if hilo.is_alive():
+        logger.info("La IA sigue revisando el evento_id=%s en segundo plano.", evento.pk)
+        return
+    evento.refresh_from_db(fields=["disparo_alerta", "descripcion_ia", "ia_analizado_en", "ia_error"])
+
+
+def _clasificar_en_hilo(evento_id):
+    try:
+        clasificar_evento(EventoDetectado.objects.select_related("camara", "zona").get(pk=evento_id))
+    except Exception:
+        logger.exception("Falló la revisión con IA en segundo plano del evento_id=%s", evento_id)
+    finally:
+        connection.close()  # cada hilo abre su propia conexión: no dejarla colgada
 
 
 def clasificar_evento(evento):

@@ -33,7 +33,7 @@ from .costos_ia import (
     gasto_del_periodo_usd,
     reiniciar_periodo,
 )
-from .ia_deteccion import clasificar_evento
+from .ia_deteccion import clasificar_evento_sin_bloquear
 from .models import (
     Camara,
     ConfiguracionIA,
@@ -113,7 +113,7 @@ def recibir_evento_camara(request):
     if regla is not None:
         disparar_alerta(evento, regla)
 
-    clasificar_evento(evento)
+    clasificar_evento_sin_bloquear(evento)
 
     equipo.ultima_conexion = timezone.now()
     equipo.save(update_fields=["ultima_conexion"])
