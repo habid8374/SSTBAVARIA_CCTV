@@ -1,6 +1,7 @@
 import base64
 import datetime
 import io
+import time
 import urllib.error
 import zipfile
 from decimal import Decimal
@@ -11,7 +12,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -19,7 +20,7 @@ from core.models import Empresa, PerfilUsuario
 
 from . import views
 from .costos_ia import calcular_costo_usd, cuota_por_camara_usd, precio_modelo, reiniciar_periodo
-from .ia_deteccion import _parsear_json, clasificar_evento
+from .ia_deteccion import _parsear_json, clasificar_evento, clasificar_evento_sin_bloquear
 from .models import (
     Camara,
     ConfiguracionIA,
@@ -1945,3 +1946,45 @@ class CuotaIAPorCamaraTests(TestCase):
         fila = next(f for f in response.data["por_camara"] if f["nombre"] == "Cam 1")
         self.assertEqual((fila["gastado_usd"], fila["porcentaje"], fila["agotada"]), (1.5, 75.0, False))
         self.assertEqual(len(response.data["por_camara"]), 10)
+
+
+class ClasificarSinBloquearTests(TransactionTestCase):
+    """La respuesta al equipo local no puede quedar esperando a la IA: el
+    equipo corta a los 10 s y, mientras espera, esa cámara no detecta."""
+
+    def setUp(self):
+        empresa = Empresa.objects.create(nombre="Empresa IA")
+        camara = Camara.objects.create(empresa=empresa, nombre="Cam IA", ip="10.0.0.9")
+        self.evento = EventoDetectado.objects.create(camara=camara)
+
+    def _ia_que_tarda(self, segundos):
+        def clasificar(evento):
+            time.sleep(segundos)
+            EventoDetectado.objects.filter(pk=evento.pk).update(disparo_alerta=True, descripcion_ia="casco")
+
+        return clasificar
+
+    def test_si_la_ia_tarda_responde_igual_y_la_revision_termina_despues(self):
+        with patch("camaras_ia.ia_deteccion.clasificar_evento", side_effect=self._ia_que_tarda(1)):
+            inicio = time.monotonic()
+            clasificar_evento_sin_bloquear(self.evento, espera_segundos=0.1)
+            self.assertLess(time.monotonic() - inicio, 0.8)
+            self.assertFalse(self.evento.disparo_alerta)
+
+            limite = time.monotonic() + 5
+            while time.monotonic() < limite and not EventoDetectado.objects.get(pk=self.evento.pk).disparo_alerta:
+                time.sleep(0.05)
+        self.assertEqual(EventoDetectado.objects.get(pk=self.evento.pk).descripcion_ia, "casco")
+
+    def test_si_la_ia_responde_a_tiempo_la_respuesta_ya_trae_su_resultado(self):
+        with patch("camaras_ia.ia_deteccion.clasificar_evento", side_effect=self._ia_que_tarda(0)):
+            clasificar_evento_sin_bloquear(self.evento, espera_segundos=5)
+        self.assertTrue(self.evento.disparo_alerta)
+        self.assertEqual(self.evento.descripcion_ia, "casco")
+
+    def test_un_error_de_la_ia_en_segundo_plano_no_rompe_nada(self):
+        with patch("camaras_ia.ia_deteccion.clasificar_evento", side_effect=RuntimeError("API caída")):
+            with self.assertLogs("camaras_ia.ia_deteccion", level="ERROR"):
+                clasificar_evento_sin_bloquear(self.evento, espera_segundos=5)
+        self.assertFalse(self.evento.disparo_alerta)
+

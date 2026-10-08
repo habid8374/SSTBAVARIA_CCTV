@@ -1,0 +1,122 @@
+name: Prueba integral cámaras y alertas
+
+# Prueba de punta a punta en un Windows real, igual que en la planta:
+# backend (PostgreSQL) + instalador descargado con el botón del dashboard +
+# equipo_local.exe publicado (Tarea Programada como SYSTEM) + 10 cámaras
+# simuladas (stream MJPEG a 25 fps con personas reales) + Claude simulado.
+# Cada cámara es un escenario distinto — ver .github/prueba-integral/.
+# Corre sola después de cada compilación publicada en main, o a mano.
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Compilar equipo_local.exe"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  prueba:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      ESTADO: ${{ github.workspace }}\prueba-estado
+      DATABASE_URL: postgres://postgres:root@localhost:5432/guardia
+      PGUSER: postgres
+      PGPASSWORD: root
+      DEBUG: "True"
+      SECRET_KEY: prueba-integral
+      ALLOWED_HOSTS: 127.0.0.1,localhost
+      ANTHROPIC_BASE_URL: http://127.0.0.1:8999
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Dependencias del backend y del simulador
+        run: pip install -r requirements.txt opencv-python-headless==4.10.0.84
+
+      - name: PostgreSQL
+        run: |
+          $servicio = Get-CimInstance Win32_Service -Filter "Name LIKE 'postgresql%'"
+          Set-Service -Name $servicio.Name -StartupType Manual
+          Start-Service -Name $servicio.Name
+          & "$env:PGBIN\pg_isready.exe" -t 30
+          & "$env:PGBIN\createdb.exe" guardia
+
+      - name: Base de datos y datos de prueba
+        run: |
+          New-Item -ItemType Directory -Force "$env:ESTADO\imagenes" | Out-Null
+          foreach ($imagen in 'bus.jpg', 'zidane.jpg') {
+            Invoke-WebRequest "https://github.com/ultralytics/assets/releases/download/v0.0.0/$imagen" -OutFile "$env:ESTADO\imagenes\$imagen"
+          }
+          python manage.py migrate --noinput -v 0
+          python .github/prueba-integral/sembrar.py $env:ESTADO
+
+      - name: Correr la prueba
+        run: |
+          $ids = Get-Content "$env:ESTADO\ids.json" | ConvertFrom-Json
+          $python = (Get-Command python).Source
+          Start-Process $python -ArgumentList '.github\prueba-integral\claude_falso.py', $env:ESTADO, 8999 -RedirectStandardOutput "$env:ESTADO\claude.out" -RedirectStandardError "$env:ESTADO\claude.err" -NoNewWindow
+          Start-Process $python -ArgumentList '.github\prueba-integral\camaras_simuladas.py', "$env:ESTADO\imagenes", $env:ESTADO, 8554 -RedirectStandardOutput "$env:ESTADO\camaras.out" -RedirectStandardError "$env:ESTADO\camaras.err" -NoNewWindow
+          Start-Process $python -ArgumentList '.github\prueba-integral\backend.py', $env:ESTADO -RedirectStandardOutput "$env:ESTADO\backend.out" -RedirectStandardError "$env:ESTADO\backend.err" -NoNewWindow
+
+          $base = 'http://127.0.0.1:8000'
+          $token = $null
+          for ($i = 0; $i -lt 30 -and -not $token; $i++) {
+            try {
+              $token = (Invoke-RestMethod -Method Post "$base/api/auth/login/" -ContentType 'application/json' -Body '{"username":"admin","password":"clave-prueba-integral"}').token
+            } catch { Start-Sleep -Seconds 2 }
+          }
+          if (-not $token) { Get-Content "$env:ESTADO\backend.err" -Tail 40; Write-Error 'El backend no arrancó'; exit 1 }
+          $cabeceras = @{ Authorization = "Token $token" }
+
+          # Mismo archivo que baja el botón "Instalador Windows (.exe)"; descarga
+          # el programa real del release de GitHub.
+          New-Item -ItemType Directory -Force prueba-instalador | Out-Null
+          Invoke-WebRequest "$base/api/camaras-ia/dashboard/equipos-locales/$($ids.equipo)/instalador/" -Headers $cabeceras -OutFile prueba-instalador\instalar_guardia.bat
+          cmd /c "prueba-instalador\instalar_guardia.bat < NUL"
+          if ($LASTEXITCODE -ne 0) { Write-Error "El instalador terminó con código $LASTEXITCODE"; exit 1 }
+
+          # Visor web del equipo local: las 9 cámaras activas (la 6 está desactivada).
+          Start-Sleep -Seconds 60
+          $visor = 'http://127.0.0.1:8090'
+          $camaras = Invoke-RestMethod "$visor/api/camaras"
+          Write-Host "Cámaras en el visor: $($camaras.nombre -join ', ')"
+          if ($camaras.Count -ne 9) { Write-Error "El visor muestra $($camaras.Count) cámaras, se esperaban 9"; exit 1 }
+          $frame = Invoke-WebRequest "$visor/api/camaras/$($ids.camaras.'1')/frame.jpg" -UseBasicParsing
+          if ($frame.Headers['Content-Type'] -notlike 'image/jpeg*') { Write-Error 'El visor no entrega la imagen en vivo'; exit 1 }
+
+          # Zona nueva dibujada desde el visor del equipo local (cámara 3), que
+          # debe subir al dashboard y empezar a alertar.
+          $horaZonaLocal = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000
+          $zona = Invoke-RestMethod -Method Post "$visor/api/config/camaras/$($ids.camaras.'3')/zonas" -ContentType 'application/json' -Body (@{ nombre = 'Zona creada en el equipo local'; tipo = 'poligono'; poligono = @(@(0, 0), @(1280, 0), @(1280, 720), @(0, 720)) } | ConvertTo-Json -Depth 5)
+          Invoke-RestMethod -Method Post "$visor/api/config/zonas/$($zona.id)/reglas" -ContentType 'application/json' -Body (@{ nombre = 'Regla local'; hora_inicio = '00:00'; hora_fin = '23:59'; dias_semana = @(0, 1, 2, 3, 4, 5, 6); canal_notificacion = 'whatsapp'; destinatario = '+573000000000' } | ConvertTo-Json) | Out-Null
+          Invoke-RestMethod -Method Post "$visor/api/config/sincronizar" | Out-Null
+
+          # Cámara 9: aparece una persona de golpe (se mide cuánto tarda la alerta).
+          Start-Sleep -Seconds 30
+          New-Item -ItemType File "$env:ESTADO\aparecer.flag" | Out-Null
+
+          Write-Host 'Observando 5 minutos...'
+          Start-Sleep -Seconds 300
+
+          # En este mismo paso: al terminar el paso, GitHub cierra los procesos
+          # que se abrieron en él (backend incluido).
+          python .github/prueba-integral/verificar.py $env:ESTADO C:\GuardIA\equipo_local\equipo_local.log $horaZonaLocal
+          exit $LASTEXITCODE
+
+      - name: Registros
+        if: always()
+        run: |
+          Write-Host '=== equipo_local.log (últimas 150 líneas) ==='
+          if (Test-Path C:\GuardIA\equipo_local\equipo_local.log) { Get-Content C:\GuardIA\equipo_local\equipo_local.log -Tail 150 }
+          Write-Host '=== backend (últimas 60 líneas) ==='
+          if (Test-Path "$env:ESTADO\backend.err") { Get-Content "$env:ESTADO\backend.err" -Tail 60 }
+          Write-Host '=== llamadas a Claude ==='
+          if (Test-Path "$env:ESTADO\claude_llamadas.jsonl") { Get-Content "$env:ESTADO\claude_llamadas.jsonl" }
+          Stop-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras -ErrorAction SilentlyContinue
+          Unregister-ScheduledTask -TaskName GuardIA-EquipoLocalCamaras -Confirm:$false -ErrorAction SilentlyContinue
+          Get-Process -Name equipo_local -ErrorAction SilentlyContinue | Stop-Process -Force
