@@ -1,6 +1,9 @@
+import re
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -330,12 +333,26 @@ class ConfiguracionNotificacionesSerializer(serializers.ModelSerializer):
             "brevo_api_key_configurada",
             "brevo_remitente_email",
             "brevo_remitente_nombre",
+            "correos_alertas",
             "actualizada_en",
         ]
         read_only_fields = ["actualizada_en"]
 
     def get_brevo_api_key_configurada(self, obj):
         return bool(obj.brevo_api_key or settings.BREVO_API_KEY)
+
+    def validate_correos_alertas(self, valor):
+        invalidos = []
+        for correo in re.split(r"[\s,;]+", valor or ""):
+            if not correo:
+                continue
+            try:
+                validate_email(correo)
+            except DjangoValidationError:
+                invalidos.append(correo)
+        if invalidos:
+            raise serializers.ValidationError(f"Correos no válidos: {', '.join(invalidos)}.")
+        return valor
 
 
 class ConfiguracionIASerializer(serializers.ModelSerializer):

@@ -105,6 +105,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
   const [apiKey, setApiKey] = useState("");
   const [remitenteEmail, setRemitenteEmail] = useState("");
   const [remitenteNombre, setRemitenteNombre] = useState("");
+  const [correosAlertas, setCorreosAlertas] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -115,6 +116,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
         setConfig(data);
         setRemitenteEmail(data.brevo_remitente_email);
         setRemitenteNombre(data.brevo_remitente_nombre);
+        setCorreosAlertas(data.correos_alertas);
       })
       .catch(() => setError("No se pudo cargar la configuración de Brevo."));
   }
@@ -130,6 +132,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
       const cambios: Parameters<typeof actualizarConfiguracionNotificaciones>[1] = {
         brevo_remitente_email: remitenteEmail,
         brevo_remitente_nombre: remitenteNombre,
+        correos_alertas: correosAlertas,
       };
       if (apiKey.trim()) {
         cambios.brevo_api_key = apiKey.trim();
@@ -149,8 +152,8 @@ function ConfiguracionBrevo({ token }: { token: string }) {
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-corp-muted">
-          API key con la que se envían las alertas por correo (Brevo) — se guarda acá en vez de en Railway,
-          para que se pueda cambiar sin tocar el servidor.
+          Correo de las alertas de cámaras (Brevo): la API key se guarda acá, para que se pueda cambiar sin
+          tocar el servidor, y abajo los correos del cliente que reciben cada alerta.
         </p>
         {config && (
           <span
@@ -192,6 +195,20 @@ function ConfiguracionBrevo({ token }: { token: string }) {
             placeholder="GuardIA"
             className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
           />
+        </Campo>
+        <Campo label="Correos que reciben las alertas">
+          <textarea
+            value={correosAlertas}
+            onChange={(event) => setCorreosAlertas(event.target.value)}
+            rows={3}
+            placeholder={"jefe.sst@cliente.com\nseguridad@cliente.com"}
+            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          />
+          <p className="text-xs text-corp-muted">
+            Uno por línea o separados por coma. Reciben un correo con la foto por cada alerta de las cámaras
+            (persona en zona restringida dentro del horario y alertas de IA), sin importar el canal de la regla.
+            Si la persona sigue en la zona, la misma cámara no repite el correo por 10 minutos.
+          </p>
         </Campo>
 
         {error && (

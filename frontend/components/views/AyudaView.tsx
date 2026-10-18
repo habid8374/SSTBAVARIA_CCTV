@@ -856,6 +856,15 @@ const TEMAS: Tema[] = [
           sin necesidad de tocar nada en Railway. La API key nunca se vuelve a mostrar una vez guardada (por
           seguridad); el badge indica si hay una configurada o no.
         </P>
+        <P>
+          En <strong>&quot;Correos que reciben las alertas&quot;</strong> van los correos del cliente (uno por
+          línea o separados por coma): cada alerta de las cámaras les llega por correo con la foto del momento —
+          tanto la persona en zona restringida dentro del horario como las alertas de IA (ej. &quot;Sin
+          casco&quot;), sin importar si la regla está por WhatsApp o por correo. Si la persona se queda en la
+          zona, el equipo local la sigue reportando cada minuto: la misma cámara y zona no repite el correo por
+          10 minutos (el evento sí queda registrado cada vez en Alertas). Para que salgan los correos tienen
+          que estar la API key y un remitente verificado en Brevo.
+        </P>
         <Sub>Inteligencia Artificial</Sub>
         <P>
           Cada vez que el equipo local reporta una persona en una zona restringida (ver &quot;Alertas

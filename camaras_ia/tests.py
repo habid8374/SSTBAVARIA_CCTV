@@ -20,7 +20,7 @@ from core.models import Empresa, PerfilUsuario
 
 from . import views
 from .costos_ia import calcular_costo_usd, cuota_por_camara_usd, precio_modelo, reiniciar_periodo
-from .ia_deteccion import _parsear_json, clasificar_evento, clasificar_evento_sin_bloquear
+from .ia_deteccion import _notificar_alerta_ia, _parsear_json, clasificar_evento, clasificar_evento_sin_bloquear
 from .models import (
     Camara,
     ConfiguracionIA,
@@ -2030,4 +2030,137 @@ class ClasificarSinBloquearTests(TransactionTestCase):
             with self.assertLogs("camaras_ia.ia_deteccion", level="ERROR"):
                 clasificar_evento_sin_bloquear(self.evento, espera_segundos=5)
         self.assertFalse(self.evento.disparo_alerta)
+
+
+@patch("camaras_ia.services.enviar_correo_brevo")
+class CorreoAlertaClienteTests(TestCase):
+    """Cada alerta (de zona o de IA) le llega por correo al cliente: a los
+    correos de Sistema → Brevo, aparte del canal de la regla."""
+
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Patio", ip="10.10.0.53", canal=2)
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Muelle", poligono=CUADRADO)
+        self.regla = ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            canal_notificacion=ReglaAlerta.Canal.WHATSAPP,
+            destinatario="+573000000000",
+        )
+        config = ConfiguracionNotificaciones.obtener()
+        config.correos_alertas = "jefe@cliente.com, sst@cliente.com\nJEFE@cliente.com, no-es-correo"
+        config.save()
+
+    def _evento(self):
+        return EventoDetectado.objects.create(
+            camara=self.camara, zona=self.zona, punto_x=1, punto_y=1, disparo_alerta=True
+        )
+
+    def test_lista_de_correos_sin_repetidos_ni_invalidos(self, _enviar):
+        self.assertEqual(
+            ConfiguracionNotificaciones.obtener().lista_correos_alertas(), ["jefe@cliente.com", "sst@cliente.com"]
+        )
+
+    def test_alerta_de_zona_llega_a_cada_correo_del_cliente(self, enviar):
+        evento = self._evento()
+        disparar_alerta(evento, self.regla)
+        destinatarios = [llamada.args[0] for llamada in enviar.call_args_list]
+        self.assertEqual(destinatarios, ["jefe@cliente.com", "sst@cliente.com"])
+        asunto = enviar.call_args.args[1]
+        self.assertIn("Muelle", asunto)
+        self.assertIn("Patio · Lente 2", asunto)
+        evento.refresh_from_db()
+        self.assertTrue(evento.notificacion_enviada)
+        self.assertIn("jefe@cliente.com", evento.notificacion_detalle)
+        self.assertIsNotNone(evento.correo_alerta_enviado_en)
+
+    def test_no_repite_el_correo_de_la_misma_zona_en_10_minutos(self, enviar):
+        disparar_alerta(self._evento(), self.regla)
+        enviar.reset_mock()
+        disparar_alerta(self._evento(), self.regla)  # la persona sigue ahí un minuto después
+        enviar.assert_not_called()
+
+    def test_pasados_10_minutos_vuelve_a_avisar(self, enviar):
+        primero = self._evento()
+        disparar_alerta(primero, self.regla)
+        EventoDetectado.objects.filter(pk=primero.pk).update(
+            correo_alerta_enviado_en=timezone.now() - datetime.timedelta(minutes=11)
+        )
+        enviar.reset_mock()
+        disparar_alerta(self._evento(), self.regla)
+        self.assertEqual(enviar.call_count, 2)
+
+    def test_si_la_regla_ya_es_por_correo_no_le_llega_dos_veces(self, enviar):
+        self.regla.canal_notificacion = ReglaAlerta.Canal.CORREO
+        self.regla.destinatario = "jefe@cliente.com"
+        self.regla.save()
+        with patch("camaras_ia.services.enviar_correo_brevo") as correo_de_la_regla:
+            disparar_alerta(self._evento(), self.regla)
+        destinatarios = [llamada.args[0] for llamada in correo_de_la_regla.call_args_list]
+        self.assertEqual(destinatarios.count("jefe@cliente.com"), 1)
+        self.assertIn("sst@cliente.com", destinatarios)
+
+    def test_sin_correos_configurados_no_manda_nada(self, enviar):
+        config = ConfiguracionNotificaciones.obtener()
+        config.correos_alertas = ""
+        config.save()
+        disparar_alerta(self._evento(), self.regla)
+        enviar.assert_not_called()
+
+    def test_un_fallo_de_brevo_no_rompe_la_alerta(self, enviar):
+        from .notificaciones import ErrorEnvioCorreo
+
+        enviar.side_effect = ErrorEnvioCorreo("Falta configurar la API key de Brevo (Sistema → Brevo).")
+        evento = self._evento()
+        disparar_alerta(evento, self.regla)
+        evento.refresh_from_db()
+        self.assertIsNone(evento.correo_alerta_enviado_en)
+
+    def test_alerta_de_ia_tambien_llega_por_correo(self, enviar):
+        tipo = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Sin casco", descripcion="Trabajador sin casco", severidad="alta"
+        )
+        evento = self._evento()
+        evento.ia_analizado_en = timezone.now()
+        evento.descripcion_ia = "Un trabajador sin casco junto al muelle."
+        evento.save()
+        evento.tipos_ia.set([tipo])
+        with patch("core.push.enviar_push_a_personal_interno"):
+            _notificar_alerta_ia(evento, [tipo])
+        self.assertEqual(enviar.call_count, 2)
+        self.assertIn("Sin casco", enviar.call_args.args[1])
+        self.assertIn("sin casco junto al muelle", enviar.call_args.args[2])
+        evento.refresh_from_db()
+        self.assertIn("alerta IA", evento.notificacion_detalle)
+
+
+class CorreosAlertasConfiguracionTests(TestCase):
+    def setUp(self):
+        Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        token = self.client.post(
+            reverse("core:login"), {"username": "admin", "password": "clave12345"}, content_type="application/json"
+        ).data["token"]
+        self.auth = {"HTTP_AUTHORIZATION": f"Token {token}"}
+
+    def test_admin_guarda_los_correos_de_alertas(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_notificaciones"),
+            {"correos_alertas": "jefe@cliente.com, sst@cliente.com"},
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["correos_alertas"], "jefe@cliente.com, sst@cliente.com")
+
+    def test_rechaza_correos_invalidos(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_notificaciones"),
+            {"correos_alertas": "jefe@cliente.com, esto-no"},
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("esto-no", str(response.data["correos_alertas"]))
 

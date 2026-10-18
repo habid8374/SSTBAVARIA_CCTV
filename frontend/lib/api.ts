@@ -546,6 +546,7 @@ export type ConfiguracionNotificaciones = {
   brevo_api_key_configurada: boolean;
   brevo_remitente_email: string;
   brevo_remitente_nombre: string;
+  correos_alertas: string;
   actualizada_en: string;
 };
 
@@ -553,6 +554,7 @@ export type CambiosConfiguracionNotificaciones = {
   brevo_api_key?: string;
   brevo_remitente_email?: string;
   brevo_remitente_nombre?: string;
+  correos_alertas?: string;
 };
 
 export function obtenerConfiguracionNotificaciones(token: string): Promise<ConfiguracionNotificaciones> {

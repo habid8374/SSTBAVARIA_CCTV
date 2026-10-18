@@ -1,7 +1,9 @@
+import re
 import secrets
 from decimal import Decimal
 
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator, validate_email
 from django.db import models
 
 from core.models import Empresa
@@ -132,6 +134,15 @@ class ConfiguracionNotificaciones(models.Model):
     brevo_api_key = models.CharField("Brevo API key", max_length=255, blank=True)
     brevo_remitente_email = models.EmailField("correo remitente", blank=True)
     brevo_remitente_nombre = models.CharField("nombre remitente", max_length=150, blank=True)
+    correos_alertas = models.TextField(
+        "correos que reciben las alertas",
+        blank=True,
+        help_text=(
+            "Uno o varios correos (separados por coma o en líneas distintas) que reciben un correo, con la "
+            "foto, por cada alerta de las cámaras: persona en zona restringida dentro del horario y alertas "
+            "de IA. Aparte del canal de cada regla."
+        ),
+    )
     actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
 
     class Meta:
@@ -145,6 +156,20 @@ class ConfiguracionNotificaciones(models.Model):
     def obtener(cls):
         objeto, _ = cls.objects.get_or_create(pk=1)
         return objeto
+
+    def lista_correos_alertas(self):
+        """Los correos de correos_alertas, sin repetidos ni inválidos."""
+        correos = []
+        for correo in re.split(r"[\s,;]+", self.correos_alertas or ""):
+            correo = correo.strip()
+            if not correo or correo.lower() in (c.lower() for c in correos):
+                continue
+            try:
+                validate_email(correo)
+            except ValidationError:
+                continue
+            correos.append(correo)
+        return correos
 
 
 class ConfiguracionIA(models.Model):
@@ -428,6 +453,12 @@ class EventoDetectado(models.Model):
     )
     punto_y = models.FloatField("punto detectado (y)", null=True, blank=True)
     disparo_alerta = models.BooleanField(default=False)
+    correo_alerta_enviado_en = models.DateTimeField(
+        "correo de alerta enviado en",
+        null=True,
+        blank=True,
+        help_text="Cuándo se mandó el correo de esta alerta a los correos de Sistema → Brevo (vacío si no se mandó).",
+    )
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.NUEVO)
     canal_notificacion = models.CharField(
         "canal de notificación",

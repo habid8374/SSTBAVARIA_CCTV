@@ -6,12 +6,20 @@ dentro de una zona restringida y si hay una regla de horario vigente.
 """
 
 import logging
+from datetime import timedelta
+from html import escape
 
 from django.utils import timezone
 
-from .notificaciones import ErrorEnvioCorreo, enviar_correo_brevo
+from .notificaciones import ErrorEnvioCorreo, enviar_correo_brevo, plantilla_aviso_marca
 
 logger = logging.getLogger("camaras_ia.alertas")
+
+# Mientras la persona siga en la zona, el equipo local reporta cada minuto:
+# el correo de alerta de una misma cámara y zona sale como mucho una vez en
+# esta ventana (el evento queda igual en el dashboard cada vez).
+VENTANA_SIN_REPETIR_CORREO = timedelta(minutes=10)
+URL_DASHBOARD = "https://sst-cctv.com"
 
 
 def punto_en_poligono(punto, poligono):
@@ -127,6 +135,103 @@ def disparar_alerta(evento, regla):
         evento.notificacion_enviada = False
         evento.notificacion_detalle = "Canal WhatsApp — integración de envío pendiente."
         evento.save(update_fields=["canal_notificacion", "notificacion_enviada", "notificacion_detalle"])
+
+    _correo_alerta_de_zona(evento, regla)
+
+
+def _correo_alerta_de_zona(evento, regla):
+    """Correo a los correos de Sistema → Brevo por una alerta de zona — sin
+    repetir la misma cámara y zona dentro de VENTANA_SIN_REPETIR_CORREO."""
+    from .models import EventoDetectado
+
+    desde = timezone.now() - VENTANA_SIN_REPETIR_CORREO
+    ya_avisado = (
+        EventoDetectado.objects.filter(camara=evento.camara, zona=evento.zona, correo_alerta_enviado_en__gte=desde)
+        .exclude(pk=evento.pk)
+        .exists()
+    )
+    if ya_avisado:
+        return
+    zona_nombre = evento.zona.nombre if evento.zona else "zona restringida"
+    excluir = {regla.destinatario.strip().lower()} if regla.canal_notificacion == "correo" else set()
+    enviados = enviar_correo_alerta_al_cliente(
+        evento,
+        asunto=f"Alerta GuardIA — persona en {zona_nombre} ({evento.camara.nombre_para_mostrar})",
+        titulo=f"Persona en zona restringida: {zona_nombre}",
+        detalle_html=(
+            f"<p>Se detectó una persona en <strong>{escape(zona_nombre)}</strong> dentro del horario restringido.</p>"
+        ),
+        excluir=excluir,
+    )
+    if enviados:
+        _registrar_correo_enviado(evento, enviados)
+
+
+def enviar_correo_alerta_al_cliente(evento, *, asunto, titulo, detalle_html, excluir=()):
+    """Manda el correo de una alerta, con la foto del momento, a cada correo
+    de ConfiguracionNotificaciones.correos_alertas (menos los de `excluir`,
+    que ya lo recibieron por el canal de la regla). Devuelve a cuáles salió.
+    Nunca rompe el flujo del evento: un fallo de Brevo queda en el log."""
+    from .models import ConfiguracionNotificaciones
+
+    correos = [
+        correo for correo in ConfiguracionNotificaciones.obtener().lista_correos_alertas()
+        if correo.lower() not in excluir
+    ]
+    if not correos:
+        return []
+
+    adjunto_bytes = adjunto_nombre = None
+    if evento.snapshot:
+        try:
+            evento.snapshot.open("rb")
+            adjunto_bytes = evento.snapshot.read()
+            adjunto_nombre = evento.snapshot.name.rsplit("/", 1)[-1]
+        except Exception:
+            logger.exception("No se pudo leer la foto del evento_id=%s para el correo", evento.pk)
+        finally:
+            evento.snapshot.close()
+
+    momento = timezone.localtime(evento.timestamp)
+    camara = escape(evento.camara.nombre_para_mostrar)
+    ubicacion = f" — {escape(evento.camara.ubicacion)}" if evento.camara.ubicacion else ""
+    cuerpo_html = (
+        f'<div style="font-size:14px; line-height:1.6; color:#333333;">{detalle_html}'
+        f"<p><strong>Cámara:</strong> {camara}{ubicacion}<br>"
+        f"<strong>Fecha y hora:</strong> {momento:%d/%m/%Y %H:%M:%S}</p>"
+        f'<p>La foto del momento va adjunta. Detalle e historial en <a href="{URL_DASHBOARD}/dashboard?ir=alertas" '
+        f'style="color:#7a5e00;">GuardIA → Alertas</a>.</p></div>'
+    )
+    contenido_html = plantilla_aviso_marca(
+        preheader=asunto,
+        eyebrow="Alerta de cámaras",
+        titulo=escape(titulo),
+        cuerpo_html=cuerpo_html,
+        logo_url=f"{URL_DASHBOARD}/logo-guardia.png",
+        nota_html=(
+            "Recibes este correo porque está en los correos de alertas de GuardIA (Sistema → Brevo). "
+            "Si la persona sigue en la zona, no se repite el aviso de la misma cámara por 10 minutos."
+        ),
+    )
+    enviados = []
+    for correo in correos:
+        try:
+            enviar_correo_brevo(correo, asunto, contenido_html, adjunto_bytes, adjunto_nombre)
+        except ErrorEnvioCorreo as err:
+            logger.error("No se pudo enviar el correo de alerta a %s (evento_id=%s): %s", correo, evento.pk, err)
+        else:
+            enviados.append(correo)
+    return enviados
+
+
+def _registrar_correo_enviado(evento, enviados):
+    texto = f"Correo de alerta enviado a {', '.join(enviados)}"
+    if evento.notificacion_enviada and evento.notificacion_detalle:
+        texto = f"{evento.notificacion_detalle} · {texto}"
+    evento.notificacion_enviada = True
+    evento.notificacion_detalle = texto[:255]
+    evento.correo_alerta_enviado_en = timezone.now()
+    evento.save(update_fields=["notificacion_enviada", "notificacion_detalle", "correo_alerta_enviado_en"])
 
 
 def _enviar_push_alerta(evento):
