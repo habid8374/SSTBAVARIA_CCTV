@@ -280,6 +280,7 @@ export type CamaraDashboard = {
   puerto_onvif: number;
   usuario_onvif: string;
   password_onvif: string;
+  canal: number;
   rtsp_url: string;
   ubicacion: string;
   activa: boolean;
@@ -295,6 +296,7 @@ export type NuevaCamara = {
   puerto_onvif?: number;
   usuario_onvif?: string;
   password_onvif?: string;
+  canal?: number;
   rtsp_url?: string;
   ubicacion?: string;
   activa?: boolean;

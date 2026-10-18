@@ -160,7 +160,10 @@ function TarjetaCamara({
       <div className="flex items-center justify-between bg-corp-navy px-4 py-2.5 text-white">
         <div>
           <p className="text-sm font-semibold">{camara.nombre}</p>
-          <p className="text-xs text-white/60">{camara.ubicacion || "Sin ubicación registrada"}</p>
+          <p className="text-xs text-white/60">
+            {camara.ubicacion || "Sin ubicación registrada"}
+            {camara.canal > 1 && ` · Lente ${camara.canal}`}
+          </p>
         </div>
         <span className={`h-2.5 w-2.5 rounded-full ${camara.activa ? "bg-red-500" : "bg-white/30"}`} />
       </div>
@@ -273,6 +276,7 @@ function FormularioCamara({
   const [puertoOnvif, setPuertoOnvif] = useState(String(camara?.puerto_onvif ?? 80));
   const [usuarioOnvif, setUsuarioOnvif] = useState(camara?.usuario_onvif ?? "");
   const [passwordOnvif, setPasswordOnvif] = useState(camara?.password_onvif ?? "");
+  const [canal, setCanal] = useState(String(camara?.canal ?? 1));
   const [rtspUrl, setRtspUrl] = useState(camara?.rtsp_url ?? "");
   const [ubicacion, setUbicacion] = useState(camara?.ubicacion ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -288,6 +292,7 @@ function FormularioCamara({
       puerto_onvif: Number(puertoOnvif) || 80,
       usuario_onvif: usuarioOnvif,
       password_onvif: passwordOnvif,
+      canal: Number(canal) || 1,
       rtsp_url: rtspUrl,
       ubicacion,
     };
@@ -366,19 +371,38 @@ function FormularioCamara({
               />
             </Campo>
           </div>
-          <Campo label="Contraseña ONVIF">
-            <input
-              type="password"
-              value={passwordOnvif}
-              onChange={(e) => setPasswordOnvif(e.target.value)}
-              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
-            />
-          </Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Contraseña ONVIF">
+              <input
+                type="password"
+                value={passwordOnvif}
+                onChange={(e) => setPasswordOnvif(e.target.value)}
+                className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+              />
+            </Campo>
+            <Campo label="Canal / lente">
+              <select
+                value={canal}
+                onChange={(e) => setCanal(e.target.value)}
+                className="w-full rounded-lg border border-corp-border bg-white px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+              >
+                {Array.from(new Set([1, 2, 3, 4, Number(canal) || 1])).map((numero) => (
+                  <option key={numero} value={numero}>
+                    {numero === 1 ? "1 (lente 1 o cámara de un lente)" : `${numero} (lente ${numero})`}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          </div>
+          <p className="-mt-1 text-xs text-corp-muted">
+            Cámaras de dos lentes (ej. Picoo A2): regístrala dos veces con la misma IP, una con canal 1 y otra
+            con canal 2. Cada lente es una vista distinta para vigilar.
+          </p>
           <Campo label="URL RTSP (opcional)">
             <input
               value={rtspUrl}
               onChange={(e) => setRtspUrl(e.target.value)}
-              placeholder="Vacío = usa el patrón estándar de Dahua con la IP y credenciales de arriba"
+              placeholder="Vacío = patrón estándar de Dahua con la IP, credenciales y canal de arriba"
               className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
             />
           </Campo>

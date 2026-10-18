@@ -1,7 +1,7 @@
 import secrets
 from decimal import Decimal
 
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from core.models import Empresa
@@ -21,6 +21,16 @@ class Camara(models.Model):
     puerto_onvif = models.PositiveIntegerField("puerto ONVIF", default=80)
     usuario_onvif = models.CharField("usuario ONVIF", max_length=100, blank=True)
     password_onvif = models.CharField("contraseña ONVIF", max_length=100, blank=True)
+    canal = models.PositiveSmallIntegerField(
+        "canal / lente",
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(16)],
+        help_text=(
+            "Canal de video de la cámara: 1 para cámaras de un lente. Las de dos lentes "
+            "(ej. Dahua Picoo A2) se registran dos veces con la misma IP, una con canal 1 "
+            "y otra con canal 2 — cada lente es una vista distinta para vigilar."
+        ),
+    )
     rtsp_url = models.CharField(
         "URL RTSP",
         max_length=500,
@@ -100,7 +110,7 @@ class Camara(models.Model):
         if self.rtsp_url:
             return self.rtsp_url
         credenciales = f"{self.usuario_onvif}:{self.password_onvif}@" if self.usuario_onvif else ""
-        return f"rtsp://{credenciales}{self.ip}:554/cam/realmonitor?channel=1&subtype=1"
+        return f"rtsp://{credenciales}{self.ip}:554/cam/realmonitor?channel={self.canal}&subtype=1"
 
 
 class ConfiguracionNotificaciones(models.Model):

@@ -139,6 +139,11 @@ const TEMAS: Tema[] = [
           <li>Si la cámara no sigue el patrón estándar (no es Dahua, o el técnico dio otra URL), se puede
             escribir la <strong>URL RTSP</strong> completa a mano; si se deja vacío, el sistema arma la URL
             sola con la IP y las credenciales de arriba.</li>
+          <li><strong>Canal / lente</strong>: 1 para cámaras de un solo lente. Las cámaras de{" "}
+            <strong>dos lentes</strong> (ej. Picoo A2, que en la app del celular muestran dos vistas) se
+            registran <strong>dos veces con la misma IP</strong>: una con canal 1 y otra con canal 2. Cada
+            lente queda como una cámara aparte, con sus propias zonas y alertas. Ojo: cada lente suma carga
+            al PC del equipo local y, si tiene alertas de IA, su parte del tope de gasto.</li>
         </Ol>
         <Nota tipo="aviso">
           Con cámaras Dahua Picoo (A2/B1, las que usa este proyecto): antes de registrarla acá, entrar a la
