@@ -176,7 +176,7 @@ def _notificar_alerta_ia(evento, detectados):
     detalle = ", ".join(f"{tipo.nombre} ({tipo.get_severidad_display().lower()})" for tipo in nuevos)
     donde = f" en {evento.zona.nombre}" if evento.zona else ""
     enviar_push_a_personal_interno(
-        f"Alerta IA — {evento.camara.nombre}", f"{detalle}{donde}.", url="/dashboard?ir=alertas"
+        f"Alerta IA — {evento.camara.nombre_para_mostrar}", f"{detalle}{donde}.", url="/dashboard?ir=alertas"
     )
 
 

@@ -290,6 +290,26 @@ export type CamaraDashboard = {
   ultimo_evento: UltimoEvento | null;
 };
 
+/** Nombre para mostrar de cada cámara al elegirla (alertas de IA, filtros,
+ * tarjetas): si hay más de un registro con la misma IP — una cámara de dos
+ * lentes, un registro por canal — agrega "· Lente N" para que no se confunda
+ * en qué lente se configura cada alerta. No lo repite si el nombre ya lo dice. */
+export function etiquetasCamaras(
+  camaras: { id: number; nombre: string; ip: string; canal: number }[]
+): Map<number, string> {
+  const registrosPorIp = new Map<string, number>();
+  for (const camara of camaras) {
+    registrosPorIp.set(camara.ip, (registrosPorIp.get(camara.ip) ?? 0) + 1);
+  }
+  return new Map(
+    camaras.map((camara) => {
+      const variosLentes = (registrosPorIp.get(camara.ip) ?? 0) > 1 || camara.canal > 1;
+      const yaLoDice = /lente/i.test(camara.nombre);
+      return [camara.id, variosLentes && !yaLoDice ? `${camara.nombre} · Lente ${camara.canal}` : camara.nombre];
+    })
+  );
+}
+
 export type NuevaCamara = {
   nombre: string;
   ip: string;

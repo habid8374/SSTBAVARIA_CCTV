@@ -92,6 +92,9 @@ class CamaraActivaSerializer(serializers.ModelSerializer):
     disparan (ver services.punto_en_zona)."""
 
     zonas = serializers.SerializerMethodField()
+    # El visor del equipo local (donde se dibujan las zonas) muestra este
+    # nombre: con "· Lente N" no se confunden los dos lentes de una cámara.
+    nombre = serializers.CharField(source="nombre_para_mostrar", read_only=True)
     rtsp_url = serializers.CharField(source="rtsp_url_efectiva", read_only=True)
     px_por_metro = serializers.FloatField(read_only=True, allow_null=True)
 
@@ -139,7 +142,7 @@ class ReglaAlertaSerializer(serializers.ModelSerializer):
 
 
 class ZonaDashboardSerializer(serializers.ModelSerializer):
-    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True)
+    camara_nombre = serializers.CharField(source="camara.nombre_para_mostrar", read_only=True)
     reglas = ReglaAlertaSerializer(many=True, read_only=True)
 
     class Meta:
@@ -188,7 +191,7 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
     """Lectura para la bandeja de Alertas; solo `estado` es editable (marcar
     revisado) — el resto del evento lo escribe recibir_evento_camara."""
 
-    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True)
+    camara_nombre = serializers.CharField(source="camara.nombre_para_mostrar", read_only=True)
     zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
     tipos_ia = serializers.SerializerMethodField()
 
@@ -426,7 +429,7 @@ class InstruccionSeguridadSerializer(serializers.ModelSerializer):
     anotar la instrucción antes de saber a qué cámara aplica o si ya se
     convirtió en una zona real."""
 
-    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True, default=None)
+    camara_nombre = serializers.CharField(source="camara.nombre_para_mostrar", read_only=True, default=None)
     zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
 
     class Meta:

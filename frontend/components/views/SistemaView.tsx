@@ -16,6 +16,7 @@ import {
   URL_PAQUETE_EQUIPO_LOCAL,
   eliminarEquipoLocal,
   eliminarTipoEventoIA,
+  etiquetasCamaras,
   enviarAccesoVisitantes,
   listarCamarasDashboard,
   listarEquiposLocales,
@@ -666,7 +667,7 @@ function CatalogoEventosIA({ token }: { token: string }) {
     media: "bg-amber-100 text-amber-700",
     baja: "bg-zinc-100 text-zinc-600",
   };
-  const nombreCamara = new Map(camaras.map((camara) => [camara.id, camara.nombre]));
+  const nombreCamara = etiquetasCamaras(camaras);
   const visibles = tipos?.filter((tipo) => filtroCamara === null || tipo.camaras.includes(filtroCamara));
 
   return (
@@ -682,7 +683,7 @@ function CatalogoEventosIA({ token }: { token: string }) {
             <option value="">Todas las cámaras</option>
             {camaras.map((camara) => (
               <option key={camara.id} value={camara.id}>
-                {camara.nombre}
+                {nombreCamara.get(camara.id)}
               </option>
             ))}
           </select>
@@ -824,6 +825,7 @@ function FormularioTipoEvento({
       ? { nombre: tipo.nombre, descripcion: tipo.descripcion, severidad: tipo.severidad, camaras: tipo.camaras }
       : { nombre: "", descripcion: "", severidad: "media", camaras: camaraInicial === null ? [] : [camaraInicial] }
   );
+  const etiquetaCamara = etiquetasCamaras(camaras);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -891,7 +893,7 @@ function FormularioTipoEvento({
                       onChange={() => alternarCamara(camara.id)}
                       className="h-4 w-4 accent-corp-navy"
                     />
-                    {camara.nombre}
+                    {etiquetaCamara.get(camara.id)}
                   </label>
                 ))}
               </div>

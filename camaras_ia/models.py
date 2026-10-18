@@ -101,6 +101,15 @@ class Camara(models.Model):
         return distancia_px / self.calibracion_distancia_metros
 
     @property
+    def nombre_para_mostrar(self):
+        """Nombre en avisos, listas de eventos y consumo de IA: al segundo
+        lente (o más) de una cámara de dos lentes le agrega "· Lente N",
+        salvo que el nombre ya lo diga — así no se confunde con el lente 1."""
+        if self.canal > 1 and "lente" not in self.nombre.lower():
+            return f"{self.nombre} · Lente {self.canal}"
+        return self.nombre
+
+    @property
     def rtsp_url_efectiva(self):
         """URL RTSP a usar por el equipo local: la explícita si se configuró,
         o si no el patrón estándar de Dahua (confirmado por investigación de

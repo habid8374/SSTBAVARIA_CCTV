@@ -575,7 +575,7 @@ def _consumo_por_camara(config, consumos):
         filas.append(
             {
                 "camara": camara.pk,
-                "nombre": camara.nombre,
+                "nombre": camara.nombre_para_mostrar,
                 "gastado_usd": float(gastado),
                 "cuota_usd": float(cuota),
                 "porcentaje": float(gastado / cuota * 100) if cuota else 100.0,

@@ -65,6 +65,14 @@ class RtspUrlEfectivaTests(TestCase):
             camara.rtsp_url_efectiva, "rtsp://10.0.0.1:554/cam/realmonitor?channel=1&subtype=1"
         )
 
+    def test_nombre_para_mostrar_marca_el_segundo_lente(self):
+        lente_1 = Camara.objects.create(empresa=self.empresa, nombre="Patio", ip="10.10.0.53")
+        lente_2 = Camara.objects.create(empresa=self.empresa, nombre="Patio", ip="10.10.0.53", canal=2)
+        ya_nombrado = Camara.objects.create(empresa=self.empresa, nombre="Bodega · Lente 2", ip="10.10.0.51", canal=2)
+        self.assertEqual(lente_1.nombre_para_mostrar, "Patio")
+        self.assertEqual(lente_2.nombre_para_mostrar, "Patio · Lente 2")
+        self.assertEqual(ya_nombrado.nombre_para_mostrar, "Bodega · Lente 2")
+
     def test_camara_de_dos_lentes_cada_lente_con_su_canal(self):
         """Dahua Picoo A2: dos lentes en la misma IP — se registra dos veces,
         una por canal, y cada registro vigila su propia vista."""
@@ -466,6 +474,13 @@ class ObtenerReglasActivasViewTests(TestCase):
         self.assertEqual(len(camaras[0]["zonas"]), 1)
         self.assertEqual(len(camaras[0]["zonas"][0]["reglas"]), 1)
         self.assertEqual(camaras[0]["zonas"][0]["reglas"][0]["id"], self.regla.pk)
+
+    def test_el_visor_del_equipo_local_recibe_el_nombre_con_el_lente(self):
+        self.camara.canal = 2
+        self.camara.save(update_fields=["canal"])
+        response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
+        self.assertEqual(response.data["camaras"][0]["nombre"], f"{self.camara.nombre} · Lente 2")
+        self.assertIn("channel=2&", response.data["camaras"][0]["rtsp_url"])
 
     def test_incluye_rtsp_url_efectiva(self):
         response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
