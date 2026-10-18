@@ -6,12 +6,17 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, validate_email
 from django.db import models
 
+from core.archivos import ruta_no_adivinable
 from core.models import Empresa
 from core.validators import validar_tamano_archivo
 
 
 def generar_api_key():
     return secrets.token_hex(20)
+
+
+def snapshot_referencia_upload_to(instance, filename):
+    return ruta_no_adivinable("camaras/referencia", filename)
 
 
 class Camara(models.Model):
@@ -46,7 +51,7 @@ class Camara(models.Model):
     ubicacion = models.CharField(max_length=255, blank=True, help_text="Descripción del punto donde está instalada")
     snapshot_referencia = models.ImageField(
         "snapshot de referencia",
-        upload_to="camaras/referencia",
+        upload_to=snapshot_referencia_upload_to,
         null=True,
         blank=True,
         validators=[validar_tamano_archivo],
@@ -427,7 +432,7 @@ class InstruccionSeguridad(models.Model):
 
 
 def snapshot_upload_to(instance, filename):
-    return f"eventos/{instance.camara_id}/{filename}"
+    return ruta_no_adivinable(f"eventos/{instance.camara_id}", filename)
 
 
 class EventoDetectado(models.Model):

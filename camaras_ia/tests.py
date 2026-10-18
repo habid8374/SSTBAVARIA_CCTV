@@ -1136,12 +1136,18 @@ class DashboardEndpointsTests(TestCase):
 
     # --- Sección Sistema: equipos locales ---
 
-    def test_operador_puede_listar_equipos_locales(self):
+    def test_admin_lista_equipos_locales_con_su_api_key(self):
         EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
-        response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.operador))
+        response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.admin))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)  # el de setUp + el de este test
         self.assertIn("api_key", response.data[0])
+
+    def test_operador_no_ve_la_api_key_de_los_equipos_locales(self):
+        """La API key deja inyectar eventos y reescribir zonas de toda la
+        empresa: solo la ve el Administrador (Sistema, que el Operador no tiene)."""
+        response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
 
     def test_contratista_no_puede_listar_equipos_locales(self):
         """El api_key de EquipoLocal es la credencial con la que ese equipo
@@ -1234,10 +1240,17 @@ class DashboardEndpointsTests(TestCase):
         )
         self.assertEqual(response.status_code, 204)
 
-    def test_operador_puede_descargar_el_zip_de_equipo_local(self):
+    def test_operador_no_puede_descargar_el_zip_de_equipo_local(self):
         response = self.client.get(
             reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
             **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_descarga_el_zip_de_equipo_local(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.admin),
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/zip")
@@ -1315,7 +1328,7 @@ class DashboardEndpointsTests(TestCase):
         self.equipo.visor_usuario = "admin"
         self.equipo.visor_password = "cl@ve&rara%"
         self.equipo.save(update_fields=["visor_usuario", "visor_password"])
-        response = self._instalador(self.operador)
+        response = self._instalador(self.admin)
         self.assertEqual(response.status_code, 200)
         self.assertIn('filename="instalar_guardia.bat"', response["Content-Disposition"])
         bat = response.content.decode("ascii")
@@ -2163,4 +2176,99 @@ class CorreosAlertasConfiguracionTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("esto-no", str(response.data["correos_alertas"]))
+
+
+class SeguridadModuloCamarasTests(TestCase):
+    """Lo que un contratista (empresa externa del portal) u otro rol no debe
+    poder leer ni tocar del módulo de cámaras."""
+
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
+        self.camara = Camara.objects.create(
+            empresa=self.empresa, nombre="Patio", ip="10.10.0.53", usuario_onvif="admin", password_onvif="CLAVE-SECRETA"
+        )
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Muelle", poligono=CUADRADO)
+        EventoDetectado.objects.create(camara=self.camara, zona=self.zona)
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.contratista = Usuario.objects.create_user("contratista1", "c@x.com", "clave12345")
+        self.contratista.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        self.contratista.perfil.save(update_fields=["rol"])
+
+    def _auth(self, user):
+        token = self.client.post(
+            reverse("core:login"), {"username": user.username, "password": "clave12345"}, content_type="application/json"
+        ).data["token"]
+        return {"HTTP_AUTHORIZATION": f"Token {token}"}
+
+    def test_el_contratista_no_lee_nada_del_modulo_de_camaras(self):
+        auth = self._auth(self.contratista)
+        rutas = [
+            "camaras_ia:indicadores_dashboard",
+            "camaras_ia:eventos_por_zona",
+            "camaras_ia:eventos_lista",
+            "camaras_ia:camaras_lista",
+            "camaras_ia:zonas_lista",
+            "camaras_ia:reglas_lista",
+            "camaras_ia:configuracion_notificaciones",
+            "camaras_ia:configuracion_ia",
+            "camaras_ia:consumo_ia",
+            "camaras_ia:tipos_evento_ia_lista",
+            "camaras_ia:instrucciones_seguridad_lista",
+            "camaras_ia:equipos_locales_lista",
+        ]
+        for ruta in rutas:
+            with self.subTest(ruta=ruta):
+                response = self.client.get(reverse(ruta), **auth)
+                self.assertEqual(response.status_code, 403)
+                self.assertNotIn(b"CLAVE-SECRETA", response.content)
+        response = self.client.get(reverse("camaras_ia:camaras_detalle", args=[self.camara.pk]), **auth)
+        self.assertEqual(response.status_code, 403)
+
+    def test_la_clave_de_la_camara_nunca_vuelve_al_navegador(self):
+        for usuario in (self.operador, self.admin):
+            with self.subTest(usuario=usuario.username):
+                auth = self._auth(usuario)
+                lista = self.client.get(reverse("camaras_ia:camaras_lista"), **auth)
+                detalle = self.client.get(reverse("camaras_ia:camaras_detalle", args=[self.camara.pk]), **auth)
+                self.assertEqual(lista.status_code, 200)
+                self.assertNotIn(b"CLAVE-SECRETA", lista.content)
+                self.assertNotIn(b"CLAVE-SECRETA", detalle.content)
+                self.assertTrue(lista.data[0]["password_onvif_configurada"])
+
+    def test_editar_sin_mandar_la_clave_la_conserva(self):
+        response = self.client.patch(
+            reverse("camaras_ia:camaras_detalle", args=[self.camara.pk]),
+            {"nombre": "Patio norte"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.camara.refresh_from_db()
+        self.assertEqual(self.camara.password_onvif, "CLAVE-SECRETA")
+        self.assertEqual(self.camara.nombre, "Patio norte")
+
+    def test_agregar_lente_2_copia_la_clave_en_el_servidor(self):
+        response = self.client.post(
+            reverse("camaras_ia:camaras_agregar_lente_2", args=[self.camara.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertNotIn(b"CLAVE-SECRETA", response.content)
+        lente_2 = Camara.objects.get(ip="10.10.0.53", canal=2)
+        self.assertEqual(lente_2.nombre, "Patio · Lente 2")
+        self.assertEqual(lente_2.password_onvif, "CLAVE-SECRETA")
+        self.camara.refresh_from_db()
+        self.assertEqual(self.camara.nombre, "Patio · Lente 1")
+
+        otra_vez = self.client.post(
+            reverse("camaras_ia:camaras_agregar_lente_2", args=[self.camara.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(otra_vez.status_code, 400)
+
+    def test_solo_el_admin_agrega_lentes(self):
+        response = self.client.post(
+            reverse("camaras_ia:camaras_agregar_lente_2", args=[self.camara.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Camara.objects.filter(canal=2).exists())
 

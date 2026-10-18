@@ -256,6 +256,11 @@ class UltimoEventoSerializer(serializers.ModelSerializer):
 
 
 class CamaraDashboardSerializer(serializers.ModelSerializer):
+    # La contraseña de la cámara solo se escribe, nunca vuelve al navegador
+    # (cualquiera del personal interno puede listar cámaras); el formulario
+    # usa password_onvif_configurada para mostrar si hay una guardada.
+    password_onvif = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
+    password_onvif_configurada = serializers.SerializerMethodField()
     zonas = ZonaDashboardSerializer(many=True, read_only=True)
     ultimo_evento = serializers.SerializerMethodField()
     px_por_metro = serializers.FloatField(read_only=True, allow_null=True)
@@ -269,6 +274,7 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
             "puerto_onvif",
             "usuario_onvif",
             "password_onvif",
+            "password_onvif_configurada",
             "canal",
             "rtsp_url",
             "ubicacion",
@@ -278,6 +284,9 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
             "zonas",
             "ultimo_evento",
         ]
+
+    def get_password_onvif_configurada(self, camara):
+        return bool(camara.password_onvif)
 
     def get_ultimo_evento(self, camara):
         evento = camara.eventos.order_by("-timestamp").first()
@@ -290,6 +299,8 @@ class CamaraCrearSerializer(serializers.ModelSerializer):
     """Alta de una cámara desde el dashboard. La empresa se asigna sola —
     este panel todavía no tiene gestión de empresas propia; si hace falta
     una distinta, se ajusta desde el admin de Django (app core)."""
+
+    password_onvif = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
 
     class Meta:
         model = Camara

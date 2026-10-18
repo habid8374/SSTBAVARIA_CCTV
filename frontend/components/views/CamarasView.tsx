@@ -9,6 +9,7 @@ import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
   actualizarCamara,
+  agregarLente2 as agregarLente2Api,
   crearCamara,
   eliminarCamara,
   etiquetasCamaras,
@@ -75,18 +76,7 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
     });
     if (!ok) return;
     try {
-      await crearCamara(token, {
-        nombre: `${base} · Lente 2`,
-        ip: camara.ip,
-        puerto_onvif: camara.puerto_onvif,
-        usuario_onvif: camara.usuario_onvif,
-        password_onvif: camara.password_onvif,
-        canal: 2,
-        ubicacion: camara.ubicacion,
-      });
-      if (renombrar) {
-        await actualizarCamara(token, camara.id, { nombre: `${base} · Lente 1` });
-      }
+      await agregarLente2Api(token, camara.id);
       cargar();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo agregar el lente 2.");
@@ -328,7 +318,8 @@ function FormularioCamara({
   const [ip, setIp] = useState(camara?.ip ?? "");
   const [puertoOnvif, setPuertoOnvif] = useState(String(camara?.puerto_onvif ?? 80));
   const [usuarioOnvif, setUsuarioOnvif] = useState(camara?.usuario_onvif ?? "");
-  const [passwordOnvif, setPasswordOnvif] = useState(camara?.password_onvif ?? "");
+  // La contraseña guardada nunca llega al navegador: vacío = no cambiarla.
+  const [passwordOnvif, setPasswordOnvif] = useState("");
   const [canal, setCanal] = useState(String(camara?.canal ?? 1));
   const [rtspUrl, setRtspUrl] = useState(camara?.rtsp_url ?? "");
   const [ubicacion, setUbicacion] = useState(camara?.ubicacion ?? "");
@@ -344,7 +335,7 @@ function FormularioCamara({
       ip,
       puerto_onvif: Number(puertoOnvif) || 80,
       usuario_onvif: usuarioOnvif,
-      password_onvif: passwordOnvif,
+      ...(passwordOnvif || !camara ? { password_onvif: passwordOnvif } : {}),
       canal: Number(canal) || 1,
       rtsp_url: rtspUrl,
       ubicacion,
@@ -430,6 +421,8 @@ function FormularioCamara({
                 type="password"
                 value={passwordOnvif}
                 onChange={(e) => setPasswordOnvif(e.target.value)}
+                placeholder={camara?.password_onvif_configurada ? "•••••••• (sin cambios)" : ""}
+                autoComplete="new-password"
                 className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
               />
             </Campo>

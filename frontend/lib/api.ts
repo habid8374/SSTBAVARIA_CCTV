@@ -279,7 +279,7 @@ export type CamaraDashboard = {
   ip: string;
   puerto_onvif: number;
   usuario_onvif: string;
-  password_onvif: string;
+  password_onvif_configurada: boolean;
   canal: number;
   rtsp_url: string;
   ubicacion: string;
@@ -373,6 +373,13 @@ export function crearCamara(token: string, datos: NuevaCamara): Promise<CamaraDa
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(datos),
+  });
+}
+
+export function agregarLente2(token: string, camaraId: number): Promise<CamaraDashboard> {
+  return request<CamaraDashboard>(`/api/camaras-ia/dashboard/camaras/${camaraId}/agregar-lente-2/`, {
+    method: "POST",
+    headers: authHeaders(token),
   });
 }
 
