@@ -65,6 +65,14 @@ class RtspUrlEfectivaTests(TestCase):
             camara.rtsp_url_efectiva, "rtsp://10.0.0.1:554/cam/realmonitor?channel=1&subtype=1"
         )
 
+    def test_camara_de_dos_lentes_cada_lente_con_su_canal(self):
+        """Dahua Picoo A2: dos lentes en la misma IP — se registra dos veces,
+        una por canal, y cada registro vigila su propia vista."""
+        lente_1 = Camara.objects.create(empresa=self.empresa, nombre="Bodega vista 1", ip="10.10.0.51")
+        lente_2 = Camara.objects.create(empresa=self.empresa, nombre="Bodega vista 2", ip="10.10.0.51", canal=2)
+        self.assertIn("channel=1&", lente_1.rtsp_url_efectiva)
+        self.assertEqual(lente_2.rtsp_url_efectiva, "rtsp://10.10.0.51:554/cam/realmonitor?channel=2&subtype=1")
+
 
 class PuntoEnPoligonoTests(TestCase):
     def test_punto_dentro(self):
@@ -1004,6 +1012,26 @@ class DashboardEndpointsTests(TestCase):
         camara = Camara.objects.get(nombre="Cam nueva")
         self.assertIsNotNone(camara.empresa)
         self.assertEqual(camara.ip, "10.0.0.9")
+
+    def test_admin_registra_el_segundo_lente_de_una_camara(self):
+        response = self.client.post(
+            reverse("camaras_ia:camaras_lista"),
+            {"nombre": "Bodega vista 2", "ip": "10.10.0.51", "canal": 2},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Camara.objects.get(nombre="Bodega vista 2").canal, 2)
+
+    def test_canal_fuera_de_rango_se_rechaza(self):
+        response = self.client.post(
+            reverse("camaras_ia:camaras_lista"),
+            {"nombre": "Cam canal 0", "ip": "10.10.0.51", "canal": 0},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("canal", response.data)
 
     def test_admin_edita_camara(self):
         url = reverse("camaras_ia:camaras_detalle", args=[self.camara.pk])
