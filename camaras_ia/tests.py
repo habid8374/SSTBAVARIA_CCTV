@@ -20,7 +20,7 @@ from core.models import Empresa, PerfilUsuario
 
 from . import views
 from .costos_ia import calcular_costo_usd, cuota_por_camara_usd, precio_modelo, reiniciar_periodo
-from .ia_deteccion import _parsear_json, clasificar_evento, clasificar_evento_sin_bloquear
+from .ia_deteccion import _notificar_alerta_ia, _parsear_json, clasificar_evento, clasificar_evento_sin_bloquear
 from .models import (
     Camara,
     ConfiguracionIA,
@@ -64,6 +64,14 @@ class RtspUrlEfectivaTests(TestCase):
         self.assertEqual(
             camara.rtsp_url_efectiva, "rtsp://10.0.0.1:554/cam/realmonitor?channel=1&subtype=1"
         )
+
+    def test_nombre_para_mostrar_marca_el_segundo_lente(self):
+        lente_1 = Camara.objects.create(empresa=self.empresa, nombre="Patio", ip="10.10.0.53")
+        lente_2 = Camara.objects.create(empresa=self.empresa, nombre="Patio", ip="10.10.0.53", canal=2)
+        ya_nombrado = Camara.objects.create(empresa=self.empresa, nombre="Bodega · Lente 2", ip="10.10.0.51", canal=2)
+        self.assertEqual(lente_1.nombre_para_mostrar, "Patio")
+        self.assertEqual(lente_2.nombre_para_mostrar, "Patio · Lente 2")
+        self.assertEqual(ya_nombrado.nombre_para_mostrar, "Bodega · Lente 2")
 
     def test_camara_de_dos_lentes_cada_lente_con_su_canal(self):
         """Dahua Picoo A2: dos lentes en la misma IP — se registra dos veces,
@@ -466,6 +474,13 @@ class ObtenerReglasActivasViewTests(TestCase):
         self.assertEqual(len(camaras[0]["zonas"]), 1)
         self.assertEqual(len(camaras[0]["zonas"][0]["reglas"]), 1)
         self.assertEqual(camaras[0]["zonas"][0]["reglas"][0]["id"], self.regla.pk)
+
+    def test_el_visor_del_equipo_local_recibe_el_nombre_con_el_lente(self):
+        self.camara.canal = 2
+        self.camara.save(update_fields=["canal"])
+        response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
+        self.assertEqual(response.data["camaras"][0]["nombre"], f"{self.camara.nombre} · Lente 2")
+        self.assertIn("channel=2&", response.data["camaras"][0]["rtsp_url"])
 
     def test_incluye_rtsp_url_efectiva(self):
         response = self.client.get(self.url, HTTP_X_API_KEY=self.equipo.api_key)
@@ -1121,12 +1136,18 @@ class DashboardEndpointsTests(TestCase):
 
     # --- Sección Sistema: equipos locales ---
 
-    def test_operador_puede_listar_equipos_locales(self):
+    def test_admin_lista_equipos_locales_con_su_api_key(self):
         EquipoLocal.objects.create(empresa=self.empresa, nombre="Equipo Bodega")
-        response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.operador))
+        response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.admin))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)  # el de setUp + el de este test
         self.assertIn("api_key", response.data[0])
+
+    def test_operador_no_ve_la_api_key_de_los_equipos_locales(self):
+        """La API key deja inyectar eventos y reescribir zonas de toda la
+        empresa: solo la ve el Administrador (Sistema, que el Operador no tiene)."""
+        response = self.client.get(reverse("camaras_ia:equipos_locales_lista"), **self._auth(self.operador))
+        self.assertEqual(response.status_code, 403)
 
     def test_contratista_no_puede_listar_equipos_locales(self):
         """El api_key de EquipoLocal es la credencial con la que ese equipo
@@ -1219,10 +1240,17 @@ class DashboardEndpointsTests(TestCase):
         )
         self.assertEqual(response.status_code, 204)
 
-    def test_operador_puede_descargar_el_zip_de_equipo_local(self):
+    def test_operador_no_puede_descargar_el_zip_de_equipo_local(self):
         response = self.client.get(
             reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
             **self._auth(self.operador),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_descarga_el_zip_de_equipo_local(self):
+        response = self.client.get(
+            reverse("camaras_ia:equipos_locales_descargar_zip") + f"?equipo_id={self.equipo.pk}",
+            **self._auth(self.admin),
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/zip")
@@ -1300,7 +1328,7 @@ class DashboardEndpointsTests(TestCase):
         self.equipo.visor_usuario = "admin"
         self.equipo.visor_password = "cl@ve&rara%"
         self.equipo.save(update_fields=["visor_usuario", "visor_password"])
-        response = self._instalador(self.operador)
+        response = self._instalador(self.admin)
         self.assertEqual(response.status_code, 200)
         self.assertIn('filename="instalar_guardia.bat"', response["Content-Disposition"])
         bat = response.content.decode("ascii")
@@ -2015,4 +2043,232 @@ class ClasificarSinBloquearTests(TransactionTestCase):
             with self.assertLogs("camaras_ia.ia_deteccion", level="ERROR"):
                 clasificar_evento_sin_bloquear(self.evento, espera_segundos=5)
         self.assertFalse(self.evento.disparo_alerta)
+
+
+@patch("camaras_ia.services.enviar_correo_brevo")
+class CorreoAlertaClienteTests(TestCase):
+    """Cada alerta (de zona o de IA) le llega por correo al cliente: a los
+    correos de Sistema → Brevo, aparte del canal de la regla."""
+
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Patio", ip="10.10.0.53", canal=2)
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Muelle", poligono=CUADRADO)
+        self.regla = ReglaAlerta.objects.create(
+            zona=self.zona,
+            hora_inicio=datetime.time(0, 0),
+            hora_fin=datetime.time(23, 59, 59),
+            dias_semana=[0, 1, 2, 3, 4, 5, 6],
+            canal_notificacion=ReglaAlerta.Canal.WHATSAPP,
+            destinatario="+573000000000",
+        )
+        config = ConfiguracionNotificaciones.obtener()
+        config.correos_alertas = "jefe@cliente.com, sst@cliente.com\nJEFE@cliente.com, no-es-correo"
+        config.save()
+
+    def _evento(self):
+        return EventoDetectado.objects.create(
+            camara=self.camara, zona=self.zona, punto_x=1, punto_y=1, disparo_alerta=True
+        )
+
+    def test_lista_de_correos_sin_repetidos_ni_invalidos(self, _enviar):
+        self.assertEqual(
+            ConfiguracionNotificaciones.obtener().lista_correos_alertas(), ["jefe@cliente.com", "sst@cliente.com"]
+        )
+
+    def test_alerta_de_zona_llega_a_cada_correo_del_cliente(self, enviar):
+        evento = self._evento()
+        disparar_alerta(evento, self.regla)
+        destinatarios = [llamada.args[0] for llamada in enviar.call_args_list]
+        self.assertEqual(destinatarios, ["jefe@cliente.com", "sst@cliente.com"])
+        asunto = enviar.call_args.args[1]
+        self.assertIn("Muelle", asunto)
+        self.assertIn("Patio · Lente 2", asunto)
+        evento.refresh_from_db()
+        self.assertTrue(evento.notificacion_enviada)
+        self.assertIn("jefe@cliente.com", evento.notificacion_detalle)
+        self.assertIsNotNone(evento.correo_alerta_enviado_en)
+
+    def test_no_repite_el_correo_de_la_misma_zona_en_10_minutos(self, enviar):
+        disparar_alerta(self._evento(), self.regla)
+        enviar.reset_mock()
+        disparar_alerta(self._evento(), self.regla)  # la persona sigue ahí un minuto después
+        enviar.assert_not_called()
+
+    def test_pasados_10_minutos_vuelve_a_avisar(self, enviar):
+        primero = self._evento()
+        disparar_alerta(primero, self.regla)
+        EventoDetectado.objects.filter(pk=primero.pk).update(
+            correo_alerta_enviado_en=timezone.now() - datetime.timedelta(minutes=11)
+        )
+        enviar.reset_mock()
+        disparar_alerta(self._evento(), self.regla)
+        self.assertEqual(enviar.call_count, 2)
+
+    def test_si_la_regla_ya_es_por_correo_no_le_llega_dos_veces(self, enviar):
+        self.regla.canal_notificacion = ReglaAlerta.Canal.CORREO
+        self.regla.destinatario = "jefe@cliente.com"
+        self.regla.save()
+        with patch("camaras_ia.services.enviar_correo_brevo") as correo_de_la_regla:
+            disparar_alerta(self._evento(), self.regla)
+        destinatarios = [llamada.args[0] for llamada in correo_de_la_regla.call_args_list]
+        self.assertEqual(destinatarios.count("jefe@cliente.com"), 1)
+        self.assertIn("sst@cliente.com", destinatarios)
+
+    def test_sin_correos_configurados_no_manda_nada(self, enviar):
+        config = ConfiguracionNotificaciones.obtener()
+        config.correos_alertas = ""
+        config.save()
+        disparar_alerta(self._evento(), self.regla)
+        enviar.assert_not_called()
+
+    def test_un_fallo_de_brevo_no_rompe_la_alerta(self, enviar):
+        from .notificaciones import ErrorEnvioCorreo
+
+        enviar.side_effect = ErrorEnvioCorreo("Falta configurar la API key de Brevo (Sistema → Brevo).")
+        evento = self._evento()
+        disparar_alerta(evento, self.regla)
+        evento.refresh_from_db()
+        self.assertIsNone(evento.correo_alerta_enviado_en)
+
+    def test_alerta_de_ia_tambien_llega_por_correo(self, enviar):
+        tipo = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Sin casco", descripcion="Trabajador sin casco", severidad="alta"
+        )
+        evento = self._evento()
+        evento.ia_analizado_en = timezone.now()
+        evento.descripcion_ia = "Un trabajador sin casco junto al muelle."
+        evento.save()
+        evento.tipos_ia.set([tipo])
+        with patch("core.push.enviar_push_a_personal_interno"):
+            _notificar_alerta_ia(evento, [tipo])
+        self.assertEqual(enviar.call_count, 2)
+        self.assertIn("Sin casco", enviar.call_args.args[1])
+        self.assertIn("sin casco junto al muelle", enviar.call_args.args[2])
+        evento.refresh_from_db()
+        self.assertIn("alerta IA", evento.notificacion_detalle)
+
+
+class CorreosAlertasConfiguracionTests(TestCase):
+    def setUp(self):
+        Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        token = self.client.post(
+            reverse("core:login"), {"username": "admin", "password": "clave12345"}, content_type="application/json"
+        ).data["token"]
+        self.auth = {"HTTP_AUTHORIZATION": f"Token {token}"}
+
+    def test_admin_guarda_los_correos_de_alertas(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_notificaciones"),
+            {"correos_alertas": "jefe@cliente.com, sst@cliente.com"},
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["correos_alertas"], "jefe@cliente.com, sst@cliente.com")
+
+    def test_rechaza_correos_invalidos(self):
+        response = self.client.patch(
+            reverse("camaras_ia:configuracion_notificaciones"),
+            {"correos_alertas": "jefe@cliente.com, esto-no"},
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("esto-no", str(response.data["correos_alertas"]))
+
+
+class SeguridadModuloCamarasTests(TestCase):
+    """Lo que un contratista (empresa externa del portal) u otro rol no debe
+    poder leer ni tocar del módulo de cámaras."""
+
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Cliente Planta")
+        self.camara = Camara.objects.create(
+            empresa=self.empresa, nombre="Patio", ip="10.10.0.53", usuario_onvif="admin", password_onvif="CLAVE-SECRETA"
+        )
+        self.zona = ZonaRestringida.objects.create(camara=self.camara, nombre="Muelle", poligono=CUADRADO)
+        EventoDetectado.objects.create(camara=self.camara, zona=self.zona)
+        self.admin = Usuario.objects.create_superuser("admin", "admin@x.com", "clave12345")
+        self.operador = Usuario.objects.create_user("operador1", "op@x.com", "clave12345")
+        self.contratista = Usuario.objects.create_user("contratista1", "c@x.com", "clave12345")
+        self.contratista.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        self.contratista.perfil.save(update_fields=["rol"])
+
+    def _auth(self, user):
+        token = self.client.post(
+            reverse("core:login"), {"username": user.username, "password": "clave12345"}, content_type="application/json"
+        ).data["token"]
+        return {"HTTP_AUTHORIZATION": f"Token {token}"}
+
+    def test_el_contratista_no_lee_nada_del_modulo_de_camaras(self):
+        auth = self._auth(self.contratista)
+        rutas = [
+            "camaras_ia:indicadores_dashboard",
+            "camaras_ia:eventos_por_zona",
+            "camaras_ia:eventos_lista",
+            "camaras_ia:camaras_lista",
+            "camaras_ia:zonas_lista",
+            "camaras_ia:reglas_lista",
+            "camaras_ia:configuracion_notificaciones",
+            "camaras_ia:configuracion_ia",
+            "camaras_ia:consumo_ia",
+            "camaras_ia:tipos_evento_ia_lista",
+            "camaras_ia:instrucciones_seguridad_lista",
+            "camaras_ia:equipos_locales_lista",
+        ]
+        for ruta in rutas:
+            with self.subTest(ruta=ruta):
+                response = self.client.get(reverse(ruta), **auth)
+                self.assertEqual(response.status_code, 403)
+                self.assertNotIn(b"CLAVE-SECRETA", response.content)
+        response = self.client.get(reverse("camaras_ia:camaras_detalle", args=[self.camara.pk]), **auth)
+        self.assertEqual(response.status_code, 403)
+
+    def test_la_clave_de_la_camara_nunca_vuelve_al_navegador(self):
+        for usuario in (self.operador, self.admin):
+            with self.subTest(usuario=usuario.username):
+                auth = self._auth(usuario)
+                lista = self.client.get(reverse("camaras_ia:camaras_lista"), **auth)
+                detalle = self.client.get(reverse("camaras_ia:camaras_detalle", args=[self.camara.pk]), **auth)
+                self.assertEqual(lista.status_code, 200)
+                self.assertNotIn(b"CLAVE-SECRETA", lista.content)
+                self.assertNotIn(b"CLAVE-SECRETA", detalle.content)
+                self.assertTrue(lista.data[0]["password_onvif_configurada"])
+
+    def test_editar_sin_mandar_la_clave_la_conserva(self):
+        response = self.client.patch(
+            reverse("camaras_ia:camaras_detalle", args=[self.camara.pk]),
+            {"nombre": "Patio norte"},
+            content_type="application/json",
+            **self._auth(self.admin),
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.camara.refresh_from_db()
+        self.assertEqual(self.camara.password_onvif, "CLAVE-SECRETA")
+        self.assertEqual(self.camara.nombre, "Patio norte")
+
+    def test_agregar_lente_2_copia_la_clave_en_el_servidor(self):
+        response = self.client.post(
+            reverse("camaras_ia:camaras_agregar_lente_2", args=[self.camara.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertNotIn(b"CLAVE-SECRETA", response.content)
+        lente_2 = Camara.objects.get(ip="10.10.0.53", canal=2)
+        self.assertEqual(lente_2.nombre, "Patio · Lente 2")
+        self.assertEqual(lente_2.password_onvif, "CLAVE-SECRETA")
+        self.camara.refresh_from_db()
+        self.assertEqual(self.camara.nombre, "Patio · Lente 1")
+
+        otra_vez = self.client.post(
+            reverse("camaras_ia:camaras_agregar_lente_2", args=[self.camara.pk]), **self._auth(self.admin)
+        )
+        self.assertEqual(otra_vez.status_code, 400)
+
+    def test_solo_el_admin_agrega_lentes(self):
+        response = self.client.post(
+            reverse("camaras_ia:camaras_agregar_lente_2", args=[self.camara.pk]), **self._auth(self.operador)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Camara.objects.filter(canal=2).exists())
 

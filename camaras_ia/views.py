@@ -1,6 +1,7 @@
 import base64
 import io
 import os
+import re
 import time
 import zipfile
 from datetime import timedelta
@@ -15,15 +16,15 @@ from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.models import Empresa
 from core.permissions import (
     EsAdministrador,
-    EsAdministradorOSoloLectura,
-    EsAdministradorParaEliminar,
+    EsPersonalInterno,
     EsPersonalInternoParaLeerYAdministradorParaEscribir,
+    EsPersonalInternoYAdministradorParaEliminar,
 )
 
 from .costos_ia import (
@@ -276,7 +277,7 @@ def sincronizar_reglas_equipo_local(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([EsPersonalInterno])
 def indicadores_dashboard(request):
     """KPIs para el Tablero: cámaras activas/total, alertas hoy y una
     disponibilidad simple (cámaras activas / total) — no es monitoreo de
@@ -297,7 +298,7 @@ def indicadores_dashboard(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([EsPersonalInterno])
 def eventos_por_zona(request):
     """Conteo de eventos de los últimos 7 días agrupados por zona, para el
     gráfico del Tablero."""
@@ -322,7 +323,7 @@ class EventoListaDashboard(generics.ListAPIView):
     ?estado=&disparo_alerta=&camara=&canal_notificacion=."""
 
     serializer_class = EventoDashboardSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInterno]
 
     def get_queryset(self):
         qs = (
@@ -350,7 +351,7 @@ class EventoDetalleDashboard(generics.RetrieveUpdateAPIView):
 
     queryset = EventoDetectado.objects.select_related("camara", "zona").prefetch_related("tipos_ia")
     serializer_class = EventoDashboardSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EsPersonalInterno]
 
 
 class CamaraListaDashboard(generics.ListCreateAPIView):
@@ -359,7 +360,7 @@ class CamaraListaDashboard(generics.ListCreateAPIView):
     Administrador."""
 
     queryset = Camara.objects.prefetch_related("zonas__reglas", "eventos").order_by("nombre")
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
     def get_serializer_class(self):
         return CamaraCrearSerializer if self.request.method == "POST" else CamaraDashboardSerializer
@@ -380,7 +381,41 @@ class CamaraDetalleDashboard(generics.RetrieveUpdateDestroyAPIView):
 
     queryset = Camara.objects.prefetch_related("zonas__reglas", "eventos")
     serializer_class = CamaraDashboardSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
+
+
+@api_view(["POST"])
+@permission_classes([EsAdministrador])
+def agregar_lente_2(request, pk):
+    """Cámara de dos lentes (ej. Picoo A2): crea el registro del lente 2
+    copiando IP, credenciales y ubicación en el servidor — la contraseña de
+    la cámara nunca viaja al navegador — y renombra el original a "· Lente 1"."""
+    camara = get_object_or_404(Camara, pk=pk)
+    if camara.canal != 1 or camara.rtsp_url:
+        return Response(
+            {"detail": "Solo se puede agregar el lente 2 a una cámara en canal 1 sin URL RTSP propia."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if Camara.objects.filter(empresa=camara.empresa, ip=camara.ip, canal=2).exists():
+        return Response({"detail": "Esta cámara ya tiene registrado el lente 2."}, status=status.HTTP_400_BAD_REQUEST)
+    base = re.sub(r"\s*[·\-–]?\s*lente\s*1\s*$", "", camara.nombre, flags=re.IGNORECASE).strip() or camara.nombre
+    lente_2 = Camara.objects.create(
+        empresa=camara.empresa,
+        nombre=f"{base} · Lente 2"[:150],
+        ip=camara.ip,
+        puerto_onvif=camara.puerto_onvif,
+        usuario_onvif=camara.usuario_onvif,
+        password_onvif=camara.password_onvif,
+        canal=2,
+        ubicacion=camara.ubicacion,
+        activa=camara.activa,
+    )
+    if "lente" not in camara.nombre.lower():
+        camara.nombre = f"{base} · Lente 1"[:150]
+        camara.save(update_fields=["nombre"])
+    return Response(
+        CamaraDashboardSerializer(lente_2, context={"request": request}).data, status=status.HTTP_201_CREATED
+    )
 
 
 @api_view(["POST", "DELETE"])
@@ -446,7 +481,7 @@ def _verificar_editable_por_dashboard(empresa):
 class ZonaListaCrear(generics.ListCreateAPIView):
     queryset = ZonaRestringida.objects.select_related("camara").prefetch_related("reglas")
     serializer_class = ZonaDashboardSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
     def perform_create(self, serializer):
         _verificar_editable_por_dashboard(serializer.validated_data["camara"].empresa)
@@ -456,7 +491,7 @@ class ZonaListaCrear(generics.ListCreateAPIView):
 class ZonaDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = ZonaRestringida.objects.select_related("camara").prefetch_related("reglas")
     serializer_class = ZonaDashboardSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
     def perform_update(self, serializer):
         _verificar_editable_por_dashboard(serializer.instance.camara.empresa)
@@ -469,7 +504,7 @@ class ZonaDetalle(generics.RetrieveUpdateDestroyAPIView):
 
 class ReglaListaCrear(generics.ListCreateAPIView):
     serializer_class = ReglaAlertaSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
     def get_queryset(self):
         qs = ReglaAlerta.objects.select_related("zona")
@@ -486,7 +521,7 @@ class ReglaListaCrear(generics.ListCreateAPIView):
 class ReglaDetalle(generics.RetrieveUpdateDestroyAPIView):
     queryset = ReglaAlerta.objects.select_related("zona")
     serializer_class = ReglaAlertaSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
     def perform_update(self, serializer):
         _verificar_editable_por_dashboard(serializer.instance.zona.camara.empresa)
@@ -505,7 +540,7 @@ class ConfiguracionNotificacionesDetalle(generics.RetrieveUpdateAPIView):
     de depender de una variable de entorno en Railway."""
 
     serializer_class = ConfiguracionNotificacionesSerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
     def get_object(self):
         return ConfiguracionNotificaciones.obtener()
@@ -516,14 +551,14 @@ class ConfiguracionIADetalle(generics.RetrieveUpdateAPIView):
     digita su API key desde acá en vez de por variable de entorno."""
 
     serializer_class = ConfiguracionIASerializer
-    permission_classes = [EsAdministradorOSoloLectura]
+    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
 
     def get_object(self):
         return ConfiguracionIA.obtener()
 
 
 @api_view(["GET"])
-@permission_classes([EsAdministradorOSoloLectura])
+@permission_classes([EsPersonalInternoParaLeerYAdministradorParaEscribir])
 def consumo_ia(request):
     """Gasto estimado de Claude en el periodo actual frente al tope, con las
     últimas llamadas — alimenta el panel de consumo en Sistema."""
@@ -575,7 +610,7 @@ def _consumo_por_camara(config, consumos):
         filas.append(
             {
                 "camara": camara.pk,
-                "nombre": camara.nombre,
+                "nombre": camara.nombre_para_mostrar,
                 "gastado_usd": float(gastado),
                 "cuota_usd": float(cuota),
                 "porcentaje": float(gastado / cuota * 100) if cuota else 100.0,
@@ -601,7 +636,7 @@ class TipoEventoIAListaCrear(generics.ListCreateAPIView):
     puesto"), sin tocar código (ver camaras_ia/ia_deteccion.py)."""
 
     serializer_class = TipoEventoIASerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInternoYAdministradorParaEliminar]
 
     def get_queryset(self):
         return TipoEventoIA.objects.filter(empresa=Empresa.objects.first())
@@ -618,7 +653,7 @@ class TipoEventoIADetalle(generics.RetrieveUpdateDestroyAPIView):
 
     queryset = TipoEventoIA.objects.all()
     serializer_class = TipoEventoIASerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInternoYAdministradorParaEliminar]
 
 
 class EquipoLocalListaCrear(generics.ListCreateAPIView):
@@ -633,7 +668,7 @@ class EquipoLocalListaCrear(generics.ListCreateAPIView):
 
     queryset = EquipoLocal.objects.order_by("nombre")
     serializer_class = EquipoLocalSerializer
-    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
+    permission_classes = [EsAdministrador]
 
     def perform_create(self, serializer):
         empresa = Empresa.objects.first()
@@ -648,7 +683,7 @@ class EquipoLocalDetalle(generics.RetrieveUpdateDestroyAPIView):
 
     queryset = EquipoLocal.objects.all()
     serializer_class = EquipoLocalSerializer
-    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
+    permission_classes = [EsAdministrador]
 
 
 class InstruccionSeguridadListaCrear(generics.ListCreateAPIView):
@@ -658,7 +693,7 @@ class InstruccionSeguridadListaCrear(generics.ListCreateAPIView):
     eliminarlas requiere Administrador (ver InstruccionSeguridadDetalle)."""
 
     serializer_class = InstruccionSeguridadSerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInternoYAdministradorParaEliminar]
 
     def get_queryset(self):
         return InstruccionSeguridad.objects.select_related("camara", "zona").filter(
@@ -678,7 +713,7 @@ class InstruccionSeguridadDetalle(generics.RetrieveUpdateDestroyAPIView):
 
     queryset = InstruccionSeguridad.objects.select_related("camara", "zona")
     serializer_class = InstruccionSeguridadSerializer
-    permission_classes = [EsAdministradorParaEliminar]
+    permission_classes = [EsPersonalInternoYAdministradorParaEliminar]
 
 
 _EQUIPO_LOCAL_EXCLUIR_DEL_ZIP = {"venv", "__pycache__", "grabaciones", "tests", ".pytest_cache"}
@@ -704,7 +739,7 @@ def _env_real_para_equipo(request, equipo):
 
 
 @api_view(["GET"])
-@permission_classes([EsPersonalInternoParaLeerYAdministradorParaEscribir])
+@permission_classes([EsAdministrador])
 def descargar_equipo_local_zip(request):
     """Empaqueta la carpeta equipo_local/ (el programa que corre en el PC
     de la planta) en un .zip listo para copiar a ese PC, con el .env ya
@@ -756,7 +791,7 @@ _PLANTILLA_INSTALADOR_EQUIPO_LOCAL = Path(__file__).resolve().parent / "plantill
 
 
 @api_view(["GET"])
-@permission_classes([EsPersonalInternoParaLeerYAdministradorParaEscribir])
+@permission_classes([EsAdministrador])
 def descargar_equipo_local_instalador(request, pk):
     """Instalador de un clic para Windows de ESTE equipo: un .bat que ya trae
     adentro su .env (en base64, para no tener que escapar nada para cmd),

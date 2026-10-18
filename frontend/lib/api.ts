@@ -279,7 +279,7 @@ export type CamaraDashboard = {
   ip: string;
   puerto_onvif: number;
   usuario_onvif: string;
-  password_onvif: string;
+  password_onvif_configurada: boolean;
   canal: number;
   rtsp_url: string;
   ubicacion: string;
@@ -289,6 +289,26 @@ export type CamaraDashboard = {
   zonas: ZonaDashboard[];
   ultimo_evento: UltimoEvento | null;
 };
+
+/** Nombre para mostrar de cada cámara al elegirla (alertas de IA, filtros,
+ * tarjetas): si hay más de un registro con la misma IP — una cámara de dos
+ * lentes, un registro por canal — agrega "· Lente N" para que no se confunda
+ * en qué lente se configura cada alerta. No lo repite si el nombre ya lo dice. */
+export function etiquetasCamaras(
+  camaras: { id: number; nombre: string; ip: string; canal: number }[]
+): Map<number, string> {
+  const registrosPorIp = new Map<string, number>();
+  for (const camara of camaras) {
+    registrosPorIp.set(camara.ip, (registrosPorIp.get(camara.ip) ?? 0) + 1);
+  }
+  return new Map(
+    camaras.map((camara) => {
+      const variosLentes = (registrosPorIp.get(camara.ip) ?? 0) > 1 || camara.canal > 1;
+      const yaLoDice = /lente/i.test(camara.nombre);
+      return [camara.id, variosLentes && !yaLoDice ? `${camara.nombre} · Lente ${camara.canal}` : camara.nombre];
+    })
+  );
+}
 
 export type NuevaCamara = {
   nombre: string;
@@ -353,6 +373,13 @@ export function crearCamara(token: string, datos: NuevaCamara): Promise<CamaraDa
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(datos),
+  });
+}
+
+export function agregarLente2(token: string, camaraId: number): Promise<CamaraDashboard> {
+  return request<CamaraDashboard>(`/api/camaras-ia/dashboard/camaras/${camaraId}/agregar-lente-2/`, {
+    method: "POST",
+    headers: authHeaders(token),
   });
 }
 
@@ -526,6 +553,7 @@ export type ConfiguracionNotificaciones = {
   brevo_api_key_configurada: boolean;
   brevo_remitente_email: string;
   brevo_remitente_nombre: string;
+  correos_alertas: string;
   actualizada_en: string;
 };
 
@@ -533,6 +561,7 @@ export type CambiosConfiguracionNotificaciones = {
   brevo_api_key?: string;
   brevo_remitente_email?: string;
   brevo_remitente_nombre?: string;
+  correos_alertas?: string;
 };
 
 export function obtenerConfiguracionNotificaciones(token: string): Promise<ConfiguracionNotificaciones> {

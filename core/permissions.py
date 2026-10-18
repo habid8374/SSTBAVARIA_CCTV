@@ -119,3 +119,19 @@ class EsPersonalInternoOSoloLectura(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         return EsPersonalInterno().has_permission(request, view)
+
+
+class EsPersonalInternoYAdministradorParaEliminar(BasePermission):
+    """Como EsAdministradorParaEliminar (el Operador crea/lee/edita, solo el
+    Administrador elimina), pero sin el portal de contratistas: para datos
+    de cámaras e IA que a un contratista no le competen."""
+
+    message = "Se requiere rol de administrador para eliminar esto."
+
+    def has_permission(self, request, view):
+        if not EsPersonalInterno().has_permission(request, view):
+            return False
+        if request.method != "DELETE":
+            return True
+        return EsAdministrador().has_permission(request, view)
+

@@ -176,8 +176,29 @@ def _notificar_alerta_ia(evento, detectados):
     detalle = ", ".join(f"{tipo.nombre} ({tipo.get_severidad_display().lower()})" for tipo in nuevos)
     donde = f" en {evento.zona.nombre}" if evento.zona else ""
     enviar_push_a_personal_interno(
-        f"Alerta IA — {evento.camara.nombre}", f"{detalle}{donde}.", url="/dashboard?ir=alertas"
+        f"Alerta IA — {evento.camara.nombre_para_mostrar}", f"{detalle}{donde}.", url="/dashboard?ir=alertas"
     )
+
+    from html import escape
+
+    from .services import enviar_correo_alerta_al_cliente
+
+    descripcion = f"<p><em>{escape(evento.descripcion_ia)}</em></p>" if evento.descripcion_ia else ""
+    enviados = enviar_correo_alerta_al_cliente(
+        evento,
+        asunto=f"Alerta IA — {detalle} ({evento.camara.nombre_para_mostrar})",
+        titulo=f"La IA detectó: {detalle}",
+        detalle_html=f"<p>La inteligencia artificial revisó la foto y detectó: <strong>{escape(detalle)}</strong>"
+        f"{escape(donde)}.</p>{descripcion}",
+    )
+    if enviados:
+        evento.refresh_from_db(fields=["notificacion_enviada", "notificacion_detalle"])
+        texto = f"Correo de alerta IA enviado a {', '.join(enviados)}"
+        if evento.notificacion_enviada and evento.notificacion_detalle:
+            texto = f"{evento.notificacion_detalle} · {texto}"
+        evento.notificacion_enviada = True
+        evento.notificacion_detalle = texto[:255]
+        evento.save(update_fields=["notificacion_enviada", "notificacion_detalle"])
 
 
 def _api_key_por_defecto(proveedor):

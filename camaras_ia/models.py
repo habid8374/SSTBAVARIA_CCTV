@@ -1,15 +1,22 @@
+import re
 import secrets
 from decimal import Decimal
 
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator, validate_email
 from django.db import models
 
+from core.archivos import ruta_no_adivinable
 from core.models import Empresa
 from core.validators import validar_tamano_archivo
 
 
 def generar_api_key():
     return secrets.token_hex(20)
+
+
+def snapshot_referencia_upload_to(instance, filename):
+    return ruta_no_adivinable("camaras/referencia", filename)
 
 
 class Camara(models.Model):
@@ -44,7 +51,7 @@ class Camara(models.Model):
     ubicacion = models.CharField(max_length=255, blank=True, help_text="Descripción del punto donde está instalada")
     snapshot_referencia = models.ImageField(
         "snapshot de referencia",
-        upload_to="camaras/referencia",
+        upload_to=snapshot_referencia_upload_to,
         null=True,
         blank=True,
         validators=[validar_tamano_archivo],
@@ -101,6 +108,15 @@ class Camara(models.Model):
         return distancia_px / self.calibracion_distancia_metros
 
     @property
+    def nombre_para_mostrar(self):
+        """Nombre en avisos, listas de eventos y consumo de IA: al segundo
+        lente (o más) de una cámara de dos lentes le agrega "· Lente N",
+        salvo que el nombre ya lo diga — así no se confunde con el lente 1."""
+        if self.canal > 1 and "lente" not in self.nombre.lower():
+            return f"{self.nombre} · Lente {self.canal}"
+        return self.nombre
+
+    @property
     def rtsp_url_efectiva(self):
         """URL RTSP a usar por el equipo local: la explícita si se configuró,
         o si no el patrón estándar de Dahua (confirmado por investigación de
@@ -123,6 +139,15 @@ class ConfiguracionNotificaciones(models.Model):
     brevo_api_key = models.CharField("Brevo API key", max_length=255, blank=True)
     brevo_remitente_email = models.EmailField("correo remitente", blank=True)
     brevo_remitente_nombre = models.CharField("nombre remitente", max_length=150, blank=True)
+    correos_alertas = models.TextField(
+        "correos que reciben las alertas",
+        blank=True,
+        help_text=(
+            "Uno o varios correos (separados por coma o en líneas distintas) que reciben un correo, con la "
+            "foto, por cada alerta de las cámaras: persona en zona restringida dentro del horario y alertas "
+            "de IA. Aparte del canal de cada regla."
+        ),
+    )
     actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
 
     class Meta:
@@ -136,6 +161,20 @@ class ConfiguracionNotificaciones(models.Model):
     def obtener(cls):
         objeto, _ = cls.objects.get_or_create(pk=1)
         return objeto
+
+    def lista_correos_alertas(self):
+        """Los correos de correos_alertas, sin repetidos ni inválidos."""
+        correos = []
+        for correo in re.split(r"[\s,;]+", self.correos_alertas or ""):
+            correo = correo.strip()
+            if not correo or correo.lower() in (c.lower() for c in correos):
+                continue
+            try:
+                validate_email(correo)
+            except ValidationError:
+                continue
+            correos.append(correo)
+        return correos
 
 
 class ConfiguracionIA(models.Model):
@@ -393,7 +432,7 @@ class InstruccionSeguridad(models.Model):
 
 
 def snapshot_upload_to(instance, filename):
-    return f"eventos/{instance.camara_id}/{filename}"
+    return ruta_no_adivinable(f"eventos/{instance.camara_id}", filename)
 
 
 class EventoDetectado(models.Model):
@@ -419,6 +458,12 @@ class EventoDetectado(models.Model):
     )
     punto_y = models.FloatField("punto detectado (y)", null=True, blank=True)
     disparo_alerta = models.BooleanField(default=False)
+    correo_alerta_enviado_en = models.DateTimeField(
+        "correo de alerta enviado en",
+        null=True,
+        blank=True,
+        help_text="Cuándo se mandó el correo de esta alerta a los correos de Sistema → Brevo (vacío si no se mandó).",
+    )
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.NUEVO)
     canal_notificacion = models.CharField(
         "canal de notificación",

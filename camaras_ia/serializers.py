@@ -1,6 +1,9 @@
+import re
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -92,6 +95,9 @@ class CamaraActivaSerializer(serializers.ModelSerializer):
     disparan (ver services.punto_en_zona)."""
 
     zonas = serializers.SerializerMethodField()
+    # El visor del equipo local (donde se dibujan las zonas) muestra este
+    # nombre: con "· Lente N" no se confunden los dos lentes de una cámara.
+    nombre = serializers.CharField(source="nombre_para_mostrar", read_only=True)
     rtsp_url = serializers.CharField(source="rtsp_url_efectiva", read_only=True)
     px_por_metro = serializers.FloatField(read_only=True, allow_null=True)
 
@@ -139,7 +145,7 @@ class ReglaAlertaSerializer(serializers.ModelSerializer):
 
 
 class ZonaDashboardSerializer(serializers.ModelSerializer):
-    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True)
+    camara_nombre = serializers.CharField(source="camara.nombre_para_mostrar", read_only=True)
     reglas = ReglaAlertaSerializer(many=True, read_only=True)
 
     class Meta:
@@ -188,7 +194,7 @@ class EventoDashboardSerializer(serializers.ModelSerializer):
     """Lectura para la bandeja de Alertas; solo `estado` es editable (marcar
     revisado) — el resto del evento lo escribe recibir_evento_camara."""
 
-    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True)
+    camara_nombre = serializers.CharField(source="camara.nombre_para_mostrar", read_only=True)
     zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
     tipos_ia = serializers.SerializerMethodField()
 
@@ -250,6 +256,11 @@ class UltimoEventoSerializer(serializers.ModelSerializer):
 
 
 class CamaraDashboardSerializer(serializers.ModelSerializer):
+    # La contraseña de la cámara solo se escribe, nunca vuelve al navegador
+    # (cualquiera del personal interno puede listar cámaras); el formulario
+    # usa password_onvif_configurada para mostrar si hay una guardada.
+    password_onvif = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
+    password_onvif_configurada = serializers.SerializerMethodField()
     zonas = ZonaDashboardSerializer(many=True, read_only=True)
     ultimo_evento = serializers.SerializerMethodField()
     px_por_metro = serializers.FloatField(read_only=True, allow_null=True)
@@ -263,6 +274,7 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
             "puerto_onvif",
             "usuario_onvif",
             "password_onvif",
+            "password_onvif_configurada",
             "canal",
             "rtsp_url",
             "ubicacion",
@@ -272,6 +284,9 @@ class CamaraDashboardSerializer(serializers.ModelSerializer):
             "zonas",
             "ultimo_evento",
         ]
+
+    def get_password_onvif_configurada(self, camara):
+        return bool(camara.password_onvif)
 
     def get_ultimo_evento(self, camara):
         evento = camara.eventos.order_by("-timestamp").first()
@@ -284,6 +299,8 @@ class CamaraCrearSerializer(serializers.ModelSerializer):
     """Alta de una cámara desde el dashboard. La empresa se asigna sola —
     este panel todavía no tiene gestión de empresas propia; si hace falta
     una distinta, se ajusta desde el admin de Django (app core)."""
+
+    password_onvif = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
 
     class Meta:
         model = Camara
@@ -327,12 +344,26 @@ class ConfiguracionNotificacionesSerializer(serializers.ModelSerializer):
             "brevo_api_key_configurada",
             "brevo_remitente_email",
             "brevo_remitente_nombre",
+            "correos_alertas",
             "actualizada_en",
         ]
         read_only_fields = ["actualizada_en"]
 
     def get_brevo_api_key_configurada(self, obj):
         return bool(obj.brevo_api_key or settings.BREVO_API_KEY)
+
+    def validate_correos_alertas(self, valor):
+        invalidos = []
+        for correo in re.split(r"[\s,;]+", valor or ""):
+            if not correo:
+                continue
+            try:
+                validate_email(correo)
+            except DjangoValidationError:
+                invalidos.append(correo)
+        if invalidos:
+            raise serializers.ValidationError(f"Correos no válidos: {', '.join(invalidos)}.")
+        return valor
 
 
 class ConfiguracionIASerializer(serializers.ModelSerializer):
@@ -426,7 +457,7 @@ class InstruccionSeguridadSerializer(serializers.ModelSerializer):
     anotar la instrucción antes de saber a qué cámara aplica o si ya se
     convirtió en una zona real."""
 
-    camara_nombre = serializers.CharField(source="camara.nombre", read_only=True, default=None)
+    camara_nombre = serializers.CharField(source="camara.nombre_para_mostrar", read_only=True, default=None)
     zona_nombre = serializers.CharField(source="zona.nombre", read_only=True, default=None)
 
     class Meta:

@@ -9,8 +9,10 @@ import { useDialog } from "@/components/DialogProvider";
 import {
   ApiError,
   actualizarCamara,
+  agregarLente2 as agregarLente2Api,
   crearCamara,
   eliminarCamara,
+  etiquetasCamaras,
   listarCamarasDashboard,
   type CamaraDashboard,
   type NuevaCamara,
@@ -60,6 +62,30 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
     }
   }
 
+  async function agregarLente2(camara: CamaraDashboard) {
+    const base = camara.nombre.replace(/\s*[·\-–]?\s*lente\s*1\s*$/i, "").trim() || camara.nombre;
+    const renombrar = !/lente/i.test(camara.nombre);
+    const ok = await confirmar({
+      titulo: "Agregar lente 2",
+      mensaje:
+        `Se crea "${base} · Lente 2" con la misma IP, usuario y contraseña, en el canal 2 (el segundo lente ` +
+        "de una cámara como la Picoo A2)." +
+        (renombrar ? ` Además "${camara.nombre}" pasa a llamarse "${base} · Lente 1", para distinguirlas.` : "") +
+        " Después cada lente se configura por separado: sus zonas, horarios y alertas de IA.",
+      textoConfirmar: "Agregar",
+    });
+    if (!ok) return;
+    try {
+      await agregarLente2Api(token, camara.id);
+      cargar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo agregar el lente 2.");
+    }
+  }
+
+  const etiquetas = etiquetasCamaras(camaras ?? []);
+  const ipsConLente2 = new Set((camaras ?? []).filter((camara) => camara.canal === 2).map((camara) => camara.ip));
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -107,7 +133,13 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
           <TarjetaCamara
             key={camara.id}
             camara={camara}
+            etiqueta={etiquetas.get(camara.id) ?? camara.nombre}
             esAdmin={esAdmin}
+            onAgregarLente2={
+              camara.canal === 1 && !camara.rtsp_url && !ipsConLente2.has(camara.ip)
+                ? () => agregarLente2(camara)
+                : null
+            }
             onEditar={() => setFormulario(camara)}
             onAlternarActiva={() => alternarActiva(camara)}
             onEliminar={() => eliminar(camara)}
@@ -132,13 +164,17 @@ export default function CamarasView({ token, rol }: { token: string; rol: Rol | 
 
 function TarjetaCamara({
   camara,
+  etiqueta,
   esAdmin,
+  onAgregarLente2,
   onEditar,
   onAlternarActiva,
   onEliminar,
 }: {
   camara: CamaraDashboard;
+  etiqueta: string;
   esAdmin: boolean;
+  onAgregarLente2: (() => void) | null;
   onEditar: () => void;
   onAlternarActiva: () => void;
   onEliminar: () => void;
@@ -159,11 +195,8 @@ function TarjetaCamara({
     <div className="overflow-hidden rounded-xl border border-corp-border bg-white shadow-sm">
       <div className="flex items-center justify-between bg-corp-navy px-4 py-2.5 text-white">
         <div>
-          <p className="text-sm font-semibold">{camara.nombre}</p>
-          <p className="text-xs text-white/60">
-            {camara.ubicacion || "Sin ubicación registrada"}
-            {camara.canal > 1 && ` · Lente ${camara.canal}`}
-          </p>
+          <p className="text-sm font-semibold">{etiqueta}</p>
+          <p className="text-xs text-white/60">{camara.ubicacion || "Sin ubicación registrada"}</p>
         </div>
         <span className={`h-2.5 w-2.5 rounded-full ${camara.activa ? "bg-red-500" : "bg-white/30"}`} />
       </div>
@@ -232,7 +265,17 @@ function TarjetaCamara({
       )}
 
       {esAdmin && (
-        <div className="flex justify-end gap-2 border-t border-corp-border px-4 py-2">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-corp-border px-4 py-2">
+          {onAgregarLente2 && (
+            <button
+              type="button"
+              onClick={onAgregarLente2}
+              title="Para cámaras de dos lentes (ej. Picoo A2): crea el lente 2 con la misma IP y contraseña"
+              className="mr-auto rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy transition hover:border-corp-blue"
+            >
+              + Agregar lente 2
+            </button>
+          )}
           <button
             type="button"
             onClick={onEditar}
@@ -275,7 +318,8 @@ function FormularioCamara({
   const [ip, setIp] = useState(camara?.ip ?? "");
   const [puertoOnvif, setPuertoOnvif] = useState(String(camara?.puerto_onvif ?? 80));
   const [usuarioOnvif, setUsuarioOnvif] = useState(camara?.usuario_onvif ?? "");
-  const [passwordOnvif, setPasswordOnvif] = useState(camara?.password_onvif ?? "");
+  // La contraseña guardada nunca llega al navegador: vacío = no cambiarla.
+  const [passwordOnvif, setPasswordOnvif] = useState("");
   const [canal, setCanal] = useState(String(camara?.canal ?? 1));
   const [rtspUrl, setRtspUrl] = useState(camara?.rtsp_url ?? "");
   const [ubicacion, setUbicacion] = useState(camara?.ubicacion ?? "");
@@ -291,7 +335,7 @@ function FormularioCamara({
       ip,
       puerto_onvif: Number(puertoOnvif) || 80,
       usuario_onvif: usuarioOnvif,
-      password_onvif: passwordOnvif,
+      ...(passwordOnvif || !camara ? { password_onvif: passwordOnvif } : {}),
       canal: Number(canal) || 1,
       rtsp_url: rtspUrl,
       ubicacion,
@@ -377,6 +421,8 @@ function FormularioCamara({
                 type="password"
                 value={passwordOnvif}
                 onChange={(e) => setPasswordOnvif(e.target.value)}
+                placeholder={camara?.password_onvif_configurada ? "•••••••• (sin cambios)" : ""}
+                autoComplete="new-password"
                 className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
               />
             </Campo>

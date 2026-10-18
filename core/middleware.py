@@ -22,6 +22,13 @@ _RUTAS_EXACTAS_VISITANTE = {
 _PATRON_RUTA_VISITANTE = re.compile(r"^/api/contratistas/capacitacion/\d+/(calificar|certificado)/$")
 
 
+# Rutas que nunca le competen al portal de contratistas (empresas externas):
+# todo el módulo de cámaras — fotos de trabajadores, claves e IP de las
+# cámaras, zonas, configuración de correo e IA. Igual que con el Visitante,
+# se corta acá para no depender de que cada vista declare bien su permiso.
+_PREFIJOS_SOLO_PERSONAL_INTERNO = ("/api/camaras-ia/dashboard/",)
+
+
 class RestringirVisitanteMiddleware:
     """El rol Visitante/Auditor (visitas externas y auditorías a planta,
     ver PerfilUsuario.Rol.VISITANTE) solo puede llegar a las rutas de
@@ -45,6 +52,12 @@ class RestringirVisitanteMiddleware:
                 .first()
             )
             perfil = getattr(token.user, "perfil", None) if token else None
+            if (
+                perfil
+                and perfil.rol == PerfilUsuario.Rol.CONTRATISTA
+                and request.path.startswith(_PREFIJOS_SOLO_PERSONAL_INTERNO)
+            ):
+                return JsonResponse({"detail": "Esta sección es solo para el personal interno."}, status=403)
             if perfil and perfil.rol == PerfilUsuario.Rol.VISITANTE:
                 permitido = request.path in _RUTAS_EXACTAS_VISITANTE or _PATRON_RUTA_VISITANTE.match(
                     request.path

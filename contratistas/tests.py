@@ -4400,3 +4400,32 @@ class ImportarTrabajadoresExcelTests(ApiTestsBase):
             **self._auth(self.operador),
         )
         self.assertEqual(response.status_code, 400)
+
+
+class ContratistaSinEmpresaTests(TestCase):
+    """Un usuario Contratista que se queda sin empresa (se borró su
+    EmpresaContratista, o se creó desde el admin de Django sin elegirla) no
+    puede terminar viendo los datos de TODAS las empresas."""
+
+    def setUp(self):
+        from core.models import Empresa, PerfilUsuario
+
+        self.otra = EmpresaContratista.objects.create(
+            empresa=Empresa.objects.create(nombre="Planta"), nombre="Otra Empresa SAS"
+        )
+        usuario = get_user_model().objects.create_user("huerfano", "h@x.com", "clave12345")
+        usuario.perfil.rol = PerfilUsuario.Rol.CONTRATISTA
+        usuario.perfil.contratista = None
+        usuario.perfil.save(update_fields=["rol", "contratista"])
+        token = self.client.post(
+            "/api/auth/login/", {"username": "huerfano", "password": "clave12345"}, content_type="application/json"
+        ).data["token"]
+        self.auth = {"HTTP_AUTHORIZATION": f"Token {token}"}
+
+    def test_no_ve_ninguna_empresa(self):
+        response = self.client.get(reverse("contratistas:empresas_lista"), **self.auth)
+        self.assertEqual(response.status_code, 200)
+        datos = response.data["results"] if isinstance(response.data, dict) else response.data
+        self.assertEqual(len(datos), 0)
+        self.assertNotIn(b"Otra Empresa", response.content)
+

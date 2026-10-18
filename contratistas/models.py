@@ -8,6 +8,7 @@ from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 
+from core.archivos import ruta_no_adivinable
 from core.models import Empresa
 from core.validators import validar_tamano_archivo
 
@@ -87,7 +88,7 @@ class EmpresaContratista(models.Model):
 
 
 def soporte_autorizacion_upload_to(instance, filename):
-    return f"autorizaciones_datos/{instance.contratista_id}/{filename}"
+    return ruta_no_adivinable(f"autorizaciones_datos/{instance.contratista_id}", filename)
 
 
 def _vencido(fecha):
@@ -360,7 +361,7 @@ class Trabajador(models.Model):
 
 
 def soporte_pago_upload_to(instance, filename):
-    return f"seguridad_social/{instance.trabajador.contratista_id}/{filename}"
+    return ruta_no_adivinable(f"seguridad_social/{instance.trabajador.contratista_id}", filename)
 
 
 class RadicacionSeguridadSocial(models.Model):
@@ -420,7 +421,7 @@ DIAS_ALERTA_VENCIMIENTO = 15  # a cuántos días de vencer se considera "por ven
 
 
 def declaracion_origen_excel_upload_to(instance, filename):
-    return f"declaraciones_origen/{instance.contratista_id}/{filename}"
+    return ruta_no_adivinable(f"declaraciones_origen/{instance.contratista_id}", filename)
 
 
 class DeclaracionMetodo(models.Model):

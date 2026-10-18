@@ -97,6 +97,7 @@ class AuditoriaMixin:
 
 
 _ROLES_ESCOPADOS_A_SU_CONTRATISTA = (PerfilUsuario.Rol.CONTRATISTA, PerfilUsuario.Rol.VISITANTE)
+_SIN_EMPRESA = 0
 
 
 def _contratista_de(request):
@@ -109,7 +110,11 @@ def _contratista_de(request):
     de que la vista corra, salvo en las rutas de Capacitación."""
     perfil = getattr(request.user, "perfil", None)
     if perfil and perfil.rol in _ROLES_ESCOPADOS_A_SU_CONTRATISTA:
-        return perfil.contratista_id
+        # Sin empresa asignada (se borró su EmpresaContratista, o se creó
+        # desde el admin de Django sin elegirla) no ve nada: None aquí
+        # significaría "personal interno, sin filtro" y vería todas las
+        # empresas. 0 no es el id de ninguna, así que los filtros dan vacío.
+        return perfil.contratista_id if perfil.contratista_id is not None else _SIN_EMPRESA
     return None
 
 
@@ -764,6 +769,8 @@ class DeclaracionMetodoListaDashboard(AuditoriaMixin, generics.ListCreateAPIView
 
     def perform_create(self, serializer):
         contratista_id = _contratista_de(self.request)
+        if contratista_id == _SIN_EMPRESA:
+            raise PermissionDenied("Tu usuario no tiene una empresa contratista asignada.")
         if contratista_id is not None:
             estado = serializer.validated_data.get("estado")
             if estado in (DeclaracionMetodo.Estado.APROBADA, DeclaracionMetodo.Estado.RECHAZADA):

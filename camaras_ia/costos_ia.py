@@ -141,7 +141,7 @@ def _avisar_si_agota_cuota(config, camara, gasto_antes, gasto_despues):
     cuota = cuota_por_camara_usd(config)
     if gasto_antes < cuota <= gasto_despues:
         enviar_push_a_personal_interno(
-            f"GuardIA — {camara.nombre} agotó su cuota de IA",
+            f"GuardIA — {camara.nombre_para_mostrar} agotó su cuota de IA",
             f"Gastó USD {gasto_despues:.2f} de su cuota de USD {cuota:.2f}. Las demás cámaras siguen funcionando.",
             url="/dashboard?ir=sistema",
         )
