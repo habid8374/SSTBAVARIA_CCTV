@@ -1548,18 +1548,29 @@ class ConfiguracionIAYTipoEventoIAEndpointsTests(TestCase):
         )
         return {"HTTP_AUTHORIZATION": f"Token {response.data['token']}"}
 
-    def test_operador_puede_ver_configuracion_ia_pero_no_editarla(self):
-        response = self.client.get(reverse("camaras_ia:configuracion_ia"), **self._auth(self.operador))
+    def test_solo_el_superusuario_ve_y_edita_la_configuracion_ia(self):
+        """La API key y el tope de gasto son del dueño de la cuenta: ni el
+        Operador ni otro usuario con rol Administrador los ven ni los cambian."""
+        administrador = Usuario.objects.create_user("admin2", "admin2@x.com", "clave12345")
+        administrador.perfil.rol = PerfilUsuario.Rol.ADMINISTRADOR
+        administrador.perfil.save(update_fields=["rol"])
+
+        for usuario in (self.operador, administrador):
+            with self.subTest(usuario=usuario.username):
+                auth = self._auth(usuario)
+                self.assertEqual(self.client.get(reverse("camaras_ia:configuracion_ia"), **auth).status_code, 403)
+                response = self.client.patch(
+                    reverse("camaras_ia:configuracion_ia"),
+                    {"proveedor": "gemini", "api_key": "intento"},
+                    content_type="application/json",
+                    **auth,
+                )
+                self.assertEqual(response.status_code, 403)
+        self.assertEqual(ConfiguracionIA.obtener().api_key, "")
+
+        response = self.client.get(reverse("camaras_ia:configuracion_ia"), **self._auth(self.admin))
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("api_key", response.data)  # write-only, nunca se devuelve
-
-        response = self.client.patch(
-            reverse("camaras_ia:configuracion_ia"),
-            {"proveedor": "gemini"},
-            content_type="application/json",
-            **self._auth(self.operador),
-        )
-        self.assertEqual(response.status_code, 403)
 
     def test_admin_configura_proveedor_y_api_key(self):
         response = self.client.patch(
@@ -1738,7 +1749,7 @@ class ConsumoIAEndpointsTests(TestCase):
         ConsumoIA.objects.create(modelo="claude-opus-5", tokens_entrada=1000, tokens_salida=200, costo_usd=Decimal("2"))
         ConsumoIA.objects.create(modelo="claude-opus-5", tokens_entrada=3000, tokens_salida=400, costo_usd=Decimal("3"))
 
-        response = self.client.get(reverse("camaras_ia:consumo_ia"), **self._auth(self.operador))
+        response = self.client.get(reverse("camaras_ia:consumo_ia"), **self._auth(self.admin))
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["tope_usd"], 20.0)
@@ -1750,9 +1761,16 @@ class ConsumoIAEndpointsTests(TestCase):
         self.assertEqual(response.data["llamadas_restantes_estimadas"], 6)  # 15 / 2.5
         self.assertEqual(len(response.data["ultimas"]), 2)
 
-    def test_solo_el_admin_reinicia_el_periodo(self):
+    def test_solo_el_superusuario_ve_el_consumo_y_reinicia_el_periodo(self):
+        administrador = Usuario.objects.create_user("admin2", "admin2@x.com", "clave12345")
+        administrador.perfil.rol = PerfilUsuario.Rol.ADMINISTRADOR
+        administrador.perfil.save(update_fields=["rol"])
         url = reverse("camaras_ia:consumo_ia_reiniciar")
-        self.assertEqual(self.client.post(url, **self._auth(self.operador)).status_code, 403)
+        for usuario in (self.operador, administrador):
+            with self.subTest(usuario=usuario.username):
+                auth = self._auth(usuario)
+                self.assertEqual(self.client.get(reverse("camaras_ia:consumo_ia"), **auth).status_code, 403)
+                self.assertEqual(self.client.post(url, **auth).status_code, 403)
 
         response = self.client.post(url, **self._auth(self.admin))
 

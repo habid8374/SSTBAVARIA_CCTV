@@ -876,6 +876,11 @@ const TEMAS: Tema[] = [
           igual que siempre, solo sin esa capa extra de análisis.
         </P>
         <P>
+          El proveedor, la API key, el modelo y el panel de consumo con su tope{" "}
+          <strong>solo los ve el superusuario real</strong> — ni siquiera otra cuenta con rol Administrador. Los
+          demás usuarios ven en esta pestaña únicamente las alertas de IA por cámara.
+        </P>
+        <P>
           Con Claude, el panel <strong>Consumo de Claude</strong> lleva la cuenta de cada llamada: tokens usados
           y su costo estimado en dólares con la tarifa del modelo. La barra compara el gasto contra el{" "}
           <strong>tope</strong> (USD 20 por defecto, editable ahí mismo): al llegar al 80% llega una
