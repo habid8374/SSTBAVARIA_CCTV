@@ -25,6 +25,7 @@ from core.permissions import (
     EsPersonalInterno,
     EsPersonalInternoParaLeerYAdministradorParaEscribir,
     EsPersonalInternoYAdministradorParaEliminar,
+    EsSuperusuario,
 )
 
 from .costos_ia import (
@@ -547,18 +548,21 @@ class ConfiguracionNotificacionesDetalle(generics.RetrieveUpdateAPIView):
 
 
 class ConfiguracionIADetalle(generics.RetrieveUpdateAPIView):
-    """Fila única — el administrador elige el proveedor (Claude o Gemini) y
-    digita su API key desde acá en vez de por variable de entorno."""
+    """Fila única — el superusuario elige el proveedor (Claude o Gemini),
+    digita su API key y fija el tope de gasto desde acá en vez de por
+    variable de entorno. Solo el superusuario real (ver EsSuperusuario): la
+    API key y el gasto son del dueño de la cuenta, no del cliente, así que
+    ni siquiera otro Administrador lo ve."""
 
     serializer_class = ConfiguracionIASerializer
-    permission_classes = [EsPersonalInternoParaLeerYAdministradorParaEscribir]
+    permission_classes = [EsSuperusuario]
 
     def get_object(self):
         return ConfiguracionIA.obtener()
 
 
 @api_view(["GET"])
-@permission_classes([EsPersonalInternoParaLeerYAdministradorParaEscribir])
+@permission_classes([EsSuperusuario])
 def consumo_ia(request):
     """Gasto estimado de Claude en el periodo actual frente al tope, con las
     últimas llamadas — alimenta el panel de consumo en Sistema."""
@@ -622,7 +626,7 @@ def _consumo_por_camara(config, consumos):
 
 
 @api_view(["POST"])
-@permission_classes([EsAdministrador])
+@permission_classes([EsSuperusuario])
 def reiniciar_consumo_ia(request):
     """Empieza un periodo nuevo (ej. al recargar créditos): el gasto vuelve a
     contar desde ahora. El historial de llamadas no se borra."""

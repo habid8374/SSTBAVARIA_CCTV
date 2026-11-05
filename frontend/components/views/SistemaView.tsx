@@ -69,7 +69,7 @@ export default function SistemaView({ token, esSuperusuario }: { token: string; 
       </div>
 
       {pestana === "brevo" && <ConfiguracionBrevo token={token} />}
-      {pestana === "ia" && <ConfiguracionInteligenciaArtificial token={token} />}
+      {pestana === "ia" && <ConfiguracionInteligenciaArtificial token={token} esSuperusuario={esSuperusuario} />}
       {pestana === "equipo-local" && <EquiposLocales token={token} />}
       {pestana === "visitantes" && <EnviarAccesoVisitantes token={token} />}
       {pestana === "reglas" && <ReglasContratistasView token={token} />}
@@ -234,7 +234,10 @@ function ConfiguracionBrevo({ token }: { token: string }) {
   );
 }
 
-function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
+// El proveedor, la API key, el modelo y el gasto de IA son del dueño de la
+// cuenta: solo el superusuario los ve (el backend responde 403 a los demás).
+// El resto ve únicamente el catálogo de alertas por cámara.
+function ConfiguracionInteligenciaArtificial({ token, esSuperusuario }: { token: string; esSuperusuario: boolean }) {
   const [config, setConfig] = useState<ConfiguracionIA | null>(null);
   const [proveedor, setProveedor] = useState<ProveedorIA>("claude");
   const [apiKey, setApiKey] = useState("");
@@ -244,6 +247,9 @@ function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
   const [guardando, setGuardando] = useState(false);
 
   function cargar() {
+    if (!esSuperusuario) {
+      return;
+    }
     obtenerConfiguracionIA(token)
       .then((data) => {
         setConfig(data);
@@ -253,7 +259,7 @@ function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
       .catch(() => setError("No se pudo cargar la configuración de IA."));
   }
 
-  useEffect(cargar, [token]);
+  useEffect(cargar, [token, esSuperusuario]);
 
   async function guardar(event: FormEvent) {
     event.preventDefault();
@@ -296,60 +302,62 @@ function ConfiguracionInteligenciaArtificial({ token }: { token: string }) {
         )}
       </div>
 
-      {config?.proveedor === "claude" && (
+      {esSuperusuario && config?.proveedor === "claude" && (
         <ConsumoClaude key={config.tope_usd} token={token} tope={config.tope_usd} onTopeGuardado={setConfig} />
       )}
 
-      <form onSubmit={guardar} className="mt-6 max-w-md space-y-4 rounded-xl border border-corp-border bg-white p-5">
-        <Campo label="Proveedor">
-          <select
-            value={proveedor}
-            onChange={(event) => setProveedor(event.target.value as ProveedorIA)}
-            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
-          >
-            <option value="claude">Claude (Anthropic)</option>
-            <option value="gemini">Gemini (Google)</option>
-          </select>
-        </Campo>
-        <Campo label="API key">
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            placeholder={config?.api_key_configurada ? "•••••••• (sin cambios)" : "sk-ant-… o AIza…"}
-            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
-          />
-          <p className="text-xs text-corp-muted">Déjalo en blanco para no cambiarla.</p>
-        </Campo>
-        <Campo label="Modelo (opcional)">
-          <input
-            value={modelo}
-            onChange={(event) => setModelo(event.target.value)}
-            placeholder={proveedor === "claude" ? "claude-opus-5" : "gemini-flash-latest"}
-            className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
-          />
-          <p className="text-xs text-corp-muted">Déjalo vacío para usar el valor por defecto.</p>
-        </Campo>
+      {esSuperusuario && (
+        <form onSubmit={guardar} className="mt-6 max-w-md space-y-4 rounded-xl border border-corp-border bg-white p-5">
+          <Campo label="Proveedor">
+            <select
+              value={proveedor}
+              onChange={(event) => setProveedor(event.target.value as ProveedorIA)}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            >
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="gemini">Gemini (Google)</option>
+            </select>
+          </Campo>
+          <Campo label="API key">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              placeholder={config?.api_key_configurada ? "•••••••• (sin cambios)" : "sk-ant-… o AIza…"}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+            <p className="text-xs text-corp-muted">Déjalo en blanco para no cambiarla.</p>
+          </Campo>
+          <Campo label="Modelo (opcional)">
+            <input
+              value={modelo}
+              onChange={(event) => setModelo(event.target.value)}
+              placeholder={proveedor === "claude" ? "claude-opus-5" : "gemini-flash-latest"}
+              className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+            />
+            <p className="text-xs text-corp-muted">Déjalo vacío para usar el valor por defecto.</p>
+          </Campo>
 
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-        )}
-        {exito && (
-          <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-            {exito}
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+          )}
+          {exito && (
+            <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              {exito}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-1">
+            <button
+              type="submit"
+              disabled={guardando}
+              className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
+            >
+              {guardando ? "Guardando…" : "Guardar"}
+            </button>
           </div>
-        )}
-
-        <div className="flex justify-end pt-1">
-          <button
-            type="submit"
-            disabled={guardando}
-            className="rounded-lg bg-corp-blue px-4 py-2 text-sm font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
-          >
-            {guardando ? "Guardando…" : "Guardar"}
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       <div className="mt-8">
         <h3 className="text-sm font-semibold text-corp-navy">Alertas de IA por cámara</h3>
