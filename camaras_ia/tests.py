@@ -65,6 +65,34 @@ class RtspUrlEfectivaTests(TestCase):
             camara.rtsp_url_efectiva, "rtsp://10.0.0.1:554/cam/realmonitor?channel=1&subtype=1"
         )
 
+    def test_codifica_caracteres_reservados_en_la_contrasena(self):
+        """Una contraseña con caracteres válidos pero reservados en una URL
+        (* @ : / espacio) se codifica, o FFmpeg/OpenCV no abre el stream y la
+        cámara queda en negro, aunque la clave sea correcta y VLC sí la
+        reproduzca — ocurrió en planta con una clave terminada en asterisco."""
+        camara = Camara.objects.create(
+            empresa=self.empresa,
+            nombre="Cam 1",
+            ip="192.168.0.59",
+            usuario_onvif="admin",
+            password_onvif="Ejemplo.0000*",
+        )
+        self.assertEqual(
+            camara.rtsp_url_efectiva,
+            "rtsp://admin:Ejemplo.0000%2A@192.168.0.59:554/cam/realmonitor?channel=1&subtype=1",
+        )
+        otra = Camara.objects.create(
+            empresa=self.empresa,
+            nombre="Cam 2",
+            ip="192.168.0.60",
+            usuario_onvif="admin",
+            password_onvif="a@b:c/d e",
+        )
+        self.assertEqual(
+            otra.rtsp_url_efectiva,
+            "rtsp://admin:a%40b%3Ac%2Fd%20e@192.168.0.60:554/cam/realmonitor?channel=1&subtype=1",
+        )
+
     def test_nombre_para_mostrar_marca_el_segundo_lente(self):
         lente_1 = Camara.objects.create(empresa=self.empresa, nombre="Patio", ip="10.10.0.53")
         lente_2 = Camara.objects.create(empresa=self.empresa, nombre="Patio", ip="10.10.0.53", canal=2)

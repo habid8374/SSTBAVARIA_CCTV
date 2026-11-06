@@ -1,6 +1,7 @@
 import re
 import secrets
 from decimal import Decimal
+from urllib.parse import quote
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, validate_email
@@ -122,10 +123,19 @@ class Camara(models.Model):
         o si no el patrón estándar de Dahua (confirmado por investigación de
         hardware — ver CLAUDE_CAMARAS.md) con la IP y credenciales ONVIF.
         subtype=1 (substream) por defecto: menor resolución/bitrate, más
-        liviano para detección en tiempo real que el canal principal."""
+        liviano para detección en tiempo real que el canal principal.
+
+        Usuario y contraseña se codifican (percent-encoding) porque el equipo
+        local arma la captura con FFmpeg/OpenCV, que es estricto con la URL:
+        caracteres válidos en una contraseña pero reservados en una URL (``*``,
+        ``@``, ``:``, ``/``, ``#``, espacios…) rompen el stream y la cámara
+        queda en negro, aunque la clave sea correcta y VLC sí la reproduzca."""
         if self.rtsp_url:
             return self.rtsp_url
-        credenciales = f"{self.usuario_onvif}:{self.password_onvif}@" if self.usuario_onvif else ""
+        if self.usuario_onvif:
+            credenciales = f"{quote(self.usuario_onvif, safe='')}:{quote(self.password_onvif, safe='')}@"
+        else:
+            credenciales = ""
         return f"rtsp://{credenciales}{self.ip}:554/cam/realmonitor?channel={self.canal}&subtype=1"
 
 
