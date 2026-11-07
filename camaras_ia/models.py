@@ -207,7 +207,7 @@ class ConfiguracionIA(models.Model):
         "modelo",
         max_length=100,
         blank=True,
-        help_text="ID del modelo a usar, ej. claude-opus-5 o gemini-flash-latest. "
+        help_text="ID del modelo a usar, ej. claude-haiku-5-5 o gemini-flash-latest. "
         "Vacío = valor por defecto según el proveedor (ver ia_deteccion.MODELOS_POR_DEFECTO).",
     )
     tope_usd = models.DecimalField(

@@ -33,7 +33,7 @@ VENTANA_SIN_REPETIR_AVISO_IA = timedelta(minutes=10)
 ESPERA_MAXIMA_IA_SEGUNDOS = 6
 
 MODELOS_POR_DEFECTO = {
-    ConfiguracionIA.Proveedor.CLAUDE: "claude-opus-5",
+    ConfiguracionIA.Proveedor.CLAUDE: "claude-haiku-5-5",
     ConfiguracionIA.Proveedor.GEMINI: "gemini-flash-latest",
 }
 

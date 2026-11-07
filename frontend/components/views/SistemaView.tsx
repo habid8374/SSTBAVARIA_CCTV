@@ -332,7 +332,7 @@ function ConfiguracionInteligenciaArtificial({ token, esSuperusuario }: { token:
             <input
               value={modelo}
               onChange={(event) => setModelo(event.target.value)}
-              placeholder={proveedor === "claude" ? "claude-opus-5" : "gemini-flash-latest"}
+              placeholder={proveedor === "claude" ? "claude-haiku-5-5" : "gemini-flash-latest"}
               className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
             />
             <p className="text-xs text-corp-muted">Déjalo vacío para usar el valor por defecto.</p>

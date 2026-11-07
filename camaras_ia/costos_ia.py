@@ -32,6 +32,7 @@ PRECIOS_CLAUDE_USD_POR_MTOK = {
     "claude-sonnet-5-5": (Decimal("2"), Decimal("10"), Decimal("0.20")),
     "claude-sonnet-5": (Decimal("2"), Decimal("10"), Decimal("0.20")),
     "claude-sonnet-4-6": (Decimal("3"), Decimal("15"), Decimal("0.30")),
+    "claude-haiku-5-5": (Decimal("0.10"), Decimal("0.50"), Decimal("0.01")),
     "claude-haiku-4-5": (Decimal("1"), Decimal("5"), Decimal("0.10")),
 }
 FACTOR_ESCRITURA_CACHE = Decimal("1.25")
