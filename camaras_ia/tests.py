@@ -1499,7 +1499,7 @@ class ClasificarEventoTests(TestCase):
         self.assertEqual(self.evento.descripcion_ia, "sin casco")
         mock_anthropic_cls.assert_called_once_with(api_key="desde-settings")
         _, kwargs = mock_anthropic_cls.return_value.messages.create.call_args
-        self.assertEqual(kwargs["model"], "claude-opus-5")
+        self.assertEqual(kwargs["model"], "claude-haiku-5-5")
 
     @override_settings(GEMINI_API_KEY="desde-settings")
     @patch("google.genai.Client")
