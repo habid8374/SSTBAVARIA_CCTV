@@ -273,6 +273,17 @@ class UltimoFrameYGrabacionTests(unittest.TestCase):
         self.assertIn("1 persona(s) detectada(s)", mensajes)
         self.assertIn("no cae en ninguna zona activa", mensajes)
 
+    def test_procesar_frame_sin_zonas_no_llama_al_detector(self):
+        """Una cámara sin zonas no corre YOLO: con muchas cámaras en configuración
+        (todavía sin zonas) eso saturaba el CPU y los streams se caían."""
+        detector = MagicMock(detectar=MagicMock(return_value=[(50, 50, 0.9)]))
+        monitor = CamaraMonitor(_camara_datos(zonas=[]), detector, MagicMock(), _config(GRABAR_VIDEO=False))
+        frame = np.zeros((100, 100, 3), dtype=np.uint8)
+
+        monitor._procesar_frame(frame)
+
+        detector.detectar.assert_not_called()
+
     def test_procesar_frame_sin_detecciones_no_registra_nada(self):
         detector = MagicMock(detectar=MagicMock(return_value=[]))
         monitor = CamaraMonitor(_camara_datos(), detector, MagicMock(), _config(GRABAR_VIDEO=False))

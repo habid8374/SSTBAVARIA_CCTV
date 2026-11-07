@@ -201,6 +201,13 @@ class CamaraMonitor:
             self._ultimo_frame_jpeg = buffer.tobytes()
 
     def _procesar_frame(self, frame):
+        # Sin zonas no hay nada que vigilar: correr YOLO igual solo gastaría
+        # CPU y, con muchas cámaras, satura el procesador y hace que los
+        # streams se atrasen y se caigan (se ven en el visor conectándose y
+        # desconectándose). La detección se enciende sola en cuanto la cámara
+        # recibe su primera zona (ver actualizar()).
+        if not self.zonas:
+            return
         alto, ancho = frame.shape[:2]
         detecciones = self.detector.detectar(frame)
         if detecciones:
