@@ -33,7 +33,15 @@ from .models import (
     TipoEventoIA,
     ZonaRestringida,
 )
-from .services import _regla_vigente, disparar_alerta, evaluar_zona_horario, punto_en_circulo, punto_en_poligono, punto_en_zona
+from .services import (
+    _regla_vigente,
+    disparar_alerta,
+    enviar_correo_alerta_al_cliente,
+    evaluar_zona_horario,
+    punto_en_circulo,
+    punto_en_poligono,
+    punto_en_zona,
+)
 
 Usuario = get_user_model()
 
@@ -2213,6 +2221,41 @@ class CorreoAlertaClienteTests(TestCase):
             _notificar_alerta_ia(evento, [tipo])
         enviar.assert_not_called()
         push.assert_not_called()
+
+    def test_tope_diario_corta_los_correos(self, enviar):
+        """Al llegar al tope diario (cuota de Brevo), no se mandan más correos
+        ese día, pero la alerta igual queda en el tablero."""
+        config = ConfiguracionNotificaciones.obtener()
+        config.tope_correos_diarios = 2
+        config.save()
+        for _ in range(2):
+            EventoDetectado.objects.create(
+                camara=self.camara, zona=self.zona, punto_x=1, punto_y=1, notificacion_enviada=True
+            )
+        enviar.reset_mock()
+
+        enviados = enviar_correo_alerta_al_cliente(
+            self._evento(), asunto="Alerta", titulo="Alerta", detalle_html="<p>x</p>"
+        )
+
+        self.assertEqual(enviados, [])
+        enviar.assert_not_called()
+
+    def test_sin_tope_no_corta(self, enviar):
+        config = ConfiguracionNotificaciones.obtener()
+        config.tope_correos_diarios = 0
+        config.save()
+        for _ in range(5):
+            EventoDetectado.objects.create(
+                camara=self.camara, zona=self.zona, punto_x=1, punto_y=1, notificacion_enviada=True
+            )
+        enviar.reset_mock()
+
+        enviados = enviar_correo_alerta_al_cliente(
+            self._evento(), asunto="Alerta", titulo="Alerta", detalle_html="<p>x</p>"
+        )
+
+        self.assertEqual(enviados, ["jefe@cliente.com", "sst@cliente.com"])
 
 
 class CorreosAlertasConfiguracionTests(TestCase):
