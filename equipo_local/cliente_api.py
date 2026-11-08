@@ -28,12 +28,19 @@ class ClienteApi:
             raise ErrorApi(f"No se pudo obtener reglas-activas: {err}") from err
         return respuesta.json()
 
-    def reportar_evento(self, camara_id, punto_x, punto_y, snapshot_jpeg=None):
+    def reportar_evento(self, camara_id, punto_x, punto_y, snapshot_jpeg=None, revision_periodica=False):
         """Reporta una detección. El backend decide si cae en una zona
         activa con horario vigente (disparo_alerta) — acá no se duplica esa
-        lógica, solo se reporta el punto detectado."""
+        lógica, solo se reporta el punto detectado.
+
+        `revision_periodica=True` marca un barrido automático sin persona
+        (ver CamaraMonitor._revisar_periodicamente): el backend lo clasifica
+        con IA y lo descarta si no detecta nada, en vez de disparar reglas de
+        zona."""
         url = f"{self.base_url}/api/camaras-ia/eventos/"
         datos = {"camara": camara_id, "punto_x": punto_x, "punto_y": punto_y}
+        if revision_periodica:
+            datos["revision_periodica"] = "true"
         archivos = {"snapshot": ("evento.jpg", snapshot_jpeg, "image/jpeg")} if snapshot_jpeg else None
         try:
             respuesta = requests.post(

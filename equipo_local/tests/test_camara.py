@@ -369,10 +369,6 @@ class UltimoFrameYGrabacionTests(unittest.TestCase):
         monitor._reportar((50, 50), np.zeros((10, 10, 3), dtype=np.uint8), {"id": 10, "nombre": "Zona"}, 0.9)  # no debe lanzar
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class _CapturaDePrueba:
     """Doble de cv2.VideoCapture: entrega `frames` frames y después corta,
     deteniendo al monitor para que _loop_captura termine."""
@@ -475,3 +471,55 @@ class DescartarFramesAtrasadosTests(unittest.TestCase):
         self.assertTrue(monitor._descartar_frames_atrasados(captura, 5))
         self.assertEqual(captura.grabs, 0)
 
+
+
+class RevisionPeriodicaTests(unittest.TestCase):
+    """Barrido periódico con IA aunque no haya nadie en la zona (ej. una
+    guarda/reja abierta sin gente cerca)."""
+
+    FRAME = np.zeros((10, 10, 3), dtype=np.uint8)
+
+    def _monitor(self, zonas=None, **config_over):
+        datos = _camara_datos() if zonas is None else _camara_datos(zonas=zonas)
+        return CamaraMonitor(
+            datos, detector=MagicMock(), cliente_api=MagicMock(), config=_config(**config_over)
+        )
+
+    def test_centroide_de_poligono_es_el_promedio_de_vertices(self):
+        self.assertEqual(self._monitor()._centroide_zona({"poligono": CUADRADO}), (50, 50))
+
+    def test_centroide_de_punto_radio_es_su_centro(self):
+        zona = {"tipo": "punto_radio", "centro_x": 30, "centro_y": 40}
+        self.assertEqual(self._monitor()._centroide_zona(zona), (30, 40))
+
+    def test_centroide_de_poligono_invalido_es_none(self):
+        self.assertIsNone(self._monitor()._centroide_zona({"poligono": [[0, 0], [1, 1]]}))
+
+    def test_enviar_revision_periodica_reporta_con_la_marca(self):
+        monitor = self._monitor()
+        monitor._enviar_revision_periodica((50, 50), b"jpeg")
+        monitor.cliente_api.reportar_evento.assert_called_once_with(1, 50, 50, b"jpeg", revision_periodica=True)
+
+    @patch("equipo_local.camara.threading.Thread")
+    def test_desactivada_no_hace_nada(self, mock_thread):
+        self._monitor(REVISION_PERIODICA_SEGUNDOS=0)._revisar_periodicamente(self.FRAME, ahora=1000)
+        mock_thread.assert_not_called()
+
+    @patch("equipo_local.camara.threading.Thread")
+    def test_sin_zonas_no_hace_nada(self, mock_thread):
+        self._monitor(zonas=[], REVISION_PERIODICA_SEGUNDOS=300)._revisar_periodicamente(self.FRAME, ahora=1000)
+        mock_thread.assert_not_called()
+
+    @patch("equipo_local.camara.threading.Thread")
+    def test_respeta_el_intervalo(self, mock_thread):
+        monitor = self._monitor(REVISION_PERIODICA_SEGUNDOS=300)
+        monitor._revisar_periodicamente(self.FRAME, ahora=1000)
+        self.assertEqual(mock_thread.call_count, 1)
+        monitor._revisar_periodicamente(self.FRAME, ahora=1100)  # muy pronto: no repite
+        self.assertEqual(mock_thread.call_count, 1)
+        monitor._revisar_periodicamente(self.FRAME, ahora=1301)  # pasó el intervalo: repite
+        self.assertEqual(mock_thread.call_count, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

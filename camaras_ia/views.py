@@ -35,7 +35,7 @@ from .costos_ia import (
     gasto_del_periodo_usd,
     reiniciar_periodo,
 )
-from .ia_deteccion import clasificar_evento_sin_bloquear
+from .ia_deteccion import clasificar_evento, clasificar_evento_sin_bloquear
 from .models import (
     Camara,
     ConfiguracionIA,
@@ -101,7 +101,14 @@ def recibir_evento_camara(request):
         )
 
     punto = (serializer.validated_data["punto_x"], serializer.validated_data["punto_y"])
+    revision_periodica = serializer.validated_data.get("revision_periodica", False)
     zona, regla = evaluar_zona_horario(camara, punto)
+
+    # Un barrido periódico (sin persona) nunca dispara las reglas de zona —
+    # esas son para "persona en zona fuera de horario"; acá solo nos interesa
+    # lo que vea la IA en el encuadre (ej. una guarda abierta).
+    if revision_periodica:
+        regla = None
 
     evento = EventoDetectado.objects.create(
         camara=camara,
@@ -115,10 +122,25 @@ def recibir_evento_camara(request):
     if regla is not None:
         disparar_alerta(evento, regla)
 
-    clasificar_evento_sin_bloquear(evento)
-
     equipo.ultima_conexion = timezone.now()
     equipo.save(update_fields=["ultima_conexion"])
+
+    if revision_periodica:
+        # Se clasifica en el momento (no en segundo plano) para poder
+        # descartar el evento si la IA no detecta nada: así un barrido que no
+        # vio novedad no deja un "evento sin novedad" cada pocos minutos
+        # ensuciando el tablero (ni su foto en el almacenamiento).
+        clasificar_evento(evento)
+        if not evento.tipos_ia.exists():
+            if evento.snapshot:
+                evento.snapshot.delete(save=False)
+            evento.delete()
+            return Response({"id": None, "revision_periodica": True, "deteccion": False}, status=status.HTTP_200_OK)
+        return Response(
+            {"id": evento.pk, "revision_periodica": True, "deteccion": True}, status=status.HTTP_201_CREATED
+        )
+
+    clasificar_evento_sin_bloquear(evento)
 
     return Response(
         {
