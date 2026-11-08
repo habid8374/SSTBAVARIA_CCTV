@@ -262,11 +262,14 @@ def _enviar_push_alerta(evento):
     from core.push import enviar_push_a_personal_interno
 
     zona_nombre = evento.zona.nombre if evento.zona else "zona restringida"
-    enviar_push_a_personal_interno(
+    entregados = enviar_push_a_personal_interno(
         "Alerta GuardIA — cámaras",
         f"Se detectó una persona en {zona_nombre} (cámara {evento.camara.nombre_para_mostrar}) fuera del horario permitido.",
         url="/dashboard?ir=alertas",
     )
+    if entregados:
+        evento.push_enviado = True
+        evento.save(update_fields=["push_enviado"])
 
 
 def _enviar_notificacion_correo(evento, regla):

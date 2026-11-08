@@ -510,6 +510,12 @@ class EventoDetectado(models.Model):
     notificacion_detalle = models.CharField(
         "detalle de la notificación", max_length=255, blank=True
     )
+    push_enviado = models.BooleanField(
+        "notificación push enviada",
+        default=False,
+        help_text="True si se envió la notificación push a la app del personal interno (gratis e ilimitada, "
+        "aparte del correo/WhatsApp).",
+    )
     tipos_ia = models.ManyToManyField(
         TipoEventoIA,
         blank=True,

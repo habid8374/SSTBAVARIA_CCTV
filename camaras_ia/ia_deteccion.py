@@ -188,11 +188,14 @@ def _notificar_alerta_ia(evento, detectados):
     para_push = [tipo for tipo in nuevos if tipo.notificar_push]
     if para_push:
         detalle_push = ", ".join(f"{tipo.nombre} ({tipo.get_severidad_display().lower()})" for tipo in para_push)
-        enviar_push_a_personal_interno(
+        entregados = enviar_push_a_personal_interno(
             f"Alerta IA — {evento.camara.nombre_para_mostrar}",
             f"{detalle_push}{donde}.",
             url="/dashboard?ir=alertas",
         )
+        if entregados:
+            evento.push_enviado = True
+            evento.save(update_fields=["push_enviado"])
 
     para_correo = [tipo for tipo in nuevos if tipo.notificar]
     if not para_correo:

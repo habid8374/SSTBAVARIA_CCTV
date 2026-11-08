@@ -213,6 +213,7 @@ export type EventoDashboard = {
   canal_notificacion: "whatsapp" | "correo" | "";
   notificacion_enviada: boolean;
   notificacion_detalle: string;
+  push_enviado: boolean;
   estado: EstadoEvento;
   tipos_ia: { id: number; nombre: string; severidad: "baja" | "media" | "alta" }[];
   descripcion_ia: string;
@@ -343,6 +344,7 @@ export function listarEventos(
     disparo_alerta?: boolean;
     camara?: number;
     canal_notificacion?: "whatsapp" | "correo";
+    push_enviado?: boolean;
   } = {}
 ): Promise<EventoDashboard[]> {
   const params = new URLSearchParams();
@@ -350,6 +352,7 @@ export function listarEventos(
   if (filtros.disparo_alerta !== undefined) params.set("disparo_alerta", String(filtros.disparo_alerta));
   if (filtros.camara !== undefined) params.set("camara", String(filtros.camara));
   if (filtros.canal_notificacion) params.set("canal_notificacion", filtros.canal_notificacion);
+  if (filtros.push_enviado !== undefined) params.set("push_enviado", String(filtros.push_enviado));
   const query = params.toString();
   return request<EventoDashboard[]>(`/api/camaras-ia/dashboard/eventos/${query ? `?${query}` : ""}`, {
     headers: authHeaders(token),
