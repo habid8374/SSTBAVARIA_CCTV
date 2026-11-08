@@ -1,10 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { actualizarEvento, listarEventos, type EstadoEvento, type EventoDashboard } from "@/lib/api";
 
 type FiltroDisparo = "todas" | "con_alerta" | "sin_alerta";
+
+// --- Agrupación por día -----------------------------------------------------
+
+function claveDia(ts: string): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function mismaFecha(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function etiquetaDia(ts: string): string {
+  const d = new Date(ts);
+  const hoy = new Date();
+  const ayer = new Date();
+  ayer.setDate(hoy.getDate() - 1);
+  if (mismaFecha(d, hoy)) return "Hoy";
+  if (mismaFecha(d, ayer)) return "Ayer";
+  const texto = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function hora(ts: string): string {
+  return new Date(ts).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+}
+
+type GrupoDia = { clave: string; etiqueta: string; eventos: EventoDashboard[] };
+
+function agruparPorDia(eventos: EventoDashboard[]): GrupoDia[] {
+  const grupos: GrupoDia[] = [];
+  const indice = new Map<string, number>();
+  for (const ev of eventos) {
+    const clave = claveDia(ev.timestamp);
+    if (!indice.has(clave)) {
+      indice.set(clave, grupos.length);
+      grupos.push({ clave, etiqueta: etiquetaDia(ev.timestamp), eventos: [] });
+    }
+    grupos[indice.get(clave)!].eventos.push(ev);
+  }
+  return grupos;
+}
+
+function esConfirmada(evento: EventoDashboard): boolean {
+  return evento.tipos_ia.length > 0 || evento.disparo_alerta;
+}
+
+// --- Vista ------------------------------------------------------------------
 
 export default function AlertasView({ token }: { token: string }) {
   const [eventos, setEventos] = useState<EventoDashboard[] | null>(null);
@@ -24,6 +72,8 @@ export default function AlertasView({ token }: { token: string }) {
 
   useEffect(cargar, [token, filtroEstado, filtroDisparo]);
 
+  const grupos = useMemo(() => (eventos ? agruparPorDia(eventos) : []), [eventos]);
+
   async function alternarEstado(evento: EventoDashboard) {
     const nuevoEstado: EstadoEvento = evento.estado === "nuevo" ? "revisado" : "nuevo";
     try {
@@ -37,7 +87,7 @@ export default function AlertasView({ token }: { token: string }) {
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-corp-muted">Eventos detectados por las cámaras, con evidencia.</p>
+        <p className="text-sm text-corp-muted">Eventos detectados por las cámaras, agrupados por día.</p>
         <div className="flex flex-wrap gap-2">
           <select
             value={filtroEstado}
@@ -54,118 +104,139 @@ export default function AlertasView({ token }: { token: string }) {
             className="rounded-md border border-corp-border px-2 py-1.5 text-sm"
           >
             <option value="todas">Con y sin alerta</option>
-            <option value="con_alerta">Solo con alerta</option>
-            <option value="sin_alerta">Solo sin alerta</option>
+            <option value="con_alerta">Solo alertas</option>
+            <option value="sin_alerta">Solo sin novedad</option>
           </select>
         </div>
       </div>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {eventos && eventos.length === 0 && (
+        <div className="mt-6 rounded-xl border border-corp-border bg-white px-4 py-10 text-center text-sm text-corp-muted">
+          {filtroEstado === "todos" && filtroDisparo === "todas"
+            ? "Todavía no ha llegado ningún evento — aparecen aquí automáticamente en cuanto una cámara reporte movimiento."
+            : "No hay eventos con estos filtros."}
         </div>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-xl border border-corp-border bg-white">
-        <table className="w-full min-w-[680px] text-left text-sm">
-          <thead className="border-b border-corp-border bg-corp-blue-light text-xs uppercase text-corp-muted">
-            <tr>
-              <th className="px-4 py-3">Foto</th>
-              <th className="px-4 py-3">Cámara</th>
-              <th className="px-4 py-3">Zona</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Alerta</th>
-              <th className="px-4 py-3">IA</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {eventos?.map((evento) => (
-              <tr key={evento.id} className="border-b border-corp-border last:border-0">
-                <td className="px-4 py-3">
-                  {evento.snapshot ? (
-                    <button type="button" onClick={() => setEventoAmpliado(evento)}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={evento.snapshot}
-                        alt={`Snapshot de ${evento.camara_nombre}`}
-                        className="h-12 w-16 rounded-md object-cover ring-1 ring-corp-border"
-                      />
-                    </button>
-                  ) : (
-                    <div className="flex h-12 w-16 items-center justify-center rounded-md bg-zinc-100 text-[10px] text-corp-muted">
-                      Sin foto
-                    </div>
+      <div className="mt-6 space-y-8">
+        {grupos.map((grupo) => {
+          const confirmadas = grupo.eventos.filter(esConfirmada).length;
+          return (
+            <section key={grupo.clave}>
+              {/* Encabezado del día */}
+              <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between border-b border-corp-border bg-background/90 px-1 py-2 backdrop-blur">
+                <h3 className="text-base font-semibold text-corp-navy">{grupo.etiqueta}</h3>
+                <div className="flex items-center gap-2 text-xs">
+                  {confirmadas > 0 && (
+                    <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-700">
+                      {confirmadas} {confirmadas === 1 ? "alerta" : "alertas"}
+                    </span>
                   )}
-                </td>
-                <td className="px-4 py-3 font-medium text-corp-navy">{evento.camara_nombre}</td>
-                <td className="px-4 py-3 text-corp-muted">{evento.zona_nombre ?? "—"}</td>
-                <td className="px-4 py-3 text-corp-muted">
-                  {new Date(evento.timestamp).toLocaleString("es-CO")}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      evento.disparo_alerta ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {evento.disparo_alerta ? "Alerta" : "Normal"}
+                  <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-medium text-corp-muted">
+                    {grupo.eventos.length} {grupo.eventos.length === 1 ? "evento" : "eventos"}
                   </span>
-                </td>
-                <td className="px-4 py-3">
-                  {evento.tipos_ia.length > 0 ? (
-                    <div className="flex flex-wrap gap-1" title={evento.descripcion_ia}>
-                      {evento.tipos_ia.map((tipo) => (
-                        <span
-                          key={tipo.id}
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            tipo.severidad === "alta"
-                              ? "bg-red-100 text-red-700"
-                              : tipo.severidad === "media"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-zinc-100 text-zinc-600"
-                          }`}
-                        >
-                          {tipo.nombre}
+                </div>
+              </div>
+
+              {/* Tarjetas del día */}
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {grupo.eventos.map((evento) => {
+                  const confirmada = esConfirmada(evento);
+                  return (
+                    <article
+                      key={evento.id}
+                      className={`overflow-hidden rounded-xl border bg-white shadow-sm transition hover:shadow-md ${
+                        confirmada ? "border-red-200 ring-1 ring-red-100" : "border-corp-border"
+                      }`}
+                    >
+                      <div className="relative">
+                        {evento.snapshot ? (
+                          <button
+                            type="button"
+                            onClick={() => setEventoAmpliado(evento)}
+                            className="block w-full"
+                            title="Ampliar foto"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={evento.snapshot}
+                              alt={`Evento en ${evento.camara_nombre}`}
+                              className="h-40 w-full object-cover"
+                            />
+                          </button>
+                        ) : (
+                          <div className="flex h-40 w-full items-center justify-center bg-zinc-100 text-xs text-corp-muted">
+                            Sin foto
+                          </div>
+                        )}
+                        <span className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+                          {hora(evento.timestamp)}
                         </span>
-                      ))}
-                    </div>
-                  ) : evento.ia_analizado_en ? (
-                    <span className="text-xs text-corp-muted">Nada detectado</span>
-                  ) : (
-                    <span className="text-xs text-corp-muted">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      evento.estado === "nuevo" ? "bg-amber-100 text-amber-700" : "bg-zinc-100 text-zinc-500"
-                    }`}
-                  >
-                    {evento.estado === "nuevo" ? "Nuevo" : "Revisado"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => alternarEstado(evento)}
-                    className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy transition hover:border-corp-blue"
-                  >
-                    {evento.estado === "nuevo" ? "Marcar revisado" : "Marcar nuevo"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {eventos?.length === 0 && (
-          <p className="px-4 py-6 text-center text-sm text-corp-muted">
-            {filtroEstado === "todos" && filtroDisparo === "todas"
-              ? "Todavía no ha llegado ningún evento — aparecen aquí automáticamente en cuanto una cámara reporte movimiento."
-              : "No hay eventos con estos filtros."}
-          </p>
-        )}
+                        {evento.estado === "nuevo" && (
+                          <span className="absolute right-2 top-2 rounded-md bg-amber-400 px-2 py-0.5 text-xs font-semibold text-black">
+                            Nuevo
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 p-3">
+                        <div>
+                          <p className="font-semibold text-corp-navy">{evento.camara_nombre}</p>
+                          <p className="text-xs text-corp-muted">{evento.zona_nombre ?? "Sin zona"}</p>
+                        </div>
+
+                        {/* Resultado de la IA */}
+                        {evento.tipos_ia.length > 0 ? (
+                          <div className="flex flex-wrap gap-1" title={evento.descripcion_ia}>
+                            {evento.tipos_ia.map((tipo) => (
+                              <span
+                                key={tipo.id}
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                  tipo.severidad === "alta"
+                                    ? "bg-red-100 text-red-700"
+                                    : tipo.severidad === "media"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-zinc-100 text-zinc-600"
+                                }`}
+                              >
+                                {tipo.nombre}
+                              </span>
+                            ))}
+                          </div>
+                        ) : evento.ia_analizado_en ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> Sin novedad
+                          </span>
+                        ) : (
+                          <span className="text-xs text-corp-muted">Pendiente de análisis</span>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1">
+                          {evento.notificacion_enviada ? (
+                            <span className="text-xs text-corp-muted">✉️ Notificado</span>
+                          ) : (
+                            <span className="text-xs text-transparent">·</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => alternarEstado(evento)}
+                            className="rounded-md border border-corp-border px-2.5 py-1 text-xs font-medium text-corp-navy transition hover:border-corp-blue"
+                          >
+                            {evento.estado === "nuevo" ? "Marcar revisado" : "Marcar nuevo"}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       {eventoAmpliado?.snapshot && (
