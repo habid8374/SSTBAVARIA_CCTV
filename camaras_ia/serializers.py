@@ -416,7 +416,7 @@ class TipoEventoIASerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TipoEventoIA
-        fields = ["id", "nombre", "descripcion", "severidad", "camaras", "activo", "notificar", "creado_en"]
+        fields = ["id", "nombre", "descripcion", "severidad", "camaras", "activo", "notificar", "notificar_push", "creado_en"]
         read_only_fields = ["id", "creado_en"]
 
 

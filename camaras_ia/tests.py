@@ -2202,16 +2202,16 @@ class CorreoAlertaClienteTests(TestCase):
         evento.refresh_from_db()
         self.assertIn("alerta IA", evento.notificacion_detalle)
 
-    def test_alerta_con_notificar_apagado_no_manda_correo(self, enviar):
-        """Una alerta con notificar=False queda en el tablero pero no manda
-        correo — así el cliente apaga el correo de las alertas muy frecuentes
-        sin perder el registro (planta 24/7)."""
+    def test_notificar_correo_apagado_pero_push_encendido(self, enviar):
+        """notificar=False (sin correo) pero notificar_push=True → llega push
+        pero no correo. Caso Bavaria: push gratis de todo, correo solo grave."""
         tipo = TipoEventoIA.objects.create(
             empresa=self.empresa,
             nombre="Peatón cerca de montacargas",
             descripcion="Persona cerca de un montacargas",
             severidad="alta",
             notificar=False,
+            notificar_push=True,
         )
         evento = self._evento()
         evento.ia_analizado_en = timezone.now()
@@ -2219,8 +2219,26 @@ class CorreoAlertaClienteTests(TestCase):
         evento.tipos_ia.set([tipo])
         with patch("core.push.enviar_push_a_personal_interno") as push:
             _notificar_alerta_ia(evento, [tipo])
+        push.assert_called_once()
         enviar.assert_not_called()
+
+    def test_los_dos_canales_apagados_no_avisan(self, enviar):
+        tipo = TipoEventoIA.objects.create(
+            empresa=self.empresa,
+            nombre="Alerta silenciosa",
+            descripcion="x",
+            severidad="baja",
+            notificar=False,
+            notificar_push=False,
+        )
+        evento = self._evento()
+        evento.ia_analizado_en = timezone.now()
+        evento.save()
+        evento.tipos_ia.set([tipo])
+        with patch("core.push.enviar_push_a_personal_interno") as push:
+            _notificar_alerta_ia(evento, [tipo])
         push.assert_not_called()
+        enviar.assert_not_called()
 
     def test_tope_diario_corta_los_correos(self, enviar):
         """Al llegar al tope diario (cuota de Brevo), no se mandan más correos
