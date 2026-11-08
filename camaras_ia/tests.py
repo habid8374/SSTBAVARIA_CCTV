@@ -1963,6 +1963,31 @@ class AlertasIAPorCamaraTests(TestCase):
 
     @patch("core.push.enviar_push_a_personal_interno")
     @patch("anthropic.Anthropic")
+    def test_push_entregado_marca_el_evento(self, mock_anthropic_cls, mock_push):
+        # Que el historial de Notificaciones pueda mostrar "push enviada".
+        mock_push.return_value = 1
+        self._detecta(mock_anthropic_cls, self.casco)
+        evento = self._evento(self.camara1, self.zona1)
+
+        clasificar_evento(evento)
+
+        evento.refresh_from_db()
+        self.assertTrue(evento.push_enviado)
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
+    def test_sin_dispositivos_no_marca_push_enviado(self, mock_anthropic_cls, mock_push):
+        mock_push.return_value = 0  # nadie suscrito, o VAPID sin configurar
+        self._detecta(mock_anthropic_cls, self.casco)
+        evento = self._evento(self.camara1, self.zona1)
+
+        clasificar_evento(evento)
+
+        evento.refresh_from_db()
+        self.assertFalse(evento.push_enviado)
+
+    @patch("core.push.enviar_push_a_personal_interno")
+    @patch("anthropic.Anthropic")
     def test_sin_deteccion_no_hay_alerta_ni_aviso(self, mock_anthropic_cls, mock_push):
         self._detecta(mock_anthropic_cls)
         evento = self._evento(self.camara1)

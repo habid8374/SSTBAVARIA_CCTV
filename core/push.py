@@ -28,13 +28,15 @@ def _personal_interno():
 def enviar_push_a_usuario(usuario, titulo, cuerpo, url="/dashboard"):
     """Manda la notificación a cada dispositivo suscrito de `usuario`. Una
     suscripción que el navegador ya dio de baja (404/410) se borra sola acá
-    — así la bandeja de SuscripcionPush no se llena de basura."""
+    — así la bandeja de SuscripcionPush no se llena de basura. Devuelve a
+    cuántos dispositivos se entregó con éxito."""
     if not (settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY and settings.VAPID_CLAIMS_EMAIL):
-        return
+        return 0
 
     from pywebpush import WebPushException, webpush
 
     payload = json.dumps({"titulo": titulo, "cuerpo": cuerpo, "url": url})
+    entregados = 0
     for suscripcion in usuario.suscripciones_push.all():
         try:
             webpush(
@@ -46,19 +48,21 @@ def enviar_push_a_usuario(usuario, titulo, cuerpo, url="/dashboard"):
                 vapid_private_key=settings.VAPID_PRIVATE_KEY,
                 vapid_claims={"sub": f"mailto:{settings.VAPID_CLAIMS_EMAIL}"},
             )
+            entregados += 1
         except WebPushException as err:
             codigo = err.response.status_code if err.response is not None else None
             if codigo in (404, 410):
                 suscripcion.delete()
             else:
                 logger.error("No se pudo enviar push a %s (%s): %s", usuario, suscripcion.pk, err)
+    return entregados
 
 
 def enviar_push_a_personal_interno(titulo, cuerpo, url="/dashboard"):
     """Igual que enviar_push_a_usuario, pero a todo el personal de
     SST/interventoría (Administrador/Operador) — nunca al portal de
-    contratistas, mismo público que ya ve la bandeja de la campanita."""
+    contratistas, mismo público que ya ve la bandeja de la campanita.
+    Devuelve el total de dispositivos a los que se entregó con éxito."""
     if not (settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY and settings.VAPID_CLAIMS_EMAIL):
-        return
-    for usuario in _personal_interno():
-        enviar_push_a_usuario(usuario, titulo, cuerpo, url)
+        return 0
+    return sum(enviar_push_a_usuario(usuario, titulo, cuerpo, url) for usuario in _personal_interno())

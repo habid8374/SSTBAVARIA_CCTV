@@ -7,7 +7,7 @@ import { listarEventos, type EventoDashboard, type Rol } from "@/lib/api";
 import ConfiguracionAlertasView from "./ConfiguracionAlertasView";
 
 type Pestana = "envios" | "configuracion";
-type FiltroCanal = "todos" | "whatsapp" | "correo";
+type FiltroCanal = "todos" | "whatsapp" | "correo" | "push";
 
 export default function NotificacionesView({ token, rol }: { token: string; rol: Rol | null }) {
   const [pestana, setPestana] = useState<Pestana>("envios");
@@ -87,7 +87,8 @@ function EnviosNotificaciones({ token }: { token: string }) {
   function cargar() {
     listarEventos(token, {
       disparo_alerta: true,
-      canal_notificacion: filtroCanal === "todos" ? undefined : filtroCanal,
+      canal_notificacion: filtroCanal === "correo" || filtroCanal === "whatsapp" ? filtroCanal : undefined,
+      push_enviado: filtroCanal === "push" ? true : undefined,
     })
       .then(setEventos)
       .catch(() => setError("No se pudo cargar el registro de notificaciones."));
@@ -107,6 +108,7 @@ function EnviosNotificaciones({ token }: { token: string }) {
           className="rounded-md border border-corp-border px-2 py-1.5 text-sm"
         >
           <option value="todos">Todos los canales</option>
+          <option value="push">Solo push (app)</option>
           <option value="correo">Solo correo</option>
           <option value="whatsapp">Solo WhatsApp</option>
         </select>
@@ -126,6 +128,7 @@ function EnviosNotificaciones({ token }: { token: string }) {
               <th className="px-4 py-3">Zona</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Canal</th>
+              <th className="px-4 py-3">Push (app)</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Detalle</th>
             </tr>
@@ -139,6 +142,15 @@ function EnviosNotificaciones({ token }: { token: string }) {
                   {new Date(evento.timestamp).toLocaleString("es-CO")}
                 </td>
                 <td className="px-4 py-3 text-corp-muted capitalize">{evento.canal_notificacion || "—"}</td>
+                <td className="px-4 py-3">
+                  {evento.push_enviado ? (
+                    <span className="rounded-full bg-corp-blue-light px-2 py-0.5 text-xs font-medium text-corp-navy">
+                      📱 Enviada
+                    </span>
+                  ) : (
+                    <span className="text-xs text-corp-muted">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <BadgeEstadoEnvio evento={evento} />
                 </td>
