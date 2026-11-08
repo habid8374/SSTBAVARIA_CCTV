@@ -1917,14 +1917,14 @@ class AlertasIAPorCamaraTests(TestCase):
 
     @patch("core.push.enviar_push_a_personal_interno")
     @patch("anthropic.Anthropic")
-    def test_no_repite_el_aviso_del_mismo_evento_ia_dentro_de_10_minutos(self, mock_anthropic_cls, mock_push):
+    def test_no_repite_el_aviso_del_mismo_evento_ia_dentro_de_la_ventana(self, mock_anthropic_cls, mock_push):
         self._detecta(mock_anthropic_cls, self.casco)
         clasificar_evento(self._evento(self.camara1))
         clasificar_evento(self._evento(self.camara1))
 
         self.assertEqual(mock_push.call_count, 1)
 
-        EventoDetectado.objects.update(ia_analizado_en=timezone.now() - datetime.timedelta(minutes=11))
+        EventoDetectado.objects.update(ia_analizado_en=timezone.now() - datetime.timedelta(minutes=31))
         clasificar_evento(self._evento(self.camara1))
 
         self.assertEqual(mock_push.call_count, 2)
@@ -2193,6 +2193,26 @@ class CorreoAlertaClienteTests(TestCase):
         self.assertIn("sin casco junto al muelle", enviar.call_args.args[2])
         evento.refresh_from_db()
         self.assertIn("alerta IA", evento.notificacion_detalle)
+
+    def test_alerta_con_notificar_apagado_no_manda_correo(self, enviar):
+        """Una alerta con notificar=False queda en el tablero pero no manda
+        correo — así el cliente apaga el correo de las alertas muy frecuentes
+        sin perder el registro (planta 24/7)."""
+        tipo = TipoEventoIA.objects.create(
+            empresa=self.empresa,
+            nombre="Peatón cerca de montacargas",
+            descripcion="Persona cerca de un montacargas",
+            severidad="alta",
+            notificar=False,
+        )
+        evento = self._evento()
+        evento.ia_analizado_en = timezone.now()
+        evento.save()
+        evento.tipos_ia.set([tipo])
+        with patch("core.push.enviar_push_a_personal_interno") as push:
+            _notificar_alerta_ia(evento, [tipo])
+        enviar.assert_not_called()
+        push.assert_not_called()
 
 
 class CorreosAlertasConfiguracionTests(TestCase):

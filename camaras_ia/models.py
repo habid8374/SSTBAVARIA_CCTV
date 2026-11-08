@@ -266,6 +266,12 @@ class TipoEventoIA(models.Model):
         help_text="Cámaras en las que la IA revisa este evento. Sin cámaras no se revisa en ninguna.",
     )
     activo = models.BooleanField(default=True)
+    notificar = models.BooleanField(
+        "enviar correo",
+        default=True,
+        help_text="Si está activo, cuando la IA confirme esta alerta se envía correo al cliente. "
+        "Si se apaga, la alerta solo queda registrada en el tablero, sin correo.",
+    )
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:

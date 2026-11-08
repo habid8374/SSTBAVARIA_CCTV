@@ -25,7 +25,7 @@ from .models import ConfiguracionIA, EventoDetectado, TipoEventoIA
 
 logger = logging.getLogger("camaras_ia.ia_deteccion")
 
-VENTANA_SIN_REPETIR_AVISO_IA = timedelta(minutes=10)
+VENTANA_SIN_REPETIR_AVISO_IA = timedelta(minutes=30)
 
 # Lo máximo que la respuesta al equipo local espera a la IA. Si la IA tarda
 # más, la revisión sigue en segundo plano: el equipo local corta a los 10 s
@@ -158,16 +158,21 @@ def _no_clasificar(evento, motivo):
 
 
 def _notificar_alerta_ia(evento, detectados):
-    """Push al personal interno — sin repetir el mismo evento IA de la misma
-    cámara dentro de VENTANA_SIN_REPETIR_AVISO_IA: el equipo local reporta a
-    la misma persona cada minuto mientras siga en la zona."""
+    """Push + correo al confirmar una alerta — sin repetir el mismo evento IA
+    de la misma cámara dentro de VENTANA_SIN_REPETIR_AVISO_IA (el equipo local
+    reporta a la misma persona cada minuto mientras siga en la zona). Solo se
+    notifican las alertas con notificar=True: las demás quedan registradas en
+    el tablero pero no mandan correo — así el cliente elige, por alerta, qué
+    le llega al correo y qué solo se ve en el dashboard (planta 24/7 con mucho
+    movimiento: sin esto, las alertas más frecuentes inundan el correo)."""
     from core.push import enviar_push_a_personal_interno
 
     desde = evento.ia_analizado_en - VENTANA_SIN_REPETIR_AVISO_IA
     nuevos = [
         tipo
         for tipo in detectados
-        if not EventoDetectado.objects.filter(camara=evento.camara, tipos_ia=tipo, ia_analizado_en__gte=desde)
+        if tipo.notificar
+        and not EventoDetectado.objects.filter(camara=evento.camara, tipos_ia=tipo, ia_analizado_en__gte=desde)
         .exclude(pk=evento.pk)
         .exists()
     ]
