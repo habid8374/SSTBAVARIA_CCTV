@@ -480,6 +480,56 @@ class RecibirEventoCamaraViewTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    @patch("camaras_ia.views.clasificar_evento")
+    def test_revision_periodica_sin_deteccion_borra_el_evento(self, mock_clasificar):
+        # Un barrido periódico que la IA no marca no debe dejar "evento sin
+        # novedad" en el tablero: se descarta.
+        response = self.client.post(
+            self.url,
+            {"camara": self.camara.pk, "punto_x": 5, "punto_y": 5, "revision_periodica": "true"},
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["deteccion"])
+        self.assertIsNone(response.data["id"])
+        self.assertFalse(EventoDetectado.objects.exists())
+        mock_clasificar.assert_called_once()
+
+    @patch("camaras_ia.views.clasificar_evento")
+    def test_revision_periodica_con_deteccion_conserva_el_evento(self, mock_clasificar):
+        tipo = TipoEventoIA.objects.create(
+            empresa=self.empresa, nombre="Guarda abierta", descripcion="Reja de seguridad abierta"
+        )
+
+        def fake_clasificar(evento):
+            evento.tipos_ia.set([tipo])
+            evento.disparo_alerta = True
+            evento.save(update_fields=["disparo_alerta"])
+
+        mock_clasificar.side_effect = fake_clasificar
+        response = self.client.post(
+            self.url,
+            {"camara": self.camara.pk, "punto_x": 5, "punto_y": 5, "revision_periodica": "true"},
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data["deteccion"])
+        evento = EventoDetectado.objects.get(pk=response.data["id"])
+        self.assertEqual(list(evento.tipos_ia.all()), [tipo])
+
+    @patch("camaras_ia.views.disparar_alerta")
+    @patch("camaras_ia.views.clasificar_evento")
+    def test_revision_periodica_no_dispara_regla_de_zona(self, mock_clasificar, mock_disparar):
+        # Aunque el punto caiga en una zona con regla vigente (24/7, ver
+        # setUp), un barrido periódico nunca dispara "persona fuera de horario".
+        response = self.client.post(
+            self.url,
+            {"camara": self.camara.pk, "punto_x": 5, "punto_y": 5, "revision_periodica": "true"},
+            HTTP_X_API_KEY=self.equipo.api_key,
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_disparar.assert_not_called()
+
 
 class ObtenerReglasActivasViewTests(TestCase):
     def setUp(self):

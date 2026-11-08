@@ -41,6 +41,7 @@ class CamaraMonitor:
         self.config = config
         self._tamano_referencia = None  # se resuelve la primera vez que hace falta, después se cachea
         self._ultimo_reporte_por_zona = {}
+        self._ultima_revision_periodica = float("-inf")
         self._detener = threading.Event()
         self._hilo = None
         self._lock_frame = threading.Lock()
@@ -161,6 +162,7 @@ class CamaraMonitor:
                     if self._grabador is not None:
                         self._grabador.procesar_frame(frame)
                     self._procesar_frame(frame)
+                    self._revisar_periodicamente(frame)
                 except Exception:
                     # Sin esto, un solo error mata el hilo de la cámara en silencio
                     # (la excepción de un hilo va a stderr, que no existe en la
@@ -227,6 +229,56 @@ class CamaraMonitor:
                 )
             for zona in zonas:
                 self._reportar(punto_escalado, frame, zona, confianza)
+
+    def _revisar_periodicamente(self, frame, ahora=None):
+        """Cada REVISION_PERIODICA_SEGUNDOS manda el encuadre actual para que
+        la IA lo revise aunque NO haya nadie en la zona — así se detecta, por
+        ejemplo, una guarda/reja abierta sin gente cerca, que el disparo por
+        persona nunca vería. El backend descarta el evento si la IA no detecta
+        nada. El envío va en un hilo aparte para no frenar la captura (la
+        clasificación en la nube tarda unos segundos)."""
+        intervalo = getattr(self.config, "REVISION_PERIODICA_SEGUNDOS", 0)
+        if not intervalo or not self.zonas:
+            return
+        ahora = ahora if ahora is not None else time.monotonic()
+        if ahora - self._ultima_revision_periodica < intervalo:
+            return
+        self._ultima_revision_periodica = ahora
+
+        punto = self._centroide_zona(self.zonas[0])
+        if punto is None:
+            return
+        ok, buffer = cv2.imencode(".jpg", frame)
+        if not ok:
+            return
+        snapshot = buffer.tobytes()
+        hilo = threading.Thread(
+            target=self._enviar_revision_periodica, args=(punto, snapshot),
+            name=f"revision-{self.id}", daemon=True,
+        )
+        hilo.start()
+
+    def _enviar_revision_periodica(self, punto, snapshot):
+        try:
+            self.cliente_api.reportar_evento(self.id, punto[0], punto[1], snapshot, revision_periodica=True)
+            logger.info("Revisión periódica IA enviada — %s", self.nombre)
+        except Exception:
+            logger.exception("No se pudo enviar la revisión periódica de %s", self.nombre)
+
+    @staticmethod
+    def _centroide_zona(zona):
+        """Un punto representativo dentro de la zona, en coordenadas del
+        encuadre de referencia (igual que el polígono). Para las zonas de
+        punto+radio es su centro; para polígonos, el promedio de los
+        vértices. El punto solo ubica la zona — la IA revisa toda la foto."""
+        if zona.get("tipo") == "punto_radio" and zona.get("centro_x") is not None:
+            return (zona["centro_x"], zona["centro_y"])
+        poligono = zona.get("poligono") or []
+        if len(poligono) < 3:
+            return None
+        xs = [p[0] for p in poligono]
+        ys = [p[1] for p in poligono]
+        return (sum(xs) / len(xs), sum(ys) / len(ys))
 
     def _reportar(self, punto, frame, zona, confianza):
         ok, buffer = cv2.imencode(".jpg", frame)

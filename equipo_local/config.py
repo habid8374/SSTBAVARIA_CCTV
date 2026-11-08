@@ -54,6 +54,15 @@ class Config:
     # (y la bandeja de correo) mientras la persona sigue parada ahí.
     COOLDOWN_ZONA_SEGUNDOS = _entero("COOLDOWN_ZONA_SEGUNDOS", 60)
 
+    # Revisión periódica con IA aunque NO haya nadie en la zona: cada este
+    # intervalo, cada cámara con zonas manda su encuadre actual para que la IA
+    # lo revise (ej. una guarda/reja abierta sin gente cerca, que el disparo
+    # por persona nunca vería). El backend descarta el evento si la IA no
+    # detecta nada, así no ensucia el tablero. 0 = desactivado. Ojo: cada
+    # revisión es una llamada de IA — el gasto total lo acota el tope de
+    # consumo de IA (ConfiguracionIA.tope_usd).
+    REVISION_PERIODICA_SEGUNDOS = _entero("REVISION_PERIODICA_SEGUNDOS", 300)
+
     # Ruta del modelo de ultralytics. Por defecto, una ruta absoluta dentro
     # de esta misma carpeta (equipo_local/yolov8n.pt) — nunca un nombre
     # suelto como "yolov8n.pt": ultralytics resuelve (y descarga, si falta)

@@ -36,6 +36,9 @@ class EventoEntradaSerializer(serializers.Serializer):
     punto_x = serializers.FloatField()
     punto_y = serializers.FloatField()
     snapshot = serializers.ImageField(required=False, allow_null=True, validators=[validar_tamano_archivo])
+    # Barrido automático sin persona (ver CamaraMonitor._revisar_periodicamente):
+    # se clasifica con IA y se descarta si no detecta nada, sin disparar reglas de zona.
+    revision_periodica = serializers.BooleanField(required=False, default=False)
 
 
 class SnapshotReferenciaSerializer(serializers.Serializer):
