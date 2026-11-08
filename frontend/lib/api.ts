@@ -681,6 +681,7 @@ export type TipoEventoIA = {
   camaras: number[];
   activo: boolean;
   notificar: boolean;
+  notificar_push: boolean;
   creado_en: string;
 };
 
@@ -690,6 +691,7 @@ export type NuevoTipoEventoIA = {
   severidad?: Severidad;
   camaras: number[];
   notificar?: boolean;
+  notificar_push?: boolean;
 };
 
 export function listarTiposEventoIA(token: string): Promise<TipoEventoIA[]> {

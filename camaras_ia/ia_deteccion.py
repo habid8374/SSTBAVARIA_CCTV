@@ -158,31 +158,46 @@ def _no_clasificar(evento, motivo):
 
 
 def _notificar_alerta_ia(evento, detectados):
-    """Push + correo al confirmar una alerta — sin repetir el mismo evento IA
-    de la misma cámara dentro de VENTANA_SIN_REPETIR_AVISO_IA (el equipo local
-    reporta a la misma persona cada minuto mientras siga en la zona). Solo se
-    notifican las alertas con notificar=True: las demás quedan registradas en
-    el tablero pero no mandan correo — así el cliente elige, por alerta, qué
-    le llega al correo y qué solo se ve en el dashboard (planta 24/7 con mucho
-    movimiento: sin esto, las alertas más frecuentes inundan el correo)."""
+    """Avisa al confirmar una alerta, por dos canales independientes, sin
+    repetir el mismo evento IA de la misma cámara dentro de
+    VENTANA_SIN_REPETIR_AVISO_IA (el equipo local reporta a la misma persona
+    cada minuto mientras siga en la zona):
+
+    - PUSH (notificación a la app del celular): gratis e ilimitado → se manda
+      para las alertas con notificar_push=True.
+    - CORREO (cuota mensual de Brevo): limitado → se manda para las alertas
+      con notificar=True, y con tope diario (ver enviar_correo_alerta_al_cliente).
+
+    Una alerta con los dos apagados queda registrada en el tablero pero no
+    avisa. Así, en una planta 24/7, el cliente recibe push de todo lo que la
+    IA detecta y correo solo de lo grave, sin inundar la cuota de correos."""
     from core.push import enviar_push_a_personal_interno
 
     desde = evento.ia_analizado_en - VENTANA_SIN_REPETIR_AVISO_IA
     nuevos = [
         tipo
         for tipo in detectados
-        if tipo.notificar
-        and not EventoDetectado.objects.filter(camara=evento.camara, tipos_ia=tipo, ia_analizado_en__gte=desde)
+        if not EventoDetectado.objects.filter(camara=evento.camara, tipos_ia=tipo, ia_analizado_en__gte=desde)
         .exclude(pk=evento.pk)
         .exists()
     ]
     if not nuevos:
         return
-    detalle = ", ".join(f"{tipo.nombre} ({tipo.get_severidad_display().lower()})" for tipo in nuevos)
     donde = f" en {evento.zona.nombre}" if evento.zona else ""
-    enviar_push_a_personal_interno(
-        f"Alerta IA — {evento.camara.nombre_para_mostrar}", f"{detalle}{donde}.", url="/dashboard?ir=alertas"
-    )
+
+    para_push = [tipo for tipo in nuevos if tipo.notificar_push]
+    if para_push:
+        detalle_push = ", ".join(f"{tipo.nombre} ({tipo.get_severidad_display().lower()})" for tipo in para_push)
+        enviar_push_a_personal_interno(
+            f"Alerta IA — {evento.camara.nombre_para_mostrar}",
+            f"{detalle_push}{donde}.",
+            url="/dashboard?ir=alertas",
+        )
+
+    para_correo = [tipo for tipo in nuevos if tipo.notificar]
+    if not para_correo:
+        return
+    detalle = ", ".join(f"{tipo.nombre} ({tipo.get_severidad_display().lower()})" for tipo in para_correo)
 
     from html import escape
 

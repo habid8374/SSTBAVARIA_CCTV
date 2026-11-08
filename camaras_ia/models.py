@@ -276,8 +276,15 @@ class TipoEventoIA(models.Model):
     notificar = models.BooleanField(
         "enviar correo",
         default=True,
-        help_text="Si está activo, cuando la IA confirme esta alerta se envía correo al cliente. "
-        "Si se apaga, la alerta solo queda registrada en el tablero, sin correo.",
+        help_text="Si está activo, cuando la IA confirme esta alerta se envía correo al cliente (cuota de "
+        "Brevo, con tope diario). Si se apaga, no se manda correo.",
+    )
+    notificar_push = models.BooleanField(
+        "enviar notificación push",
+        default=True,
+        help_text="Si está activo, cuando la IA confirme esta alerta se manda notificación push a la app del "
+        "celular. El push es gratis e ilimitado. Si los dos (correo y push) están apagados, la alerta solo "
+        "queda en el tablero.",
     )
     creado_en = models.DateTimeField(auto_now_add=True)
 

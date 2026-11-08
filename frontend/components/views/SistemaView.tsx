@@ -870,6 +870,7 @@ function FormularioTipoEvento({
           severidad: tipo.severidad,
           camaras: tipo.camaras,
           notificar: tipo.notificar,
+          notificar_push: tipo.notificar_push,
         }
       : {
           nombre: "",
@@ -877,6 +878,7 @@ function FormularioTipoEvento({
           severidad: "media",
           camaras: camaraInicial === null ? [] : [camaraInicial],
           notificar: true,
+          notificar_push: true,
         }
   );
   const etiquetaCamara = etiquetasCamaras(camaras);
@@ -965,22 +967,38 @@ function FormularioTipoEvento({
             </select>
           </Campo>
 
-          <label className="flex items-start gap-2 rounded-lg border border-corp-border p-3 text-sm">
-            <input
-              type="checkbox"
-              checked={datos.notificar ?? true}
-              onChange={(event) => setDatos({ ...datos, notificar: event.target.checked })}
-              className="mt-0.5 h-4 w-4 accent-corp-navy"
-            />
-            <span>
-              <span className="font-medium text-corp-navy">Avisar al cliente (correo y notificación push)</span>
-              <span className="mt-0.5 block text-xs text-corp-muted">
-                Si está encendido, cuando la IA confirme esta alerta se envía correo y notificación push a la app
-                del celular. Si lo apagas, la alerta igual queda registrada en el tablero, pero no avisa. Útil
-                para alertas muy frecuentes que no quieres que inunden el correo ni el celular.
+          <fieldset className="space-y-2 rounded-lg border border-corp-border p-3">
+            <legend className="px-1 text-xs font-medium text-corp-muted">Cuando la IA confirme esta alerta…</legend>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={datos.notificar_push ?? true}
+                onChange={(event) => setDatos({ ...datos, notificar_push: event.target.checked })}
+                className="mt-0.5 h-4 w-4 accent-corp-navy"
+              />
+              <span>
+                <span className="font-medium text-corp-navy">Enviar notificación push a la app</span>
+                <span className="mt-0.5 block text-xs text-corp-muted">Gratis e ilimitado. Llega al celular.</span>
               </span>
-            </span>
-          </label>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={datos.notificar ?? true}
+                onChange={(event) => setDatos({ ...datos, notificar: event.target.checked })}
+                className="mt-0.5 h-4 w-4 accent-corp-navy"
+              />
+              <span>
+                <span className="font-medium text-corp-navy">Enviar correo</span>
+                <span className="mt-0.5 block text-xs text-corp-muted">
+                  Usa la cuota de Brevo (tope diario). Apágalo en las alertas muy frecuentes.
+                </span>
+              </span>
+            </label>
+            <p className="px-1 text-xs text-corp-muted">
+              Con los dos apagados, la alerta solo queda registrada en el tablero.
+            </p>
+          </fieldset>
 
           {error && (
             <div
