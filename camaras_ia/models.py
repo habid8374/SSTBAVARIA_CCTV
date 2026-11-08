@@ -158,6 +158,13 @@ class ConfiguracionNotificaciones(models.Model):
             "de IA. Aparte del canal de cada regla."
         ),
     )
+    tope_correos_diarios = models.PositiveSmallIntegerField(
+        "tope de correos por día",
+        default=10,
+        help_text="Máximo de correos de alerta que se envían por día, para no agotar la cuota mensual de "
+        "Brevo (plan gratis: 300/mes ≈ 10/día). Al llegar al tope, las alertas siguen quedando en el "
+        "tablero pero no se manda más correo hasta el otro día. 0 = sin límite.",
+    )
     actualizada_en = models.DateTimeField("actualizada en", auto_now=True)
 
     class Meta:

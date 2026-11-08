@@ -554,6 +554,7 @@ export type ConfiguracionNotificaciones = {
   brevo_remitente_email: string;
   brevo_remitente_nombre: string;
   correos_alertas: string;
+  tope_correos_diarios: number;
   actualizada_en: string;
 };
 
@@ -562,6 +563,7 @@ export type CambiosConfiguracionNotificaciones = {
   brevo_remitente_email?: string;
   brevo_remitente_nombre?: string;
   correos_alertas?: string;
+  tope_correos_diarios?: number;
 };
 
 export function obtenerConfiguracionNotificaciones(token: string): Promise<ConfiguracionNotificaciones> {

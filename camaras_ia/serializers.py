@@ -345,6 +345,7 @@ class ConfiguracionNotificacionesSerializer(serializers.ModelSerializer):
             "brevo_remitente_email",
             "brevo_remitente_nombre",
             "correos_alertas",
+            "tope_correos_diarios",
             "actualizada_en",
         ]
         read_only_fields = ["actualizada_en"]

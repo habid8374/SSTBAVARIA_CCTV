@@ -172,14 +172,35 @@ def enviar_correo_alerta_al_cliente(evento, *, asunto, titulo, detalle_html, exc
     de ConfiguracionNotificaciones.correos_alertas (menos los de `excluir`,
     que ya lo recibieron por el canal de la regla). Devuelve a cuáles salió.
     Nunca rompe el flujo del evento: un fallo de Brevo queda en el log."""
-    from .models import ConfiguracionNotificaciones
+    from .models import ConfiguracionNotificaciones, EventoDetectado
 
-    correos = [
-        correo for correo in ConfiguracionNotificaciones.obtener().lista_correos_alertas()
-        if correo.lower() not in excluir
-    ]
+    config = ConfiguracionNotificaciones.obtener()
+    correos = [correo for correo in config.lista_correos_alertas() if correo.lower() not in excluir]
     if not correos:
         return []
+
+    # Tope diario de correos: con el plan gratis de Brevo (300/mes ≈ 10/día)
+    # una planta 24/7 agotaría la cuota en días. Al llegar al tope, la alerta
+    # igual queda en el tablero (notificacion_enviada se deja en False) pero no
+    # se manda correo hasta el otro día.
+    tope = config.tope_correos_diarios
+    if tope:
+        hoy = timezone.localdate()
+        enviados_hoy = (
+            EventoDetectado.objects.filter(
+                camara__empresa_id=evento.camara.empresa_id, notificacion_enviada=True, timestamp__date=hoy
+            )
+            .exclude(pk=evento.pk)
+            .count()
+        )
+        if enviados_hoy >= tope:
+            logger.warning(
+                "Tope diario de correos de alerta alcanzado (%s/%s) — no se envía el del evento_id=%s.",
+                enviados_hoy,
+                tope,
+                evento.pk,
+            )
+            return []
 
     adjunto_bytes = adjunto_nombre = None
     if evento.snapshot:

@@ -106,6 +106,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
   const [remitenteEmail, setRemitenteEmail] = useState("");
   const [remitenteNombre, setRemitenteNombre] = useState("");
   const [correosAlertas, setCorreosAlertas] = useState("");
+  const [topeDiario, setTopeDiario] = useState("10");
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -117,6 +118,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
         setRemitenteEmail(data.brevo_remitente_email);
         setRemitenteNombre(data.brevo_remitente_nombre);
         setCorreosAlertas(data.correos_alertas);
+        setTopeDiario(String(data.tope_correos_diarios));
       })
       .catch(() => setError("No se pudo cargar la configuración de Brevo."));
   }
@@ -133,6 +135,7 @@ function ConfiguracionBrevo({ token }: { token: string }) {
         brevo_remitente_email: remitenteEmail,
         brevo_remitente_nombre: remitenteNombre,
         correos_alertas: correosAlertas,
+        tope_correos_diarios: Math.max(0, parseInt(topeDiario, 10) || 0),
       };
       if (apiKey.trim()) {
         cambios.brevo_api_key = apiKey.trim();
@@ -205,9 +208,23 @@ function ConfiguracionBrevo({ token }: { token: string }) {
             className="w-full rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
           />
           <p className="text-xs text-corp-muted">
-            Uno por línea o separados por coma. Reciben un correo con la foto por cada alerta de las cámaras
-            (persona en zona restringida dentro del horario y alertas de IA), sin importar el canal de la regla.
-            Si la persona sigue en la zona, la misma cámara no repite el correo por 10 minutos.
+            Uno por línea o separados por coma. Reciben un correo con la foto por cada alerta de las cámaras,
+            según el interruptor de correo de cada alerta de IA. La misma cámara no repite el mismo aviso por 30
+            minutos.
+          </p>
+        </Campo>
+        <Campo label="Tope de correos por día">
+          <input
+            type="number"
+            min={0}
+            value={topeDiario}
+            onChange={(event) => setTopeDiario(event.target.value)}
+            className="w-32 rounded-lg border border-corp-border px-3 py-2 text-sm outline-none transition focus:border-corp-blue focus:ring-2 focus:ring-corp-blue/20"
+          />
+          <p className="text-xs text-corp-muted">
+            Máximo de correos de alerta al día, para no agotar la cuota de Brevo (plan gratis: 300/mes ≈ 10 por
+            día). Al llegar al tope, las alertas siguen quedando en el tablero pero no se manda más correo hasta
+            el otro día. Pon 0 para no limitar.
           </p>
         </Campo>
 
