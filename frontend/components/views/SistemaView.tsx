@@ -973,10 +973,11 @@ function FormularioTipoEvento({
               className="mt-0.5 h-4 w-4 accent-corp-navy"
             />
             <span>
-              <span className="font-medium text-corp-navy">Enviar correo cuando la IA confirme esta alerta</span>
+              <span className="font-medium text-corp-navy">Avisar al cliente (correo y notificación push)</span>
               <span className="mt-0.5 block text-xs text-corp-muted">
-                Si lo apagas, la alerta igual queda registrada en el tablero, pero no manda correo. Útil para
-                alertas muy frecuentes que no quieres que inunden el correo.
+                Si está encendido, cuando la IA confirme esta alerta se envía correo y notificación push a la app
+                del celular. Si lo apagas, la alerta igual queda registrada en el tablero, pero no avisa. Útil
+                para alertas muy frecuentes que no quieres que inunden el correo ni el celular.
               </span>
             </span>
           </label>
