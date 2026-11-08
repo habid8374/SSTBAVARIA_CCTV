@@ -8,6 +8,7 @@ plano (systemd en Linux, Tarea Programada en Windows — ver equipo_local/README
 """
 
 import logging
+import os
 import signal
 import sys
 import time
@@ -53,6 +54,13 @@ try:
     # "python -m equipo_local.main" se pueda importar) ni de si se está
     # corriendo compilado (ver rutas.py).
     load_dotenv(carpeta_base() / ".env")
+
+    # RTSP sobre TCP por defecto (OpenCV/FFmpeg usa UDP si no se dice nada):
+    # con muchas cámaras a la vez, UDP pierde paquetes y algunas quedan en
+    # negro turnándose, aunque sobre CPU y red. TCP es confiable. setdefault
+    # para que el .env lo pueda sobreescribir si hiciera falta. Debe quedar en
+    # os.environ antes del primer cv2.VideoCapture (OpenCV lo lee de ahí).
+    os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp")
 
     from .almacenamiento_local import AlmacenamientoLocal
     from .camara import CamaraMonitor
