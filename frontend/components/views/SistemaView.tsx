@@ -847,8 +847,20 @@ function FormularioTipoEvento({
 }) {
   const [datos, setDatos] = useState<NuevoTipoEventoIA>(
     tipo
-      ? { nombre: tipo.nombre, descripcion: tipo.descripcion, severidad: tipo.severidad, camaras: tipo.camaras }
-      : { nombre: "", descripcion: "", severidad: "media", camaras: camaraInicial === null ? [] : [camaraInicial] }
+      ? {
+          nombre: tipo.nombre,
+          descripcion: tipo.descripcion,
+          severidad: tipo.severidad,
+          camaras: tipo.camaras,
+          notificar: tipo.notificar,
+        }
+      : {
+          nombre: "",
+          descripcion: "",
+          severidad: "media",
+          camaras: camaraInicial === null ? [] : [camaraInicial],
+          notificar: true,
+        }
   );
   const etiquetaCamara = etiquetasCamaras(camaras);
   const [error, setError] = useState<string | null>(null);
@@ -935,6 +947,22 @@ function FormularioTipoEvento({
               <option value="alta">Alta</option>
             </select>
           </Campo>
+
+          <label className="flex items-start gap-2 rounded-lg border border-corp-border p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={datos.notificar ?? true}
+              onChange={(event) => setDatos({ ...datos, notificar: event.target.checked })}
+              className="mt-0.5 h-4 w-4 accent-corp-navy"
+            />
+            <span>
+              <span className="font-medium text-corp-navy">Enviar correo cuando la IA confirme esta alerta</span>
+              <span className="mt-0.5 block text-xs text-corp-muted">
+                Si lo apagas, la alerta igual queda registrada en el tablero, pero no manda correo. Útil para
+                alertas muy frecuentes que no quieres que inunden el correo.
+              </span>
+            </span>
+          </label>
 
           {error && (
             <div
