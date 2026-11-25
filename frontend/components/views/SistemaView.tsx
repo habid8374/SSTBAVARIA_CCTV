@@ -25,9 +25,11 @@ import {
   obtenerConfiguracionNotificaciones,
   obtenerConsumoIA,
   reiniciarConsumoIA,
+  analizarDatasetIA,
   type CamaraDashboard,
   type ConfiguracionIA,
   type ConsumoIA,
+  type ResumenDatasetIA,
   type ConfiguracionNotificaciones,
   type EquipoLocal,
   type NuevoTipoEventoIA,
@@ -322,6 +324,8 @@ function ConfiguracionInteligenciaArtificial({ token, esSuperusuario }: { token:
       {esSuperusuario && config?.proveedor === "claude" && (
         <ConsumoClaude key={config.tope_usd} token={token} tope={config.tope_usd} onTopeGuardado={setConfig} />
       )}
+
+      {esSuperusuario && <AnalisisDataset token={token} />}
 
       {esSuperusuario && (
         <form onSubmit={guardar} className="mt-6 max-w-md space-y-4 rounded-xl border border-corp-border bg-white p-5">
@@ -655,6 +659,98 @@ function Cifra({ etiqueta, valor }: { etiqueta: string; valor: string }) {
       <dt className="text-xs text-corp-muted">{etiqueta}</dt>
       <dd className="mt-0.5 text-sm font-semibold text-corp-navy tabular-nums">{valor}</dd>
     </div>
+  );
+}
+
+function AnalisisDataset({ token }: { token: string }) {
+  const [datos, setDatos] = useState<ResumenDatasetIA | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function analizar() {
+    setError(null);
+    setCargando(true);
+    try {
+      setDatos(await analizarDatasetIA(token));
+    } catch {
+      setError("No se pudo analizar el dataset.");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  const listas = datos?.por_clase.filter((c) => c.n >= datos.umbral_entrenable) ?? [];
+
+  return (
+    <section className="mt-6 rounded-xl border border-corp-border bg-white p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-corp-navy">Dataset para modelo local (destilación)</h3>
+          <p className="mt-0.5 max-w-xl text-xs text-corp-muted">
+            Cada foto ya clasificada por Claude es un ejemplo para entrenar un modelo propio que, con el tiempo, haga el
+            trabajo localmente y baje el costo de IA. Aquí se mide cuántos ejemplos hay acumulados.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={analizar}
+          disabled={cargando}
+          className="self-start rounded-lg bg-corp-blue px-4 py-2 text-xs font-semibold text-black transition hover:bg-corp-navy hover:text-white disabled:opacity-60"
+        >
+          {cargando ? "Analizando…" : "Analizar dataset"}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+      )}
+
+      {datos && (
+        <div className="mt-4">
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Cifra etiqueta="Fotos clasificadas" valor={datos.etiquetados_utiles.toLocaleString("es-CO")} />
+            <Cifra etiqueta="Positivos (con alerta)" valor={datos.positivos.toLocaleString("es-CO")} />
+            <Cifra etiqueta="Negativos (sin novedad)" valor={datos.negativos.toLocaleString("es-CO")} />
+            <Cifra etiqueta="Con foto" valor={datos.con_foto.toLocaleString("es-CO")} />
+          </dl>
+
+          <h4 className="mt-5 text-xs font-semibold uppercase tracking-wide text-corp-muted">Positivos por clase</h4>
+          {datos.por_clase.length === 0 ? (
+            <p className="mt-2 text-sm text-corp-muted">Todavía no hay clases con ejemplos.</p>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {datos.por_clase.map((c) => {
+                const estado =
+                  c.n >= datos.umbral_entrenable
+                    ? { color: "#16a34a", texto: "✓ listo" }
+                    : c.n >= datos.umbral_insuficiente
+                      ? { color: "#d97706", texto: "~ justo" }
+                      : { color: "#dc2626", texto: "✗ faltan" };
+                return (
+                  <li key={c.nombre} className="flex items-center justify-between text-sm">
+                    <span className="text-corp-navy">{c.nombre}</span>
+                    <span className="flex items-center gap-2 tabular-nums">
+                      <span className="font-semibold text-corp-navy">{c.n.toLocaleString("es-CO")}</span>
+                      <span className="text-xs font-medium" style={{ color: estado.color }}>
+                        {estado.texto}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-corp-muted">
+            {listas.length > 0
+              ? `Ya hay suficientes ejemplos (${datos.umbral_entrenable}+) para entrenar un primer modelo de: ${listas
+                  .map((c) => c.nombre)
+                  .join(", ")}.`
+              : `Aún ninguna clase llega a ${datos.umbral_entrenable} ejemplos: conviene seguir acumulando antes de entrenar.`}
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 
