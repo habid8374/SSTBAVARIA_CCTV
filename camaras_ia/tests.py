@@ -2500,3 +2500,46 @@ class SeguridadModuloCamarasTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(Camara.objects.filter(canal=2).exists())
 
+
+
+class ResumenDatasetIATests(TestCase):
+    """Conteos del análisis del dataset para destilar la IA a un modelo local."""
+
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Planta")
+        self.camara = Camara.objects.create(empresa=self.empresa, nombre="Cam", ip="10.0.0.1")
+        self.casco = TipoEventoIA.objects.create(empresa=self.empresa, nombre="Sin casco", descripcion="x")
+        self.guarda = TipoEventoIA.objects.create(empresa=self.empresa, nombre="Guarda abierta", descripcion="y")
+
+    def _evento(self, con_foto=True, error="", tipos=()):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        kwargs = {"camara": self.camara}
+        if con_foto:
+            kwargs["snapshot"] = SimpleUploadedFile("e.jpg", b"falso")
+        evento = EventoDetectado.objects.create(**kwargs)
+        evento.ia_analizado_en = timezone.now()
+        evento.ia_error = error
+        evento.save(update_fields=["ia_analizado_en", "ia_error"])
+        if tipos:
+            evento.tipos_ia.set(tipos)
+        return evento
+
+    def test_cuenta_positivos_negativos_y_por_clase(self):
+        from .dataset_ia import resumen_dataset
+
+        self._evento(tipos=[self.casco])                 # positivo: casco
+        self._evento(tipos=[self.casco, self.guarda])    # positivo: casco + guarda
+        self._evento(tipos=[])                           # negativo: sin novedad
+        self._evento(error="API caída")                  # con error: no es etiqueta útil
+        self._evento(con_foto=False, tipos=[self.casco]) # sin foto: no entrenable
+
+        r = resumen_dataset()
+        self.assertEqual(r["total_eventos"], 5)
+        self.assertEqual(r["con_foto"], 4)
+        self.assertEqual(r["etiquetados_utiles"], 3)
+        self.assertEqual(r["positivos"], 2)
+        self.assertEqual(r["negativos"], 1)
+        por_clase = {f["nombre"]: f["n"] for f in r["por_clase"]}
+        self.assertEqual(por_clase["Sin casco"], 2)
+        self.assertEqual(por_clase["Guarda abierta"], 1)
