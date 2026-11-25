@@ -683,6 +683,25 @@ def reiniciar_consumo_ia(request):
     return Response({"consumo_desde": config.consumo_desde})
 
 
+@api_view(["GET"])
+@permission_classes([EsSuperusuario])
+def analizar_dataset_ia(request):
+    """Cuánto dataset etiquetado por la IA hay acumulado, para decidir si ya se
+    puede destilar la clasificación a un modelo local (ver dataset_ia.py)."""
+    from .dataset_ia import UMBRAL_ENTRENABLE, UMBRAL_INSUFICIENTE, resumen_dataset
+
+    r = resumen_dataset()
+    return Response(
+        {
+            **r,
+            "fecha_primero": r["fecha_primero"].isoformat() if r["fecha_primero"] else None,
+            "fecha_ultimo": r["fecha_ultimo"].isoformat() if r["fecha_ultimo"] else None,
+            "umbral_entrenable": UMBRAL_ENTRENABLE,
+            "umbral_insuficiente": UMBRAL_INSUFICIENTE,
+        }
+    )
+
+
 class TipoEventoIAListaCrear(generics.ListCreateAPIView):
     """Catálogo de eventos que la IA debe buscar en cada snapshot — el
     administrador lo redacta en lenguaje natural (ej. "Persona sin casco

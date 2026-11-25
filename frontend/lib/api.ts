@@ -657,6 +657,25 @@ export function reiniciarConsumoIA(token: string): Promise<{ consumo_desde: stri
   });
 }
 
+export type ResumenDatasetIA = {
+  total_eventos: number;
+  con_foto: number;
+  analizados_por_ia: number;
+  con_error_ia: number;
+  etiquetados_utiles: number;
+  positivos: number;
+  negativos: number;
+  por_clase: { nombre: string; n: number }[];
+  fecha_primero: string | null;
+  fecha_ultimo: string | null;
+  umbral_entrenable: number;
+  umbral_insuficiente: number;
+};
+
+export function analizarDatasetIA(token: string): Promise<ResumenDatasetIA> {
+  return request<ResumenDatasetIA>("/api/camaras-ia/dashboard/dataset-ia/", { headers: authHeaders(token) });
+}
+
 export function obtenerConfiguracionIA(token: string): Promise<ConfiguracionIA> {
   return request<ConfiguracionIA>("/api/camaras-ia/dashboard/configuracion-ia/", {
     headers: authHeaders(token),
