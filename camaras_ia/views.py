@@ -1,5 +1,6 @@
 import base64
 import io
+import logging
 import os
 import re
 import time
@@ -9,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -66,6 +68,8 @@ from .serializers import (
 )
 from .services import disparar_alerta, evaluar_zona_horario
 
+logger = logging.getLogger("camaras_ia.views")
+
 
 def _equipo_desde_api_key(request):
     """Resuelve el EquipoLocal autenticado por el header X-API-Key, o None."""
@@ -113,11 +117,31 @@ def recibir_evento_camara(request):
     evento = EventoDetectado.objects.create(
         camara=camara,
         zona=zona,
-        snapshot=serializer.validated_data.get("snapshot"),
         punto_x=punto[0],
         punto_y=punto[1],
         disparo_alerta=regla is not None,
     )
+
+    # La foto se sube al almacenamiento (R2/S3) aparte del registro del evento:
+    # un hipo transitorio del almacenamiento (p. ej. "InternalError, please try
+    # again") no debe tumbar la detección, que es la función central. Si la
+    # subida falla, el evento queda registrado sin foto (y sin clasificación de
+    # IA, que necesita la imagen) en vez de perderse.
+    snapshot = serializer.validated_data.get("snapshot")
+    if snapshot:
+        try:
+            # Savepoint propio: si la subida falla dentro de la transacción del
+            # request, solo se revierte este guardado y la transacción sigue
+            # usable para el resto (equipo.ultima_conexion, etc.).
+            with transaction.atomic():
+                evento.snapshot = snapshot
+                evento.save(update_fields=["snapshot"])
+        except Exception:
+            logger.exception(
+                "No se pudo guardar la foto del evento_id=%s (almacenamiento caído) — "
+                "el evento queda registrado sin foto.",
+                evento.pk,
+            )
 
     if regla is not None:
         disparar_alerta(evento, regla)

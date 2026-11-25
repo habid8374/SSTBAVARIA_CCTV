@@ -530,6 +530,32 @@ class RecibirEventoCamaraViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         mock_disparar.assert_not_called()
 
+    def test_falla_del_almacenamiento_no_pierde_el_evento(self):
+        # Un hipo transitorio del almacenamiento de fotos (R2/S3) al subir el
+        # snapshot NO debe tumbar el registro del evento: la detección es la
+        # función central. El evento queda registrado sin foto.
+        import io
+        from unittest.mock import patch
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (8, 8)).save(buffer, "JPEG")
+        imagen = SimpleUploadedFile("evento.jpg", buffer.getvalue(), content_type="image/jpeg")
+
+        campo_snapshot = EventoDetectado._meta.get_field("snapshot")
+        with patch.object(campo_snapshot.storage, "save", side_effect=Exception("R2 InternalError")):
+            response = self.client.post(
+                self.url,
+                {"camara": self.camara.pk, "punto_x": 50, "punto_y": 50, "snapshot": imagen},
+                HTTP_X_API_KEY=self.equipo.api_key,
+            )
+
+        self.assertEqual(response.status_code, 201)
+        evento = EventoDetectado.objects.get(pk=response.data["id"])
+        self.assertFalse(evento.snapshot)  # registrado, pero sin foto
+
 
 class ObtenerReglasActivasViewTests(TestCase):
     def setUp(self):
