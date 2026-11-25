@@ -2543,3 +2543,29 @@ class ResumenDatasetIATests(TestCase):
         por_clase = {f["nombre"]: f["n"] for f in r["por_clase"]}
         self.assertEqual(por_clase["Sin casco"], 2)
         self.assertEqual(por_clase["Guarda abierta"], 1)
+
+    def test_construir_zip_tiene_positivos_negativos_y_manifiesto(self):
+        import io
+        import zipfile
+
+        from .dataset_ia import construir_zip_dataset
+
+        self._evento(tipos=[self.guarda])  # positivo
+        self._evento(tipos=[self.guarda])  # positivo
+        self._evento(tipos=[])             # negativo
+        self._evento(tipos=[])             # negativo
+
+        datos, stats = construir_zip_dataset("Guarda", max_negativos=1)
+        self.assertEqual(stats["positivos"], 2)
+        self.assertEqual(stats["negativos"], 1)  # limitado por max_negativos
+
+        nombres = zipfile.ZipFile(io.BytesIO(datos)).namelist()
+        self.assertIn("manifiesto.csv", nombres)
+        self.assertEqual(sum(1 for n in nombres if n.startswith("positivos/")), 2)
+        self.assertEqual(sum(1 for n in nombres if n.startswith("negativos/")), 1)
+
+    def test_construir_zip_clase_inexistente_falla(self):
+        from .dataset_ia import construir_zip_dataset
+
+        with self.assertRaises(ValueError):
+            construir_zip_dataset("Clase que no existe en el catálogo")
