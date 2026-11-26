@@ -24,7 +24,10 @@ INTERVALO_LOG_ERRORES_FRAME_SEGUNDOS = 60
 
 
 class CamaraMonitor:
-    def __init__(self, camara_datos, detector, cliente_api, config, fabrica_grabador=GrabadorEventos):
+    def __init__(
+        self, camara_datos, detector, cliente_api, config, fabrica_grabador=GrabadorEventos,
+        clasificador_guardas=None,
+    ):
         """`camara_datos` es el dict de una cámara tal como lo devuelve
         obtener_reglas_activas(): id, nombre, rtsp_url, snapshot_referencia, zonas[]."""
         self.id = camara_datos["id"]
@@ -39,6 +42,7 @@ class CamaraMonitor:
         self.detector = detector
         self.cliente_api = cliente_api
         self.config = config
+        self.clasificador_guardas = clasificador_guardas  # modo híbrido; None = apagado
         self._tamano_referencia = None  # se resuelve la primera vez que hace falta, después se cachea
         self._ultimo_reporte_por_zona = {}
         self._ultima_revision_periodica = float("-inf")
@@ -244,6 +248,11 @@ class CamaraMonitor:
         if ahora - self._ultima_revision_periodica < intervalo:
             return
         self._ultima_revision_periodica = ahora
+
+        # Modo híbrido: el modelo local mira el frame gratis; si NO ve una
+        # guarda abierta, no se escala a Claude (se ahorra la llamada de IA).
+        if self.clasificador_guardas is not None and not self.clasificador_guardas.posible_guarda_abierta(frame):
+            return
 
         punto = self._centroide_zona(self.zonas[0])
         if punto is None:

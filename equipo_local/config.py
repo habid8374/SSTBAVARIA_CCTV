@@ -63,6 +63,16 @@ class Config:
     # consumo de IA (ConfiguracionIA.tope_usd).
     REVISION_PERIODICA_SEGUNDOS = _entero("REVISION_PERIODICA_SEGUNDOS", 300)
 
+    # Modo híbrido de guardas: un clasificador local (destilado de Claude, ver
+    # entrenamiento/) pre-filtra la revisión periódica. Si el archivo del modelo
+    # existe junto al programa, cada revisión se mira primero con ese modelo
+    # (gratis) y SOLO las que marca como «posible guarda abierta» se mandan a
+    # Claude para confirmar — bajando muchísimo el gasto de API. Si el archivo no
+    # está, el modo híbrido queda apagado y la revisión periódica sigue igual.
+    MODELO_GUARDAS = os.environ.get("MODELO_GUARDAS", str(_CARPETA_EQUIPO_LOCAL / "guardas.pt"))
+    UMBRAL_GUARDAS = _flotante("UMBRAL_GUARDAS", 0.5)  # confianza mínima para escalar a Claude
+    CLASE_GUARDA_ABIERTA = os.environ.get("CLASE_GUARDA_ABIERTA", "positivos")
+
     # Ruta del modelo de ultralytics. Por defecto, una ruta absoluta dentro
     # de esta misma carpeta (equipo_local/yolov8n.pt) — nunca un nombre
     # suelto como "yolov8n.pt": ultralytics resuelve (y descarga, si falta)
