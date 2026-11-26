@@ -11,6 +11,9 @@ decidir si ya se puede entrenar un primer modelo o si falta acumular.
 import csv
 import io
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
+
+from django.db import connection
 
 from .models import EventoDetectado, TipoEventoIA
 
@@ -78,7 +81,25 @@ def slug_clase(texto):
     return limpio.strip("_")[:40] or "clase"
 
 
-def construir_zip_dataset(clase_nombre, max_negativos=None):
+def _bajar_foto(tarea):
+    """Lee la foto de un evento del almacenamiento (R2/S3). Pensada para
+    correr en un hilo del pool; devuelve (etiqueta, evento, bytes|None)."""
+    etiqueta, evento = tarea
+    try:
+        evento.snapshot.open("rb")
+        datos = evento.snapshot.read()
+    except Exception:
+        datos = None
+    finally:
+        try:
+            evento.snapshot.close()
+        except Exception:
+            pass
+        connection.close()  # cada hilo abre su propia conexión: no dejarla colgada
+    return etiqueta, evento, (datos or None)
+
+
+def construir_zip_dataset(clase_nombre, max_negativos=None, progreso=None):
     """Arma en memoria un ZIP con las fotos POSITIVAS de la clase indicada y una
     muestra balanceada de NEGATIVOS (sin novedad), listo para entrenar un
     clasificador "¿<clase>: sí/no?". Estructura:
@@ -86,9 +107,10 @@ def construir_zip_dataset(clase_nombre, max_negativos=None):
         negativos/evento_<id>.jpg
         manifiesto.csv   (evento_id, etiqueta, cámara, timestamp, archivo)
 
-    Devuelve (bytes_del_zip, estadísticas). Cada foto se baja del almacenamiento
-    (R2/S3); una que falle se cuenta como "fallida" y se omite, sin romper la
-    exportación.
+    Las fotos se bajan del almacenamiento EN PARALELO (son cientos; secuencial
+    tardaba minutos). `progreso(hechos, total)` se llama de a ratos para poder
+    mostrar avance. Una foto que falle se cuenta como "fallida" y se omite, sin
+    romper la exportación. Devuelve (bytes_del_zip, estadísticas).
     """
     clase = TipoEventoIA.objects.filter(nombre__icontains=clase_nombre).first()
     if clase is None:
@@ -102,23 +124,18 @@ def construir_zip_dataset(clase_nombre, max_negativos=None):
         etiquetados.filter(tipos_ia__isnull=True).select_related("camara").order_by("?")[:max_negativos]
     )
 
+    tareas = [("positivos", ev) for ev in positivos] + [("negativos", ev) for ev in negativos]
+    total = len(tareas)
     stats = {"clase": clase.nombre, "positivos": 0, "negativos": 0, "fallidos": 0}
     filas = []
     buffer = io.BytesIO()
+    hechos = 0
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for etiqueta, grupo in (("positivos", positivos), ("negativos", negativos)):
-            for evento in grupo:
-                try:
-                    evento.snapshot.open("rb")
-                    datos = evento.snapshot.read()
-                except Exception:
-                    stats["fallidos"] += 1
-                    continue
-                finally:
-                    try:
-                        evento.snapshot.close()
-                    except Exception:
-                        pass
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            for etiqueta, evento, datos in pool.map(_bajar_foto, tareas):
+                hechos += 1
+                if progreso and (hechos % 50 == 0 or hechos == total):
+                    progreso(hechos, total)
                 if not datos:
                     stats["fallidos"] += 1
                     continue
