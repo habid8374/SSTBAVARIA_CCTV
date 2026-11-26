@@ -29,8 +29,13 @@ class Command(BaseCommand):
         parser.add_argument("--salida", default="", help="Ruta local del ZIP. Vacío = subir al almacenamiento.")
 
     def handle(self, *args, **opciones):
+        def progreso(hechos, total):
+            self.stdout.write(f"  Descargando fotos… {hechos}/{total}")
+
         try:
-            datos, stats = construir_zip_dataset(opciones["clase"], opciones["max_negativos"] or None)
+            datos, stats = construir_zip_dataset(
+                opciones["clase"], opciones["max_negativos"] or None, progreso=progreso
+            )
         except ValueError as err:
             raise CommandError(str(err)) from err
 
