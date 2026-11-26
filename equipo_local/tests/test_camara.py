@@ -520,6 +520,43 @@ class RevisionPeriodicaTests(unittest.TestCase):
         monitor._revisar_periodicamente(self.FRAME, ahora=1301)  # pasó el intervalo: repite
         self.assertEqual(mock_thread.call_count, 2)
 
+    @patch("equipo_local.camara.threading.Thread")
+    def test_hibrido_guarda_cerrada_no_escala_a_claude(self, mock_thread):
+        # El modelo local dice que NO hay guarda abierta -> no se gasta Claude.
+        clasificador = MagicMock()
+        clasificador.posible_guarda_abierta.return_value = False
+        monitor = CamaraMonitor(
+            _camara_datos(), detector=MagicMock(), cliente_api=MagicMock(),
+            config=_config(REVISION_PERIODICA_SEGUNDOS=300), clasificador_guardas=clasificador,
+        )
+        monitor._revisar_periodicamente(self.FRAME, ahora=1000)
+        clasificador.posible_guarda_abierta.assert_called_once()
+        mock_thread.assert_not_called()
+
+    @patch("equipo_local.camara.threading.Thread")
+    def test_hibrido_guarda_abierta_si_escala_a_claude(self, mock_thread):
+        # El modelo local ve una posible guarda abierta -> se escala a Claude.
+        clasificador = MagicMock()
+        clasificador.posible_guarda_abierta.return_value = True
+        monitor = CamaraMonitor(
+            _camara_datos(), detector=MagicMock(), cliente_api=MagicMock(),
+            config=_config(REVISION_PERIODICA_SEGUNDOS=300), clasificador_guardas=clasificador,
+        )
+        monitor._revisar_periodicamente(self.FRAME, ahora=1000)
+        self.assertEqual(mock_thread.call_count, 1)
+
+
+class CargarClasificadorGuardasTests(unittest.TestCase):
+    def test_sin_archivo_devuelve_none(self):
+        from equipo_local.clasificador_guardas import cargar_si_existe
+
+        self.assertIsNone(cargar_si_existe("/ruta/que/no/existe/guardas.pt"))
+
+    def test_ruta_vacia_devuelve_none(self):
+        from equipo_local.clasificador_guardas import cargar_si_existe
+
+        self.assertIsNone(cargar_si_existe(""))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -86,12 +86,16 @@ class SincronizadorCamaras:
     default) se comporta como antes: las zonas vienen tal cual del backend
     — así los tests que no les interesa esta parte no se ven afectados."""
 
-    def __init__(self, cliente_api, detector, config, fabrica_monitor=CamaraMonitor, almacenamiento=None):
+    def __init__(
+        self, cliente_api, detector, config, fabrica_monitor=CamaraMonitor, almacenamiento=None,
+        clasificador_guardas=None,
+    ):
         self.cliente_api = cliente_api
         self.detector = detector
         self.config = config
         self._fabrica_monitor = fabrica_monitor
         self.almacenamiento = almacenamiento
+        self.clasificador_guardas = clasificador_guardas
         self.monitores = {}
 
     def sincronizar(self):
@@ -119,7 +123,10 @@ class SincronizadorCamaras:
                 self.monitores[camara_id].actualizar(camara_datos)
             else:
                 logger.info("Nueva cámara activa: %s (id=%s)", camara_datos.get("nombre"), camara_id)
-                monitor = self._fabrica_monitor(camara_datos, self.detector, self.cliente_api, self.config)
+                monitor = self._fabrica_monitor(
+                    camara_datos, self.detector, self.cliente_api, self.config,
+                    clasificador_guardas=self.clasificador_guardas,
+                )
                 monitor.iniciar()
                 self.monitores[camara_id] = monitor
 
@@ -137,12 +144,18 @@ def main():
         logger.error(str(err))
         sys.exit(1)
 
+    from .clasificador_guardas import cargar_si_existe  # import perezoso (usa ultralytics)
     from .deteccion import DetectorPersonas  # import perezoso: acá sí hace falta el modelo real
 
     cliente_api = ClienteApi(Config.API_BASE_URL, Config.API_KEY, Config.TIMEOUT_HTTP_SEGUNDOS)
     detector = DetectorPersonas(Config.MODELO_YOLO, Config.CONFIANZA_MINIMA)
+    clasificador_guardas = cargar_si_existe(
+        Config.MODELO_GUARDAS, Config.UMBRAL_GUARDAS, Config.CLASE_GUARDA_ABIERTA
+    )
     almacenamiento = AlmacenamientoLocal(Config.ALMACENAMIENTO_LOCAL_DB)
-    sincronizador = SincronizadorCamaras(cliente_api, detector, Config, almacenamiento=almacenamiento)
+    sincronizador = SincronizadorCamaras(
+        cliente_api, detector, Config, almacenamiento=almacenamiento, clasificador_guardas=clasificador_guardas
+    )
 
     anuncio_mdns = None
     if Config.VISOR_WEB_ACTIVO:
