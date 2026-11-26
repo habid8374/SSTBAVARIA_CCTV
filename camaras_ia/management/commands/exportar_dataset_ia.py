@@ -31,6 +31,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opciones):
         def progreso(hechos, total):
             self.stdout.write(f"  Descargando fotos… {hechos}/{total}")
+            self.stdout.flush()  # la terminal de Coolify bufferea: forzar que se vea en vivo
 
         try:
             datos, stats = construir_zip_dataset(
